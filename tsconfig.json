@@ -8,18 +8,60 @@
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
     "jsx": "react-jsx",
     "incremental": true,
+    "baseUrl": "./",
     "plugins": [
       {
         "name": "next"
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+            "@components":[
+        "src/shared/components/index"
+      ],
+      "@types":[
+        "src/shared/types/index"
+      ],
+      "@model":[
+        "src/shared/model/index"
+      ],
+      "@services":[
+        "src/shared/services/index"
+      ],
+      "@generated":[
+        "src/shared/generated/graphql-schema.tsx"
+      ],
+      "@constants":[
+        "src/shared/constants/index"
+      ],
+      "@schemas":[
+        "src/shared/schemas/index"
+      ],
+      "@contexts":[
+        "src/shared/contexts/index"
+      ],
+      "@atoms":[
+        "src/shared/components/atoms/index"
+      ],
+      "@molecules":[
+        "src/shared/components/molecules/index"
+      ],
+      "@organisms":[
+        "src/shared/components/organisms/index"
+      ],
+      "@templates":[
+        "src/shared/components/templates/index"
+      ],
+      "@hooks":[
+        "src/shared/hooks/index"
+      ]
     }
   },
   "include": [
