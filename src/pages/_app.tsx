@@ -1,4 +1,5 @@
 import type { AppProps } from 'next/app'
+import Head from 'next/head'
 import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
 import AuthProvider from '@/shared/contexts/auth.provider'
 import { ApolloClient, HttpLink, InMemoryCache } from '@apollo/client';
@@ -12,6 +13,9 @@ export default function App({ Component, pageProps }: AppProps) {
   });
 
   return <ChakraProvider value={defaultSystem}>
+      <Head>
+        <link rel="icon" href="/favicon.png" type="image/png" />
+      </Head>
       <ApolloProvider client={client}>
         <AuthProvider>
           <Component {...pageProps} />
