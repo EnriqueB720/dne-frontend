@@ -1,0 +1,24 @@
+mutation Signup($data: SignupInput!) {
+  signup(data: $data) {
+    userId
+    email
+    country
+    subscription {
+      subscriptionId
+      userId
+      plan {
+        planId
+        planName
+        price
+        features
+      }
+      startDate
+      endDate
+      status
+    }
+    supplier {
+      supplierId
+      companyName
+    }
+  }
+}
