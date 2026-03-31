@@ -28,4 +28,4 @@ const QRCode = Object.assign(MemoQRCodeRoot, {
   Frame:   MemoQRCodeFrame,
 });
 
-export { QRCode };
+export default QRCode;

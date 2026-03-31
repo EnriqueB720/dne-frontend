@@ -1,12 +1,12 @@
 import * as React from 'react';
 import _ from 'lodash';
-import { Text } from '@chakra-ui/react';
+import { Text as CKText } from '@chakra-ui/react';
 import { TextProps } from '@types';
 
-const TextComponent: React.FC<TextProps> = ({ children, ...props }) => (
-  <Text {...props}>
+const Text: React.FC<TextProps> = ({ children, ...props }) => (
+  <CKText {...props}>
     {children}
-  </Text>
+  </CKText>
 );
 
-export default React.memo(TextComponent, (prev, next) => _.isEqual(prev, next));
+export default React.memo(Text, (prev, next) => _.isEqual(prev, next));

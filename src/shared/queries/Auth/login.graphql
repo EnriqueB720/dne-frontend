@@ -1,11 +1,30 @@
-query login($data: LoginUserInput!){#TODO change the login query to return all the values possible/needed
-  login(data: $data){
-    access_token,
-    expiresAt,
-    user{
+query login($data: LoginUserInput!) {
+  login(data: $data) {
+    access_token
+    expiresAt
+    user {
       userId
       email
       language
+      country
+      name
+      phone
+      role
+      profilePicture
+      subscription {
+        subscriptionId
+        plan {
+          planId
+          planName
+          price
+        }
+        startDate
+        endDate
+      }
+      supplier {
+        supplierId
+        companyName
+      }
     }
   }
 }

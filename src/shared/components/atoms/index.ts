@@ -1,4 +1,7 @@
+import Avatar from './avatar/avatar.component';
+import Badge from './badge/badge.component';
 import Box from './box/box.component';
+import Button from './button/button.component';
 import Combobox from './comboBox/comboBox.components';
 import Flex from './flex/flex.component';
 import Icon from './icon/icon.component';
@@ -14,7 +17,10 @@ import Text from './text/text.component';
 import Textarea from './textArea/textArea.component';
 
 export {
+  Avatar,
+  Badge,
   Box,
+  Button,
   Combobox,
   Flex,
   Icon,
