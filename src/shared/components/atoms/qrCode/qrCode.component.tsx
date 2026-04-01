@@ -1,31 +1,16 @@
 import * as React from 'react';
 import _ from 'lodash';
 import { QrCode as CKQRCode } from '@chakra-ui/react';
-import { QRCodeRootProps, QRCodePatternProps, QRCodeFrameProps } from '@types';
+import { QRCodeProps } from '@types';
 
-const QRCodeRoot: React.FC<QRCodeRootProps> = ({ children, ...props }) => (
+const QRCodeBase: React.FC<QRCodeProps> = ({ ...props }) => (
   <CKQRCode.Root {...props}>
-    {children}
+    <CKQRCode.Frame>
+      <CKQRCode.Pattern />
+    </CKQRCode.Frame>
   </CKQRCode.Root>
 );
 
-const QRCodePattern: React.FC<QRCodePatternProps> = ({ children, ...props }) => (
-  <CKQRCode.Pattern {...props}>
-    {children}
-  </CKQRCode.Pattern>
-);
-
-const QRCodeFrame: React.FC<QRCodeFrameProps> = ({ ...props }) => (
-  <CKQRCode.Frame {...props} />
-);
-
-const MemoQRCodeRoot    = React.memo(QRCodeRoot,    (prev, next) => _.isEqual(prev, next));
-const MemoQRCodePattern = React.memo(QRCodePattern, (prev, next) => _.isEqual(prev, next));
-const MemoQRCodeFrame   = React.memo(QRCodeFrame,   (prev, next) => _.isEqual(prev, next));
-
-const QRCode = Object.assign(MemoQRCodeRoot, {
-  Pattern: MemoQRCodePattern,
-  Frame:   MemoQRCodeFrame,
-});
+const QRCode = React.memo(QRCodeBase, (prev, next) => _.isEqual(prev, next));
 
 export default QRCode;

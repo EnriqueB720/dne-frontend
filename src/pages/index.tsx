@@ -6,7 +6,7 @@ const frameworks = [
   { label: 'Angular', value: 'angular' },
 ];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+
 export default function Home(prop: any) {
 
   return (
@@ -22,10 +22,7 @@ export default function Home(prop: any) {
      <Badge>a</Badge>
      <br />
      Avatar - Lebron
-     <Avatar size="xl">
-      <Avatar.Fallback />
-      <Avatar.Image src="https://media.tenor.com/IuUdckvjNT4AAAAM/i%27ve-played-these-games-before--gin-hun.gif" />
-     </Avatar>
+     <Avatar size="xl" src="https://media.tenor.com/IuUdckvjNT4AAAAM/i%27ve-played-these-games-before--gin-hun.gif" name="Lebron" />
      <br />
      Button
       <Button
@@ -38,29 +35,13 @@ export default function Home(prop: any) {
       </Button>
       <br />
       Combobox
-      <Combobox items={frameworks}>
-        <Combobox.Label>Pick a framework</Combobox.Label>
-        <Combobox.Control>
-          <Combobox.Input placeholder="Search..." />
-          <Combobox.IndicatorGroup>
-            <Combobox.ClearTrigger>Clear</Combobox.ClearTrigger>
-            <Combobox.Trigger>▼</Combobox.Trigger>
-          </Combobox.IndicatorGroup>
-        </Combobox.Control>
-        <Combobox.Positioner>
-          <Combobox.Content>
-            <Combobox.Empty>No results found</Combobox.Empty>
-            <Combobox.ItemGroup>
-              <Combobox.ItemGroupLabel>Frameworks</Combobox.ItemGroupLabel>
-              {frameworks.map((fw) => (
-                <Combobox.Item key={fw.value} item={fw}>
-                  {fw.label}
-                </Combobox.Item>
-              ))}
-            </Combobox.ItemGroup>
-          </Combobox.Content>
-        </Combobox.Positioner>
-      </Combobox>
+      <Combobox
+        items={frameworks}
+        label="Pick a framework"
+        placeholder="Search..."
+        emptyText="No results found"
+        groupLabel="Frameworks"
+      />
       <br />
       Flex
       <Flex gap={4} align="center" justify="space-between" bg="gray.100" p={4}>
@@ -111,11 +92,7 @@ export default function Home(prop: any) {
       />
       <br />
       QRCode
-      <QRCode value="https://vergemagazine.co.uk/wp-content/uploads/2025/10/Screenshot-2025-10-09-235055-e1760050295687.jpg" size="md">
-        <QRCode.Frame>
-          <QRCode.Pattern />
-        </QRCode.Frame>
-      </QRCode>
+      <QRCode value="https://vergemagazine.co.uk/wp-content/uploads/2025/10/Screenshot-2025-10-09-235055-e1760050295687.jpg" size="md" />
       <br />
       Skeleton
       <Skeleton height="20px" width="200px" />
