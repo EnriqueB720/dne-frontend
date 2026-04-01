@@ -1,5 +1,5 @@
-query login($data: LoginUserInput!) {
-  login(data: $data) {
+query refreshUser($data: String!) {
+  refreshUser(data: $data) {
     access_token
     expiresAt
    user {
