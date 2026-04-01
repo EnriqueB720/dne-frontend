@@ -310,7 +310,7 @@ export type User = {
   language: Language;
   name: Scalars['String']['output'];
   phone: Scalars['String']['output'];
-  profilePicture: Scalars['String']['output'];
+  profilePicture?: Maybe<Scalars['String']['output']>;
   role: Role;
   subscription?: Maybe<Array<Subscription>>;
   supplier?: Maybe<Array<Supplier>>;
@@ -339,14 +339,14 @@ export type LoginQueryVariables = Exact<{
 }>;
 
 
-export type LoginQuery = { __typename?: 'Query', login: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, email: string, language: Language, country: string, name: string, phone: string, role: Role, profilePicture: string, subscription?: Array<{ __typename?: 'Subscription', subscriptionId: number, startDate: any, endDate: any, plan?: { __typename?: 'Pricing', planId: number, planName: string, price: string } | null }> | null, supplier?: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string }> | null } } };
+export type LoginQuery = { __typename?: 'Query', login: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, email: string, language: Language, country: string, name: string, phone: string, role: Role, profilePicture?: string | null, subscription?: Array<{ __typename?: 'Subscription', subscriptionId: number, status: string, startDate: any, endDate: any, plan?: { __typename?: 'Pricing', planId: number, planName: string, price: string } | null }> | null, supplier?: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, posts?: Array<{ __typename?: 'Post', postId: number, title: string, description: string, price: string, media_url: string, createdAt: any, category: { __typename?: 'Category', categoryId: number, categoryName: string } }> | null }> | null } } };
 
 export type RefreshUserQueryVariables = Exact<{
   data: Scalars['String']['input'];
 }>;
 
 
-export type RefreshUserQuery = { __typename?: 'Query', refreshUser: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, email: string, language: Language, country: string, name: string, phone: string, role: Role, profilePicture: string, subscription?: Array<{ __typename?: 'Subscription', subscriptionId: number, startDate: any, endDate: any, plan?: { __typename?: 'Pricing', planId: number, planName: string, price: string } | null }> | null, supplier?: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string }> | null } } };
+export type RefreshUserQuery = { __typename?: 'Query', refreshUser: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, email: string, language: Language, country: string, name: string, phone: string, role: Role, profilePicture?: string | null, subscription?: Array<{ __typename?: 'Subscription', subscriptionId: number, status: string, startDate: any, endDate: any, plan?: { __typename?: 'Pricing', planId: number, planName: string, price: string } | null }> | null, supplier?: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, posts?: Array<{ __typename?: 'Post', postId: number, title: string, description: string, price: string, media_url: string, createdAt: any, category: { __typename?: 'Category', categoryId: number, categoryName: string } }> | null }> | null } } };
 
 export type SignupMutationVariables = Exact<{
   data: SignUpInput;
@@ -377,12 +377,25 @@ export const LoginDocument = gql`
           planName
           price
         }
+        status
         startDate
         endDate
       }
       supplier {
         supplierId
         companyName
+        posts {
+          postId
+          title
+          description
+          price
+          media_url
+          createdAt
+          category {
+            categoryId
+            categoryName
+          }
+        }
       }
     }
   }
@@ -445,12 +458,25 @@ export const RefreshUserDocument = gql`
           planName
           price
         }
+        status
         startDate
         endDate
       }
       supplier {
         supplierId
         companyName
+        posts {
+          postId
+          title
+          description
+          price
+          media_url
+          createdAt
+          category {
+            categoryId
+            categoryName
+          }
+        }
       }
     }
   }
