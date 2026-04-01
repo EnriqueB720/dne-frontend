@@ -40,7 +40,6 @@ export default function Home(prop: any) {
         label="Pick a framework"
         placeholder="Search..."
         emptyText="No results found"
-        groupLabel="Frameworks"
       />
       <br />
       Flex
