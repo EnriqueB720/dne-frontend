@@ -18,6 +18,12 @@ import {
   Textarea,
 } from '@atoms';
 
+import {
+  PasswordInput,
+  Field,
+  Form,
+} from '@molecules';
+
 export {
   Avatar,
   Badge,
@@ -25,10 +31,13 @@ export {
   Button,
   Combobox,
   Flex,
+  Field,
+  Form,
   Icon,
   IconButton,
   Image,
   Input,
+  PasswordInput,
   QRCode,
   Skeleton,
   SkeletonCircle,

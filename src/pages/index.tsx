@@ -1,10 +1,37 @@
-import { Box, Badge, Avatar, Button, Combobox, Flex, Icon, IconButton, Image, Input, QRCode, Skeleton, SkeletonCircle, SkeletonText, Stack, Text, Textarea } from "@components";
+import { Box, Badge, Avatar, Button, Combobox, Flex, Form, Icon, IconButton, Image, Input, QRCode, Skeleton, SkeletonCircle, SkeletonText, Stack, Text, Textarea } from "@components";
+import * as yup from "yup";
 
 const frameworks = [
   { label: 'React',   value: 'react' },
   { label: 'Vue',     value: 'vue' },
   { label: 'Angular', value: 'angular' },
 ];
+//Test Fields
+const formFields = [
+  { label: 'Name', name: 'name', inputPlaceholder: 'Enter your name', isRequired: true },
+  { label: 'Email', name: 'email', inputPlaceholder: 'Enter your email', isRequired: true },
+  { label: 'Password', name: 'password', inputPlaceholder: 'Enter your password', isRequired: true, isPassword: true },
+  { label: 'Phone', name: 'phone', fieldType: 'phone' as const, inputPlaceholder: 'Enter your phone', isRequired: true, countryFieldName: 'phoneCountry' },
+  { label: 'Framework', name: 'framework', fieldType: 'combobox' as const, comboboxItems: frameworks, comboboxPlaceholder: 'Pick a framework', comboboxEmptyText: 'No frameworks found' },
+];
+//Test yup validation schema and initial values for the form
+const formValidationSchema = yup.object().shape({
+  name: yup.string().required('Name is required'),
+  email: yup.string().email('Invalid email').required('Email is required'),
+  password: yup.string().min(6, 'Min 6 characters').required('* Password is required'),
+  phone: yup.string().required('Phone is required'),
+  phoneCountry: yup.string(),
+  framework: yup.string(),
+});
+//test form initial values
+const formInitialValues = {
+  name: '',
+  email: '',
+  password: '',
+  phone: '',
+  phoneCountry: '',
+  framework: '',
+};
 
 
 export default function Home(prop: any) {
@@ -12,6 +39,19 @@ export default function Home(prop: any) {
   return (
     <>
      <p>Index page</p>
+     <br />
+     Form
+     <Box maxW="500px" p={4}>
+       <Form
+         fields={formFields}
+         validationSchema={formValidationSchema}
+         formValues={formInitialValues}
+         isLoading={false}
+         submitButtonText="Register"
+         groupings={[2, 1, 1, 1]}
+         onSubmit={(values) => console.log('Form submitted:', values)}
+       />
+     </Box>
      <br />
      Box
      <Box bg="black" color="white" p={4} borderRadius="md">
