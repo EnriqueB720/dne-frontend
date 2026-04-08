@@ -4,7 +4,7 @@ import _ from 'lodash';
 
 import { FieldProps } from '@types';
 import { Field as ChakraField, FieldLabel, FieldErrorText } from '@chakra-ui/react';
-import { Input, PasswordInput, Combobox } from '@components';
+import { Input, PasswordInput, Combobox, Textarea } from '@components';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 
@@ -73,6 +73,15 @@ const Field: React.FC<FieldProps> = ({
             items={comboboxItems || []}
             placeholder={comboboxPlaceholder}
             emptyText={comboboxEmptyText}
+          />
+        );
+      case 'textarea':
+        return (
+          <Textarea
+            onChange={onChange}
+            name={name}
+            placeholder={inputPlaceholder}
+            value={inputValue}
           />
         );
     }

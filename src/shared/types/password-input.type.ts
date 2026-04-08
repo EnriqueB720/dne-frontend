@@ -1,3 +1,3 @@
-import { PasswordInputProps as PasswordInputProperties } from "@/components/ui/password-input"
+import { PasswordInputProps as PasswordInputProperties } from "@/shared/components/atoms/chakraPasswordInput/password-input.component"
 
 export interface PasswordInputProps extends PasswordInputProperties {}

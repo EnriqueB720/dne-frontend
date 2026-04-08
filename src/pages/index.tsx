@@ -1,3 +1,4 @@
+import { FieldProps } from "@types";
 import { Box, Badge, Avatar, Button, Combobox, Flex, Form, Icon, IconButton, Image, Input, QRCode, Skeleton, SkeletonCircle, SkeletonText, Stack, Text, Textarea } from "@components";
 import * as yup from "yup";
 
@@ -7,12 +8,13 @@ const frameworks = [
   { label: 'Angular', value: 'angular' },
 ];
 //Test Fields
-const formFields = [
+const formFields: FieldProps[] = [
   { label: 'Name', name: 'name', inputPlaceholder: 'Enter your name', isRequired: true },
   { label: 'Email', name: 'email', inputPlaceholder: 'Enter your email', isRequired: true },
   { label: 'Password', name: 'password', inputPlaceholder: 'Enter your password', isRequired: true, isPassword: true },
-  { label: 'Phone', name: 'phone', fieldType: 'phone' as const, inputPlaceholder: 'Enter your phone', isRequired: true, countryFieldName: 'phoneCountry' },
-  { label: 'Framework', name: 'framework', fieldType: 'combobox' as const, comboboxItems: frameworks, comboboxPlaceholder: 'Pick a framework', comboboxEmptyText: 'No frameworks found' },
+  { label: 'Phone', name: 'phone', fieldType: 'phone', inputPlaceholder: 'Enter your phone', isRequired: true, countryFieldName: 'phoneCountry' },
+  { label: 'Framework', name: 'framework', fieldType: "combobox", comboboxItems: frameworks, comboboxPlaceholder: 'Pick a framework', comboboxEmptyText: 'No frameworks found',},
+  { label: 'Description', name: 'description', fieldType: "textarea", inputPlaceholder: 'Enter a description', isRequired: true },
 ];
 //Test yup validation schema and initial values for the form
 const formValidationSchema = yup.object().shape({
@@ -20,6 +22,7 @@ const formValidationSchema = yup.object().shape({
   email: yup.string().email('Invalid email').required('Email is required'),
   password: yup.string().min(6, 'Min 6 characters').required('* Password is required'),
   phone: yup.string().required('Phone is required'),
+  description: yup.string().required('Description is required'),
   phoneCountry: yup.string(),
   framework: yup.string(),
 });
@@ -48,7 +51,7 @@ export default function Home(prop: any) {
          formValues={formInitialValues}
          isLoading={false}
          submitButtonText="Register"
-         groupings={[2, 1, 1, 1]}
+         groupings={[2, 1, 1, 1 , 1]}
          onSubmit={(values) => console.log('Form submitted:', values)}
        />
      </Box>

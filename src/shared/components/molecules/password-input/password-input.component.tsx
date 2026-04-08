@@ -2,7 +2,7 @@ import * as React from 'react';
 
 import _ from 'lodash';
 
-import { PasswordInput as CKPasswordInput } from "@/components/ui/password-input"
+import { CKPasswordInput } from "@components";
 
 import { PasswordInputProps } from '@types';
 
