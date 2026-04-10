@@ -47,7 +47,6 @@ const Field: React.FC<FieldProps> = ({
               onChange={onChange}
               name={name}
               placeholder={inputPlaceholder}
-              value={inputValue}
             />
         );
       case 'phone':
@@ -73,6 +72,12 @@ const Field: React.FC<FieldProps> = ({
             items={comboboxItems || []}
             placeholder={comboboxPlaceholder}
             emptyText={comboboxEmptyText}
+            value={inputValue ? [inputValue] : []}
+            onValueChange={(details) => {
+              if (setFieldValue) {
+                setFieldValue(name, details.value[0] || '');
+              }
+            }}
           />
         );
       case 'textarea':

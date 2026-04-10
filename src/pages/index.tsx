@@ -28,12 +28,13 @@ const formValidationSchema = yup.object().shape({
 });
 //test form initial values
 const formInitialValues = {
-  name: '',
-  email: '',
-  password: '',
-  phone: '',
+  name: 'Test',
+  email: 'test@email.com',
+  password: 'secret123',
+  phone: '50660022709',
   phoneCountry: '',
-  framework: '',
+  framework: 'react',
+  description: 'A test description',
 };
 
 
