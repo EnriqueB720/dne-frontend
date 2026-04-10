@@ -18,7 +18,14 @@ import {
   Textarea,
 } from '@atoms';
 
+import {
+  Footer,
+  NavBar,
+} from '@molecules';
+
 export {
+  Footer,
+  NavBar,
   Avatar,
   Badge,
   Box,

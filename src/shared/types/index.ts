@@ -25,3 +25,5 @@ export * from './skeletonText.type';
 export * from './stack.type';
 export * from './text.type';
 export * from './textarea.type';
+export * from './footer.type';
+export * from './navBar.type';

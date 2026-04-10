@@ -1,4 +1,4 @@
-import { Box, Badge, Avatar, Button, Combobox, Flex, Icon, IconButton, Image, Input, QRCode, Skeleton, SkeletonCircle, SkeletonText, Stack, Text, Textarea } from "@components";
+import { Box, Badge, Avatar, Button, Combobox, Flex, Icon, IconButton, Image, Input, QRCode, Skeleton, SkeletonCircle, SkeletonText, Stack, Text, Textarea, NavBar, Footer } from "@components";
 
 const frameworks = [
   { label: 'React',   value: 'react' },
@@ -11,6 +11,7 @@ export default function Home(prop: any) {
 
   return (
     <>
+     <NavBar />
      <p>Index page</p>
      <br />
      Box
@@ -122,6 +123,15 @@ export default function Home(prop: any) {
         onChange={(e) => console.log('Textarea value:', e.target.value)}
       />
       <br />
+      NavBar (Logged In)
+      <NavBar isLoggedIn={true} onLogout={() => console.log('Logout clicked!')} />
+      <br />
+      <Footer
+        links={[
+          { label: 'About Us', href: '/about' },
+          { label: 'Contact', href: '/contact' },
+        ]}
+      />
     </>
   )
 }
