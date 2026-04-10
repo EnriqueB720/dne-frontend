@@ -4,7 +4,7 @@ import _ from 'lodash';
 
 import { FieldProps } from '@types';
 import { Field as ChakraField, FieldLabel, FieldErrorText } from '@chakra-ui/react';
-import { Input, PasswordInput, Combobox, Textarea } from '@components';
+import { Input, PasswordInput, Combobox, Textarea, FileUpload } from '@components';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 
@@ -89,6 +89,17 @@ const Field: React.FC<FieldProps> = ({
             value={inputValue}
           />
         );
+      case 'fileUpload':
+        return (
+          <FileUpload
+            placeholder={inputPlaceholder}
+            onFileChange={(file) => {
+              if (setFieldValue) {
+                setFieldValue(name, file);
+              }
+            }}
+          />
+        );
     }
   }
 
@@ -109,6 +120,8 @@ const Field: React.FC<FieldProps> = ({
 
 }
 
+const functionKeys: (keyof FieldProps)[] = ['onChange', 'onBlur', 'setFieldValue'];
+
 export default React.memo(Field, (prevProps, nextProps) => {
-  return _.isEqual(prevProps, nextProps);
+  return _.isEqual(_.omit(prevProps, functionKeys), _.omit(nextProps, functionKeys));
 });

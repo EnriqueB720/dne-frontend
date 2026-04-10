@@ -1,7 +1,7 @@
 import { ChangeEvent } from "react";
 import { ComboboxItem } from "./comboBox.type";
 
-export type FieldType = 'field' | 'phone' | 'combobox' | 'textarea';
+export type FieldType = 'field' | 'phone' | 'combobox' | 'textarea' | 'fileUpload';
 
 export interface FieldProps {
   label: string;
