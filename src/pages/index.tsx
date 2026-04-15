@@ -26,6 +26,15 @@ const formValidationSchema = yup.object().shape({
   description: yup.string().required('Description is required'),
   phoneCountry: yup.string(),
   framework: yup.string(),
+  profilePicture: yup.mixed()
+    .required("File is required or too large (max 1MB)")
+    .test(
+      "fileSize",
+      "File is too large (max 1MB)",
+      (value) => {
+        if (!value) return true; // handled by required
+        return (value as File).size <= (1024 * 1024); //1MB
+      },)
 });
 //test form initial values
 const formInitialValues = {
