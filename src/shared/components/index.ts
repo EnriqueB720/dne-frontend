@@ -4,11 +4,13 @@ import {
   Box,
   Button,
   Combobox,
+  FileUpload,
   Flex,
   Icon,
   IconButton,
   Image,
   Input,
+  CKPasswordInput,
   QRCode,
   Skeleton,
   SkeletonCircle,
@@ -18,17 +20,28 @@ import {
   Textarea,
 } from '@atoms';
 
+import {
+  PasswordInput,
+  Field,
+  Form,
+} from '@molecules';
+
 export {
   Avatar,
   Badge,
   Box,
   Button,
   Combobox,
+  CKPasswordInput,
+  FileUpload,
   Flex,
+  Field,
+  Form,
   Icon,
   IconButton,
   Image,
   Input,
+  PasswordInput,
   QRCode,
   Skeleton,
   SkeletonCircle,
