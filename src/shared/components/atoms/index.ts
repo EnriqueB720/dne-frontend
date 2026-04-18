@@ -15,6 +15,8 @@ import SkeletonText from './skeletonText/skeletonText.component';
 import Stack from './stack/stack.component';
 import Text from './text/text.component';
 import Textarea from './textArea/textArea.component';
+import FileUpload from './fileUpload/fileUpload.component';
+import {PasswordInput} from './chakraPasswordInput/password-input.component';
 
 export {
   Avatar,
@@ -22,11 +24,13 @@ export {
   Box,
   Button,
   Combobox,
+  FileUpload,
   Flex,
   Icon,
   IconButton,
   Image,
   Input,
+  PasswordInput as CKPasswordInput,
   QRCode,
   Skeleton,
   SkeletonCircle,

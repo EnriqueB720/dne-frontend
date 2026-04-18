@@ -27,3 +27,8 @@ export * from './text.type';
 export * from './textarea.type';
 export * from './footer.type';
 export * from './navBar.type';
+export * from './textArea.type';
+export * from './field.type';
+export * from './form.type';
+export * from './password-input.type'
+export * from './fileUpload.type'
