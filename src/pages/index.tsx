@@ -1,11 +1,11 @@
 import { FieldProps } from "@types";
-import { Box, Badge, Avatar, Button, Combobox, Flex, Form, Icon, IconButton, Image, Input, QRCode, Skeleton, SkeletonCircle, SkeletonText, Stack, Text, Textarea } from "@components";
+import { Box, Badge, Avatar, Button, Combobox, Flex, Form, Icon, IconButton, Image, Input, QRCode, Skeleton, SkeletonCircle, SkeletonText, Stack, Text, Textarea, NavBar, Footer } from "@components";
 import * as yup from "yup";
 
 const frameworks = [
-  { label: 'React',   value: 'react' },
-  { label: 'Vue',     value: 'vue' },
-  { label: 'Angular', value: 'angular' },
+  { label: "React", value: "react" },
+  { label: "Vue", value: "vue" },
+  { label: "Angular", value: "angular" },
 ];
 //Test Fields
 const formFields: FieldProps[] = [
@@ -47,11 +47,42 @@ const formInitialValues = {
   description: 'A test description',
 };
 
-
 export default function Home(prop: any) {
-
   return (
     <>
+      <NavBar
+        loggedOutLinks={[
+          { label: "Home", href: "/" },
+          { label: "Supplier Login", href: "/supplierLogin" },
+          { label: "Pricing", href: "/pricing" },
+        ]}
+        rightLinks={[
+          { label: "About", href: "/help" },
+          { label: "Contact Us", href: "/contact" },
+          { label: "Extra Prop link", href: "/extra" },
+        ]}
+        containerProps={{ bg: "gray.900", padding: "20px 40px" }}
+        linkTextProps={{ color: "white", fontSize: "md", fontWeight: "bold" }}
+        logoHeight="50px"
+      />
+      <p>Index page</p>
+      <br />
+      Box
+      <Box bg="black" color="white" p={4} borderRadius="md">
+        pichita
+      </Box>
+      <br />
+      Badge
+      <Badge>a</Badge>
+      <br />
+      Avatar - Lebron
+      <Avatar
+        size="xl"
+        src="https://media.tenor.com/IuUdckvjNT4AAAAM/i%27ve-played-these-games-before--gin-hun.gif"
+        name="Lebron"
+      />
+      <br />
+      Button
      <p>Index page</p>
      <br />
      Form
@@ -83,7 +114,7 @@ export default function Home(prop: any) {
         colorPalette="blue"
         size="md"
         variant="solid"
-        onClick={() => console.log('Button clicked!')}
+        onClick={() => console.log("Button clicked!")}
       >
         Click me - check console
       </Button>
@@ -98,9 +129,15 @@ export default function Home(prop: any) {
       <br />
       Flex
       <Flex gap={4} align="center" justify="space-between" bg="gray.100" p={4}>
-        <Box bg="red.300" p={2}>Item 1</Box>
-        <Box bg="blue.300" p={2}>Item 2</Box>
-        <Box bg="green.300" p={2}>Item 3</Box>
+        <Box bg="red.300" p={2}>
+          Item 1
+        </Box>
+        <Box bg="blue.300" p={2}>
+          Item 2
+        </Box>
+        <Box bg="green.300" p={2}>
+          Item 3
+        </Box>
       </Flex>
       <br />
       Icon
@@ -116,14 +153,14 @@ export default function Home(prop: any) {
           aria-label="Show password"
           variant="ghost"
           size="md"
-          onClick={() => console.log('visibilityOn clicked!')}
+          onClick={() => console.log("visibilityOn clicked!")}
         />
         <IconButton
           icon="visibilityOff"
           aria-label="Hide password"
           variant="ghost"
           size="md"
-          onClick={() => console.log('visibilityOff clicked!')}
+          onClick={() => console.log("visibilityOff clicked!")}
         />
       </Flex>
       <br />
@@ -141,11 +178,14 @@ export default function Home(prop: any) {
         placeholder="Type something..."
         size="md"
         variant="outline"
-        onChange={(e) => console.log('Input value:', e.target.value)}
+        onChange={(e) => console.log("Input value:", e.target.value)}
       />
       <br />
       QRCode
-      <QRCode value="https://vergemagazine.co.uk/wp-content/uploads/2025/10/Screenshot-2025-10-09-235055-e1760050295687.jpg" size="md" />
+      <QRCode
+        value="https://vergemagazine.co.uk/wp-content/uploads/2025/10/Screenshot-2025-10-09-235055-e1760050295687.jpg"
+        size="md"
+      />
       <br />
       Skeleton
       <Skeleton height="20px" width="200px" />
@@ -158,14 +198,24 @@ export default function Home(prop: any) {
       <br />
       Stack
       <Stack gap={4} bg="gray.100" p={4}>
-        <Box bg="red.300" p={2}>Stack Item 1</Box>
-        <Box bg="blue.300" p={2}>Stack Item 2</Box>
-        <Box bg="green.300" p={2}>Stack Item 3</Box>
+        <Box bg="red.300" p={2}>
+          Stack Item 1
+        </Box>
+        <Box bg="blue.300" p={2}>
+          Stack Item 2
+        </Box>
+        <Box bg="green.300" p={2}>
+          Stack Item 3
+        </Box>
       </Stack>
       <br />
       Text
-      <Text fontSize="xl" fontWeight="bold" color="blue.500">Hello world</Text>
-      <Text fontSize="sm" color="gray.500">Smaller subtle text</Text>
+      <Text fontSize="xl" fontWeight="bold" color="blue.500">
+        Hello world
+      </Text>
+      <Text fontSize="sm" color="gray.500">
+        Smaller subtle text
+      </Text>
       <br />
       Text Area
       <Textarea
@@ -173,9 +223,40 @@ export default function Home(prop: any) {
         size="md"
         variant="outline"
         rows={4}
-        onChange={(e) => console.log('Textarea value:', e.target.value)}
+        onChange={(e) => console.log("Textarea value:", e.target.value)}
       />
       <br />
+      NavBar (Logged In) NavBar (Custom - Logged In)
+      <NavBar
+        isLoggedIn={true}
+        onLogout={() => console.log("Logout clicked!")}
+        loggedInLinks={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "My Orders", href: "/orders" },
+          { label: "Settings", href: "/settings" },
+        ]}
+        rightLinks={[{ label: "Help Center", href: "/help" }]}
+        containerProps={{ bg: "blue.600", padding: "16px 32px" }}
+        linkTextProps={{ color: "white", fontSize: "sm" }}
+      />
+      <br />
+      <Footer
+        copyrightText="© 2026 D&E Inc. All rights reserved."
+        links={[
+          { label: "Privacy Policy", href: "/privacy" },
+          { label: "Terms of Service", href: "/terms" },
+          { label: "About Us", href: "/about" },
+        ]}
+        containerProps={{
+          bg: "gray.100",
+          borderTop: "1px solid",
+          borderColor: "gray.300",
+          padding: "24px 40px",
+        }}
+        linkTextProps={{ color: "blue.600", fontWeight: "medium" }}
+        copyrightTextProps={{ color: "gray.700", fontWeight: "bold" }}
+        logoHeight="60px"
+      />
     </>
-  )
+  );
 }

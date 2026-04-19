@@ -21,12 +21,16 @@ import {
 } from '@atoms';
 
 import {
+  Footer,
+  NavBar,
   PasswordInput,
   Field,
   Form,
 } from '@molecules';
 
 export {
+  Footer,
+  NavBar,
   Avatar,
   Badge,
   Box,
