@@ -3,6 +3,7 @@ import Form from './form/form.component';
 import PasswordInput from './password-input/password-input.component';
 import Footer from './footer/footer.component';
 import NavBar from './navBar/navBar.component';
+import ProfileCard from './profileCard/profileCard.component';
 
 export {
   Field,
@@ -10,4 +11,5 @@ export {
   Footer,
   NavBar,
   PasswordInput,
+  ProfileCard,
 }
