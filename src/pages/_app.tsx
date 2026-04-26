@@ -14,7 +14,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return <ChakraProvider value={defaultSystem}>
       <Head>
-        <link rel="icon" href="/favicon.png" type="image/png" />
+        <link rel="icon" href="/assets/logos/logo.png" type="image/png" />
       </Head>
       <ApolloProvider client={client}>
         <AuthProvider>
