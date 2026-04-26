@@ -26,11 +26,13 @@ import {
   PasswordInput,
   Field,
   Form,
+  ItemDetail,
 } from '@molecules';
 
 export {
   Footer,
   NavBar,
+  ItemDetail,
   Avatar,
   Badge,
   Box,

@@ -1,5 +1,27 @@
 import { FieldProps } from "@types";
-import { Box, Badge, Avatar, Button, Combobox, Flex, Form, Icon, IconButton, Image, Input, QRCode, Skeleton, SkeletonCircle, SkeletonText, Stack, Text, Textarea, NavBar, Footer } from "@components";
+import {
+  Box,
+  Badge,
+  Avatar,
+  Button,
+  Combobox,
+  Flex,
+  Form,
+  Icon,
+  IconButton,
+  Image,
+  Input,
+  QRCode,
+  Skeleton,
+  SkeletonCircle,
+  SkeletonText,
+  Stack,
+  Text,
+  Textarea,
+  NavBar,
+  Footer,
+  ItemDetail,
+} from "@components";
 import * as yup from "yup";
 
 const frameworks = [
@@ -9,42 +31,84 @@ const frameworks = [
 ];
 //Test Fields
 const formFields: FieldProps[] = [
-  { label: 'Name', name: 'name', inputPlaceholder: 'Enter your name', isRequired: true },
-  { label: 'Email', name: 'email', inputPlaceholder: 'Enter your email', isRequired: true },
-  { label: 'Password', name: 'password', inputPlaceholder: 'Enter your password', isRequired: true, isPassword: true },
-  { label: 'Phone', name: 'phone', fieldType: 'phone', inputPlaceholder: 'Enter your phone', isRequired: true, countryFieldName: 'phoneCountry' },
-  { label: 'Framework', name: 'framework', fieldType: "combobox", comboboxItems: frameworks, comboboxPlaceholder: 'Pick a framework', comboboxEmptyText: 'No frameworks found',},
-  { label: 'Description', name: 'description', fieldType: "textarea", inputPlaceholder: 'Enter a description', isRequired: true },
-  { label: 'Profile Picture', name: 'profilePicture', fieldType: 'fileUpload', inputPlaceholder: 'Drop your image here' }
+  {
+    label: "Name",
+    name: "name",
+    inputPlaceholder: "Enter your name",
+    isRequired: true,
+  },
+  {
+    label: "Email",
+    name: "email",
+    inputPlaceholder: "Enter your email",
+    isRequired: true,
+  },
+  {
+    label: "Password",
+    name: "password",
+    inputPlaceholder: "Enter your password",
+    isRequired: true,
+    isPassword: true,
+  },
+  {
+    label: "Phone",
+    name: "phone",
+    fieldType: "phone",
+    inputPlaceholder: "Enter your phone",
+    isRequired: true,
+    countryFieldName: "phoneCountry",
+  },
+  {
+    label: "Framework",
+    name: "framework",
+    fieldType: "combobox",
+    comboboxItems: frameworks,
+    comboboxPlaceholder: "Pick a framework",
+    comboboxEmptyText: "No frameworks found",
+  },
+  {
+    label: "Description",
+    name: "description",
+    fieldType: "textarea",
+    inputPlaceholder: "Enter a description",
+    isRequired: true,
+  },
+  {
+    label: "Profile Picture",
+    name: "profilePicture",
+    fieldType: "fileUpload",
+    inputPlaceholder: "Drop your image here",
+  },
 ];
 //Test yup validation schema and initial values for the form
 const formValidationSchema = yup.object().shape({
-  name: yup.string().required('Name is required'),
-  email: yup.string().email('Invalid email').required('Email is required'),
-  password: yup.string().min(6, 'Min 6 characters').required('* Password is required'),
-  phone: yup.string().required('Phone is required'),
-  description: yup.string().required('Description is required'),
+  name: yup.string().required("Name is required"),
+  email: yup.string().email("Invalid email").required("Email is required"),
+  password: yup
+    .string()
+    .min(6, "Min 6 characters")
+    .required("* Password is required"),
+  phone: yup.string().required("Phone is required"),
+  description: yup.string().required("Description is required"),
   phoneCountry: yup.string(),
   framework: yup.string(),
-  profilePicture: yup.mixed()
+  profilePicture: yup
+    .mixed()
     .required("File is required or too large (max 1MB)")
-    .test(
-      "fileSize",
-      "File is too large (max 1MB)",
-      (value) => {
-        if (!value) return true; // handled by required
-        return (value as File).size <= (1024 * 1024); //1MB
-      },)
+    .test("fileSize", "File is too large (max 1MB)", (value) => {
+      if (!value) return true; // handled by required
+      return (value as File).size <= 1024 * 1024; //1MB
+    }),
 });
 //test form initial values
 const formInitialValues = {
-  name: 'Test',
-  email: 'test@email.com',
-  password: 'secret123',
-  phone: '50660022709',
-  phoneCountry: '',
-  framework: 'react',
-  description: 'A test description',
+  name: "Test",
+  email: "test@email.com",
+  password: "secret123",
+  phone: "50660022709",
+  phoneCountry: "",
+  framework: "react",
+  description: "A test description",
 };
 
 export default function Home(prop: any) {
@@ -83,33 +147,37 @@ export default function Home(prop: any) {
       />
       <br />
       Button
-     <p>Index page</p>
-     <br />
-     Form
-     <Box maxW="500px" p={4}>
-       <Form
-         fields={formFields}
-         validationSchema={formValidationSchema}
-         formValues={formInitialValues}
-         isLoading={false}
-         submitButtonText="Register"
-         groupings={[2, 1, 1, 1 , 1, 1]}
-         onSubmit={(values) => console.log('Form submitted:', values)}
-       />
-     </Box>
-     <br />
-     Box
-     <Box bg="black" color="white" p={4} borderRadius="md">
-      pichita
-     </Box>
-     <br />
-     Badge
-     <Badge>a</Badge>
-     <br />
-     Avatar - Lebron
-     <Avatar size="xl" src="https://media.tenor.com/IuUdckvjNT4AAAAM/i%27ve-played-these-games-before--gin-hun.gif" name="Lebron" />
-     <br />
-     Button
+      <p>Index page</p>
+      <br />
+      Form
+      <Box maxW="500px" p={4}>
+        <Form
+          fields={formFields}
+          validationSchema={formValidationSchema}
+          formValues={formInitialValues}
+          isLoading={false}
+          submitButtonText="Register"
+          groupings={[2, 1, 1, 1, 1, 1]}
+          onSubmit={(values) => console.log("Form submitted:", values)}
+        />
+      </Box>
+      <br />
+      Box
+      <Box bg="black" color="white" p={4} borderRadius="md">
+        pichita
+      </Box>
+      <br />
+      Badge
+      <Badge>a</Badge>
+      <br />
+      Avatar - Lebron
+      <Avatar
+        size="xl"
+        src="https://media.tenor.com/IuUdckvjNT4AAAAM/i%27ve-played-these-games-before--gin-hun.gif"
+        name="Lebron"
+      />
+      <br />
+      Button
       <Button
         colorPalette="blue"
         size="md"
@@ -257,6 +325,30 @@ export default function Home(prop: any) {
         copyrightTextProps={{ color: "gray.700", fontWeight: "bold" }}
         logoHeight="60px"
       />
+      <br />
+      <Flex justify="center" padding="32px">
+        <ItemDetail
+          itemNumber="00012345"
+          description="This is a vintage leather sofa in excellent condition. The leather has a beautiful patina from years of use, but it's structurally solid and the cushions are firm. Perfect for a living room or office. Originally purchased in 2010, this piece has been well cared for and shows minimal wear."
+          contactEmail="seller@dne.com"
+          contactPhone="+1 555 123 4567"
+          contactAddress="123 Main Street, San José, CR"
+        />
+
+        <ItemDetail
+          itemNumber="00012345"
+          description="bba ba bouiba ba boui ba ba boui ba boui ba ba boui ba boui ba ba boui ba boui ba ba boui ba boui ba ba boui ba boui ba ba boui ba boui ba"
+          contactEmail="seller@dne.com"
+          contactPhone="+1 555 123 4567"
+          contactAddress="123 Main Street"
+          images={[
+            "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400",
+            "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400",
+            "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=400",
+          ]}
+        />
+      </Flex>
+      <br />
     </>
   );
 }
