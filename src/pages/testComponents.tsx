@@ -1,31 +1,5 @@
 import { FieldProps } from "@types";
-import {
-  Box,
-  Badge,
-  Avatar,
-  Button,
-  Combobox,
-  Flex,
-  Form,
-  Icon,
-  IconButton,
-  Image,
-  Input,
-  QRCode,
-  Skeleton,
-  SkeletonCircle,
-  SkeletonText,
-  Stack,
-  Text,
-  Textarea,
-  NavBar,
-  Footer,
-  TitleSearchBar,
-  PricingCard,
-  ResultCard,
-  ProfileCard,
-  ItemDetail,
-} from "@components";
+import { Box, Badge, Avatar, Button, Combobox, Flex, Form, Icon, IconButton, Image, Input, QRCode, Skeleton, SkeletonCircle, SkeletonText, Stack, Text, Textarea, NavBar, Footer } from "@components";
 import * as yup from "yup";
 
 const frameworks = [
@@ -35,94 +9,48 @@ const frameworks = [
 ];
 //Test Fields
 const formFields: FieldProps[] = [
-  {
-    label: "Name",
-    name: "name",
-    inputPlaceholder: "Enter your name",
-    isRequired: true,
-  },
-  {
-    label: "Email",
-    name: "email",
-    inputPlaceholder: "Enter your email",
-    isRequired: true,
-  },
-  {
-    label: "Password",
-    name: "password",
-    inputPlaceholder: "Enter your password",
-    isRequired: true,
-    isPassword: true,
-  },
-  {
-    label: "Phone",
-    name: "phone",
-    fieldType: "phone",
-    inputPlaceholder: "Enter your phone",
-    isRequired: true,
-    countryFieldName: "phoneCountry",
-  },
-  {
-    label: "Framework",
-    name: "framework",
-    fieldType: "combobox",
-    comboboxItems: frameworks,
-    comboboxPlaceholder: "Pick a framework",
-    comboboxEmptyText: "No frameworks found",
-  },
-  {
-    label: "Description",
-    name: "description",
-    fieldType: "textarea",
-    inputPlaceholder: "Enter a description",
-    isRequired: true,
-  },
-  {
-    label: "Profile Picture",
-    name: "profilePicture",
-    fieldType: "fileUpload",
-    inputPlaceholder: "Drop your image here",
-  },
+  { label: 'Name', name: 'name', inputPlaceholder: 'Enter your name', isRequired: true },
+  { label: 'Email', name: 'email', inputPlaceholder: 'Enter your email', isRequired: true },
+  { label: 'Password', name: 'password', inputPlaceholder: 'Enter your password', isRequired: true, isPassword: true },
+  { label: 'Phone', name: 'phone', fieldType: 'phone', inputPlaceholder: 'Enter your phone', isRequired: true, countryFieldName: 'phoneCountry' },
+  { label: 'Framework', name: 'framework', fieldType: "combobox", comboboxItems: frameworks, comboboxPlaceholder: 'Pick a framework', comboboxEmptyText: 'No frameworks found',},
+  { label: 'Description', name: 'description', fieldType: "textarea", inputPlaceholder: 'Enter a description', isRequired: true },
+  { label: 'Profile Picture', name: 'profilePicture', fieldType: 'fileUpload', inputPlaceholder: 'Drop your image here' }
 ];
 //Test yup validation schema and initial values for the form
 const formValidationSchema = yup.object().shape({
-  name: yup.string().required("Name is required"),
-  email: yup.string().email("Invalid email").required("Email is required"),
-  password: yup
-    .string()
-    .min(6, "Min 6 characters")
-    .required("* Password is required"),
-  phone: yup.string().required("Phone is required"),
-  description: yup.string().required("Description is required"),
+  name: yup.string().required('Name is required'),
+  email: yup.string().email('Invalid email').required('Email is required'),
+  password: yup.string().min(6, 'Min 6 characters').required('* Password is required'),
+  phone: yup.string().required('Phone is required'),
+  description: yup.string().required('Description is required'),
   phoneCountry: yup.string(),
   framework: yup.string(),
-  profilePicture: yup
-<<<<<<< HEAD
-=======
->>>>>>> origin/master
-    .mixed()
+  profilePicture: yup.mixed()
     .required("File is required or too large (max 1MB)")
-    .test("fileSize", "File is too large (max 1MB)", (value) => {
-      if (!value) return true; // handled by required
-      return (value as File).size <= 1024 * 1024; //1MB
-    }),
+    .test(
+      "fileSize",
+      "File is too large (max 1MB)",
+      (value) => {
+        if (!value) return true; // handled by required
+        return (value as File).size <= (1024 * 1024); //1MB
+      },)
 });
 //test form initial values
 const formInitialValues = {
-  name: "Test",
-  email: "test@email.com",
-  password: "secret123",
-  phone: "50660022709",
-  phoneCountry: "",
-  framework: "react",
-  description: "A test description",
+  name: 'Test',
+  email: 'test@email.com',
+  password: 'secret123',
+  phone: '50660022709',
+  phoneCountry: '',
+  framework: 'react',
+  description: 'A test description',
 };
 
-export default function Home(prop: any) {
+export default function TestComponents() {
   return (
     <>
-      <NavBar
-        logoVariant="light"
+    <NavBar
         loggedOutLinks={[
           { label: "Home", href: "/" },
           { label: "Supplier Login", href: "/supplierLogin" },
@@ -300,7 +228,6 @@ export default function Home(prop: any) {
       <br />
       NavBar (Logged In) NavBar (Custom - Logged In)
       <NavBar
-        logoVariant="dark"
         isLoggedIn={true}
         onLogout={() => console.log("Logout clicked!")}
         loggedInLinks={[
@@ -330,95 +257,7 @@ export default function Home(prop: any) {
         copyrightTextProps={{ color: "gray.700", fontWeight: "bold" }}
         logoHeight="60px"
       />
-      <br />
-<<<<<<< HEAD
-=======
-      <Flex gap="24px" justify="center" padding="32px">
-        <PricingCard
-          planName="Basic"
-          price={9}
-          features={["1 user", "10GB storage", "Email support"]}
-          onChoose={() => console.log("Basic chosen")}
-        />
-        <PricingCard
-          planName="Pro"
-          price={29}
-          features={[
-            "5 users",
-            "100GB storage",
-            "Priority support",
-            "Advanced analytics",
-          ]}
-          isHighlighted={true}
-          onChoose={() => console.log("Pro chosen")}
-        />
-        <PricingCard
-          planName="Enterprise"
-          price={99}
-          features={[
-            "Unlimited users",
-            "1TB storage",
-            "24/7 support",
-            "Custom integrations",
-            "SLA",
-          ]}
-          onChoose={() => console.log("Enterprise chosen")}
-        />
-      </Flex>
-      <TitleSearchBar />
-      <br />
-      <Flex justify="center" padding="32px">
-        <ProfileCard
-          name="LEBROOOOOOOOOON JAMESSSSSSSSSSSSSSSSSSSSSSSSSSSS"
-          email="john.doe@example.com"
-          phone="+1 555 123 4567"
-          avatarSrc="https://media.tenor.com/IuUdckvjNT4AAAAM/i%27ve-played-these-games-before--gin-hun.gif"
-          onEdit={() => console.log("Edit clicked")}
-        />
-
-        <ProfileCard
-          name="Jane Smith"
-          email="jane@example.com"
-          phone="+1 555 999 0000"
-          onEdit={() => console.log("Edit Jane")}
-        />
-
-        <ProfileCard
-          name="Carlos Pérez"
-          email="carlos@example.com"
-          phone="+506 8888 1234"
-          nameLabel="Nombre"
-          emailLabel="Correo"
-          phoneLabel="Teléfono"
-          editLabel="Editar"
-          extraFields={[{ label: "Address", value: "San José, CR" }]}
-          onEdit={() => console.log("Edit Carlos")}
-        />
-      </Flex>
-      <Flex justify="center" padding="32px">
-        <ItemDetail
-          itemNumber="00012345"
-          description="This is a vintage leather sofa in excellent condition. The leather has a beautiful patina from years of use, but it's structurally solid and the cushions are firm. Perfect for a living room or office. Originally purchased in 2010, this piece has been well cared for and shows minimal wear."
-          contactEmail="seller@dne.com"
-          contactPhone="+1 555 123 4567"
-          contactAddress="123 Main Street, San José, CR"
-        />
-
-        <ItemDetail
-          itemNumber="00012345"
-          description="bba ba bouiba ba boui ba ba boui ba boui ba ba boui ba boui ba ba boui ba boui ba ba boui ba boui ba ba boui ba boui ba ba boui ba boui ba"
-          contactEmail="seller@dne.com"
-          contactPhone="+1 555 123 4567"
-          contactAddress="123 Main Street"
-          images={[
-            "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400",
-            "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400",
-            "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=400",
-          ]}
-        />
-      </Flex>
-      <br />
->>>>>>> origin/master
     </>
   );
+
 }

@@ -27,12 +27,19 @@ import {
   Field,
   Form,
   ItemDetail,
+  ProfileCard,
+  ResultCard,
+  TitleSearchBar
+  PricingCard,
 } from '@molecules';
 
 export {
   Footer,
   NavBar,
   ItemDetail,
+  ProfileCard,
+  PricingCard,
+  ResultCard,
   Avatar,
   Badge,
   Box,
@@ -55,4 +62,5 @@ export {
   Stack,
   Text,
   Textarea,
+  TitleSearchBar
 }

@@ -6,8 +6,10 @@ export interface FooterLink {
   href: string;
 }
 
+import { LogoVariant } from './navBar.type';
+
 export interface FooterProps {
-  logoSrc?: string;
+  logoVariant?: LogoVariant;
   logoAlt?: string;
   logoHeight?: string | number;
   copyrightText?: string;
