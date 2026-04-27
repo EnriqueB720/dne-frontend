@@ -32,5 +32,6 @@ export * from './field.type';
 export * from './form.type';
 export * from './password-input.type'
 export * from './fileUpload.type'
+export * from './profileCard.type';
 export * from './pricingCard.type';
 export * from './resultCard.type';

@@ -23,6 +23,7 @@ import {
   TitleSearchBar,
   PricingCard,
   ResultCard,
+  ProfileCard,
 } from "@components";
 import * as yup from "yup";
 
@@ -95,6 +96,7 @@ const formValidationSchema = yup.object().shape({
   phoneCountry: yup.string(),
   framework: yup.string(),
   profilePicture: yup
+
     .mixed()
     .required("File is required or too large (max 1MB)")
     .test("fileSize", "File is too large (max 1MB)", (value) => {
@@ -133,6 +135,37 @@ export default function Home(prop: any) {
         logoHeight="50px"
       />
       <p>Index page</p>
+      <br />
+      Box
+      <Box bg="black" color="white" p={4} borderRadius="md">
+        pichita
+      </Box>
+      <br />
+      Badge
+      <Badge>a</Badge>
+      <br />
+      Avatar - Lebron
+      <Avatar
+        size="xl"
+        src="https://media.tenor.com/IuUdckvjNT4AAAAM/i%27ve-played-these-games-before--gin-hun.gif"
+        name="Lebron"
+      />
+      <br />
+      Button
+      <p>Index page</p>
+      <br />
+      Form
+      <Box maxW="500px" p={4}>
+        <Form
+          fields={formFields}
+          validationSchema={formValidationSchema}
+          formValues={formInitialValues}
+          isLoading={false}
+          submitButtonText="Register"
+          groupings={[2, 1, 1, 1, 1, 1]}
+          onSubmit={(values) => console.log("Form submitted:", values)}
+        />
+      </Box>
       <br />
       Box
       <Box bg="black" color="white" p={4} borderRadius="md">
@@ -363,6 +396,35 @@ export default function Home(prop: any) {
         />
       </Flex>
       <TitleSearchBar />
+      <br />
+      <Flex justify="center" padding="32px">
+        <ProfileCard
+          name="LEBROOOOOOOOOON JAMESSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+          email="john.doe@example.com"
+          phone="+1 555 123 4567"
+          avatarSrc="https://media.tenor.com/IuUdckvjNT4AAAAM/i%27ve-played-these-games-before--gin-hun.gif"
+          onEdit={() => console.log("Edit clicked")}
+        />
+
+        <ProfileCard
+          name="Jane Smith"
+          email="jane@example.com"
+          phone="+1 555 999 0000"
+          onEdit={() => console.log("Edit Jane")}
+        />
+
+        <ProfileCard
+          name="Carlos Pérez"
+          email="carlos@example.com"
+          phone="+506 8888 1234"
+          nameLabel="Nombre"
+          emailLabel="Correo"
+          phoneLabel="Teléfono"
+          editLabel="Editar"
+          extraFields={[{ label: "Address", value: "San José, CR" }]}
+          onEdit={() => console.log("Edit Carlos")}
+        />
+      </Flex>
     </>
   );
 }

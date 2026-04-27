@@ -26,6 +26,7 @@ import {
   PasswordInput,
   Field,
   Form,
+  ProfileCard,
   ResultCard,
   TitleSearchBar
   PricingCard,
@@ -34,6 +35,7 @@ import {
 export {
   Footer,
   NavBar,
+  ProfileCard,
   PricingCard,
   ResultCard,
   Avatar,
