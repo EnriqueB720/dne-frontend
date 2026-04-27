@@ -22,6 +22,7 @@ import {
   Footer,
   TitleSearchBar,
   PricingCard,
+  ResultCard,
 } from "@components";
 import * as yup from "yup";
 

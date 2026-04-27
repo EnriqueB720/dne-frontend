@@ -26,6 +26,7 @@ import {
   PasswordInput,
   Field,
   Form,
+  ResultCard,
   TitleSearchBar
   PricingCard,
 } from '@molecules';
@@ -34,6 +35,7 @@ export {
   Footer,
   NavBar,
   PricingCard,
+  ResultCard,
   Avatar,
   Badge,
   Box,
