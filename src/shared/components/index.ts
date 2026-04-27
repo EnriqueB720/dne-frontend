@@ -26,6 +26,7 @@ import {
   PasswordInput,
   Field,
   Form,
+  TitleSearchBar
   PricingCard,
 } from '@molecules';
 
@@ -55,4 +56,5 @@ export {
   Stack,
   Text,
   Textarea,
+  TitleSearchBar
 }
