@@ -22,8 +22,13 @@ const defaultRightLinks: NavBarLink[] = [
   { label: 'Contact Us', href: '/contact' },
 ];
 
+const logoVariantMap = {
+  dark: '/assets/logos/logo.png',
+  light: '/assets/logos/logo-light.png',
+};
+
 const NavBar: React.FC<NavBarProps> = ({
-  logoSrc = '/favicon.png',
+  logoVariant = 'dark',
   logoAlt = 'D&E Logo',
   logoHeight = '40px',
   isLoggedIn = false,
@@ -35,6 +40,7 @@ const NavBar: React.FC<NavBarProps> = ({
   linkTextProps,
 }) => {
   const navLinks = isLoggedIn ? loggedInLinks : loggedOutLinks;
+  const logoSrc = logoVariantMap[logoVariant];
 
   return (
     <Flex

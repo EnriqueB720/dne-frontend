@@ -3,8 +3,13 @@ import _ from 'lodash';
 import { Flex, Image, Text } from '@atoms';
 import { FooterProps } from '@types';
 
+const logoVariantMap = {
+  dark: '/assets/logos/logo.png',
+  light: '/assets/logos/logo-light.png',
+};
+
 const Footer: React.FC<FooterProps> = ({
-  logoSrc = '/favicon.png',
+  logoVariant = 'dark',
   logoAlt = 'D&E Logo',
   logoHeight = '100px',
   copyrightText = `© ${new Date().getFullYear()}`,
@@ -13,6 +18,8 @@ const Footer: React.FC<FooterProps> = ({
   linkTextProps,
   copyrightTextProps,
 }) => {
+  const logoSrc = logoVariantMap[logoVariant];
+
   return (
     <Flex
       as="footer"

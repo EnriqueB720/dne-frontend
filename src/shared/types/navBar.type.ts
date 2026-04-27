@@ -6,8 +6,10 @@ export interface NavBarLink {
   href: string;
 }
 
+export type LogoVariant = 'dark' | 'light';
+
 export interface NavBarProps {
-  logoSrc?: string;
+  logoVariant?: LogoVariant;
   logoAlt?: string;
   logoHeight?: string | number;
   isLoggedIn?: boolean;
