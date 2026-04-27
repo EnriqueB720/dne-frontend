@@ -20,6 +20,9 @@ import {
   Textarea,
   NavBar,
   Footer,
+  TitleSearchBar,
+  PricingCard,
+  ResultCard,
   ProfileCard,
 } from "@components";
 import * as yup from "yup";
@@ -93,6 +96,7 @@ const formValidationSchema = yup.object().shape({
   phoneCountry: yup.string(),
   framework: yup.string(),
   profilePicture: yup
+
     .mixed()
     .required("File is required or too large (max 1MB)")
     .test("fileSize", "File is too large (max 1MB)", (value) => {
@@ -115,6 +119,7 @@ export default function Home(prop: any) {
   return (
     <>
       <NavBar
+        logoVariant="light"
         loggedOutLinks={[
           { label: "Home", href: "/" },
           { label: "Supplier Login", href: "/supplierLogin" },
@@ -130,6 +135,37 @@ export default function Home(prop: any) {
         logoHeight="50px"
       />
       <p>Index page</p>
+      <br />
+      Box
+      <Box bg="black" color="white" p={4} borderRadius="md">
+        pichita
+      </Box>
+      <br />
+      Badge
+      <Badge>a</Badge>
+      <br />
+      Avatar - Lebron
+      <Avatar
+        size="xl"
+        src="https://media.tenor.com/IuUdckvjNT4AAAAM/i%27ve-played-these-games-before--gin-hun.gif"
+        name="Lebron"
+      />
+      <br />
+      Button
+      <p>Index page</p>
+      <br />
+      Form
+      <Box maxW="500px" p={4}>
+        <Form
+          fields={formFields}
+          validationSchema={formValidationSchema}
+          formValues={formInitialValues}
+          isLoading={false}
+          submitButtonText="Register"
+          groupings={[2, 1, 1, 1, 1, 1]}
+          onSubmit={(values) => console.log("Form submitted:", values)}
+        />
+      </Box>
       <br />
       Box
       <Box bg="black" color="white" p={4} borderRadius="md">
@@ -296,6 +332,7 @@ export default function Home(prop: any) {
       <br />
       NavBar (Logged In) NavBar (Custom - Logged In)
       <NavBar
+        logoVariant="dark"
         isLoggedIn={true}
         onLogout={() => console.log("Logout clicked!")}
         loggedInLinks={[
@@ -325,6 +362,40 @@ export default function Home(prop: any) {
         copyrightTextProps={{ color: "gray.700", fontWeight: "bold" }}
         logoHeight="60px"
       />
+      <br />
+      <Flex gap="24px" justify="center" padding="32px">
+        <PricingCard
+          planName="Basic"
+          price={9}
+          features={["1 user", "10GB storage", "Email support"]}
+          onChoose={() => console.log("Basic chosen")}
+        />
+        <PricingCard
+          planName="Pro"
+          price={29}
+          features={[
+            "5 users",
+            "100GB storage",
+            "Priority support",
+            "Advanced analytics",
+          ]}
+          isHighlighted={true}
+          onChoose={() => console.log("Pro chosen")}
+        />
+        <PricingCard
+          planName="Enterprise"
+          price={99}
+          features={[
+            "Unlimited users",
+            "1TB storage",
+            "24/7 support",
+            "Custom integrations",
+            "SLA",
+          ]}
+          onChoose={() => console.log("Enterprise chosen")}
+        />
+      </Flex>
+      <TitleSearchBar />
       <br />
       <Flex justify="center" padding="32px">
         <ProfileCard
