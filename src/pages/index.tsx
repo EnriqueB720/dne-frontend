@@ -20,7 +20,8 @@ import {
   Textarea,
   NavBar,
   Footer,
-  TitleSearchBar
+  TitleSearchBar,
+  PricingCard,
 } from "@components";
 import * as yup from "yup";
 
@@ -327,6 +328,39 @@ export default function Home(prop: any) {
         copyrightTextProps={{ color: "gray.700", fontWeight: "bold" }}
         logoHeight="60px"
       />
+      <br />
+      <Flex gap="24px" justify="center" padding="32px">
+        <PricingCard
+          planName="Basic"
+          price={9}
+          features={["1 user", "10GB storage", "Email support"]}
+          onChoose={() => console.log("Basic chosen")}
+        />
+        <PricingCard
+          planName="Pro"
+          price={29}
+          features={[
+            "5 users",
+            "100GB storage",
+            "Priority support",
+            "Advanced analytics",
+          ]}
+          isHighlighted={true}
+          onChoose={() => console.log("Pro chosen")}
+        />
+        <PricingCard
+          planName="Enterprise"
+          price={99}
+          features={[
+            "Unlimited users",
+            "1TB storage",
+            "24/7 support",
+            "Custom integrations",
+            "SLA",
+          ]}
+          onChoose={() => console.log("Enterprise chosen")}
+        />
+      </Flex>
       <TitleSearchBar />
     </>
   );

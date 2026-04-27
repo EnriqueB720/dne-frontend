@@ -27,11 +27,13 @@ import {
   Field,
   Form,
   TitleSearchBar
+  PricingCard,
 } from '@molecules';
 
 export {
   Footer,
   NavBar,
+  PricingCard,
   Avatar,
   Badge,
   Box,
