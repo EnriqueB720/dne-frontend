@@ -7,6 +7,7 @@ import ProfileCard from './profileCard/profileCard.component';
 import PricingCard from './pricingCard/pricingCard.component';
 import TitleSearchBar from './title-search-bar/title-search-bar.component';
 import ResultCard from './resultCard/resultCard.component';
+import ItemDetail from './itemDetail/itemDetail.component';
 
 export {
   Field,
@@ -18,4 +19,5 @@ export {
   TitleSearchBar,
   PricingCard,
   ResultCard,
+  ItemDetail,
 }
