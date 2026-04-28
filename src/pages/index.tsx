@@ -97,9 +97,6 @@ const formValidationSchema = yup.object().shape({
   phoneCountry: yup.string(),
   framework: yup.string(),
   profilePicture: yup
-<<<<<<< HEAD
-=======
->>>>>>> origin/master
     .mixed()
     .required("File is required or too large (max 1MB)")
     .test("fileSize", "File is too large (max 1MB)", (value) => {
@@ -331,8 +328,6 @@ export default function Home(prop: any) {
         logoHeight="60px"
       />
       <br />
-<<<<<<< HEAD
-=======
       <Flex gap="24px" justify="center" padding="32px">
         <PricingCard
           planName="Basic"
@@ -418,7 +413,6 @@ export default function Home(prop: any) {
         />
       </Flex>
       <br />
->>>>>>> origin/master
     </>
   );
 }
