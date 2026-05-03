@@ -9,6 +9,7 @@ import TitleSearchBar from './title-search-bar/title-search-bar.component';
 import CompactSearchBar from './compact-search-bar/compact-search-bar.component';
 import ResultCard from './resultCard/resultCard.component';
 import ItemDetail from './itemDetail/itemDetail.component';
+import PostItem from './postItem/postItem.component';
 
 export {
   Field,
@@ -22,4 +23,5 @@ export {
   PricingCard,
   ResultCard,
   ItemDetail,
+  PostItem,
 }
