@@ -36,3 +36,4 @@ export * from './profileCard.type';
 export * from './pricingCard.type';
 export * from './resultCard.type';
 export * from './itemDetail.type';
+export * from './compactSearchBar.type';

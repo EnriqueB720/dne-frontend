@@ -29,7 +29,8 @@ import {
   ItemDetail,
   ProfileCard,
   ResultCard,
-  TitleSearchBar
+  TitleSearchBar,
+  CompactSearchBar,
   PricingCard,
 } from '@molecules';
 
@@ -62,5 +63,6 @@ export {
   Stack,
   Text,
   Textarea,
-  TitleSearchBar
+  TitleSearchBar,
+  CompactSearchBar,
 }
