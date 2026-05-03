@@ -32,6 +32,7 @@ import {
   TitleSearchBar,
   CompactSearchBar,
   PricingCard,
+  TagChipGroup,
 } from '@molecules';
 
 export {
@@ -65,4 +66,5 @@ export {
   Textarea,
   TitleSearchBar,
   CompactSearchBar,
+  TagChipGroup,
 }
