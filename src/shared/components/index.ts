@@ -32,8 +32,13 @@ import {
   TitleSearchBar,
   CompactSearchBar,
   PricingCard,
+  PostItem,
   TagChipGroup,
 } from '@molecules';
+
+import {
+  PostGrid,
+} from '@organisms';
 
 export {
   Footer,
@@ -66,5 +71,7 @@ export {
   Textarea,
   TitleSearchBar,
   CompactSearchBar,
+  PostItem,
+  PostGrid,
   TagChipGroup,
 }
