@@ -39,3 +39,4 @@ export * from './itemDetail.type';
 export * from './compactSearchBar.type';
 export * from './postItem.type';
 export * from './postGrid.type';
+export * from './tagChipGroup.type';

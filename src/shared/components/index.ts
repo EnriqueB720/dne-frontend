@@ -33,6 +33,7 @@ import {
   CompactSearchBar,
   PricingCard,
   PostItem,
+  TagChipGroup,
 } from '@molecules';
 
 import {
@@ -72,4 +73,5 @@ export {
   CompactSearchBar,
   PostItem,
   PostGrid,
+  TagChipGroup,
 }
