@@ -11,6 +11,10 @@ import ResultCard from './resultCard/resultCard.component';
 import ItemDetail from './itemDetail/itemDetail.component';
 import PostItem from './postItem/postItem.component';
 import TagChipGroup from './tagChipGroup/tagChipGroup.component';
+import Logo from './logo/logo.component';
+import LoadingState from './loadingState/loadingState.component';
+import ProviderCard from './providerCard/providerCard.component';
+import PackageCard from './packageCard/packageCard.component';
 
 export {
   Field,
@@ -26,4 +30,8 @@ export {
   ItemDetail,
   PostItem,
   TagChipGroup,
+  Logo,
+  LoadingState,
+  ProviderCard,
+  PackageCard,
 }
