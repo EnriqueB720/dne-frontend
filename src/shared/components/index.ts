@@ -40,6 +40,7 @@ import {
   ProviderCard,
   PackageCard,
 } from '@molecules';
+export type { ProviderData, PackageData } from '@molecules';
 
 import {
   PostGrid,
