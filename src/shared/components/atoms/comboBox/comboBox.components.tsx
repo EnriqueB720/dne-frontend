@@ -1,12 +1,14 @@
 import * as React from 'react';
 import _ from 'lodash';
 import {
-  Combobox as CKCombobox,
+  Combobox as ChakraCombobox,
   Portal,
   useFilter,
   useListCollection,
 } from '@chakra-ui/react';
 import { ComboboxProps } from '@types';
+
+const CKCombobox: any = ChakraCombobox;
 
 const ComboboxBase: React.FC<ComboboxProps> = ({
   items,

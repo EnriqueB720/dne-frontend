@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { Sparkles, Send, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Box, Flex, Text } from '@atoms';
+import { Box, Flex, Text, Input } from '@atoms';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 
 interface Message {
@@ -165,8 +165,7 @@ const RefineFooter: React.FC = () => {
               borderColor={solvoColors.border}
               gap="8px"
             >
-              <Box
-                as="input"
+              <Input
                 flex="1"
                 padding="8px 12px"
                 borderRadius="10px"

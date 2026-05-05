@@ -6,6 +6,7 @@ import {
   Box,
   Flex,
   Text,
+  Input,
   SolvoNavBar,
   ProviderCard,
   LoadingState,
@@ -84,8 +85,7 @@ export default function Search() {
 
         {editing ? (
           <Flex gap="10px" marginBottom="24px">
-            <Box
-              as="input"
+            <Input
               flex="1"
               padding="14px 18px"
               borderRadius="14px"

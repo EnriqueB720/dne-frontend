@@ -1,11 +1,13 @@
 import * as React from 'react';
 import _ from 'lodash';
 import {
-  FileUpload as CKFileUpload,
+  FileUpload as ChakraFileUpload,
   Icon,
 } from '@chakra-ui/react';
 import { FileUploadProps } from '@types';
 import { LuUpload } from 'react-icons/lu';
+
+const CKFileUpload: any = ChakraFileUpload;
 
 const FileUpload: React.FC<FileUploadProps> = ({
   accept = ['image/png', 'image/jpeg', 'image/webp'],

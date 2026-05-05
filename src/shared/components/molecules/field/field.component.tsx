@@ -3,7 +3,15 @@ import * as React from 'react';
 import _ from 'lodash';
 
 import { FieldProps } from '@types';
-import { Field as ChakraField, FieldLabel, FieldErrorText } from '@chakra-ui/react';
+import {
+  Field as ChakraOriginalField,
+  FieldLabel as ChakraFieldLabel,
+  FieldErrorText as ChakraFieldErrorText,
+} from '@chakra-ui/react';
+
+const ChakraField: any = ChakraOriginalField;
+const FieldLabel: any = ChakraFieldLabel;
+const FieldErrorText: any = ChakraFieldErrorText;
 import { Input, PasswordInput, Combobox, Textarea, FileUpload } from '@components';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
