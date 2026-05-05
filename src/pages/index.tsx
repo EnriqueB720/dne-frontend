@@ -15,7 +15,7 @@ import {
   Scissors,
   Car,
 } from 'lucide-react';
-import { Box, Flex, Text, SolvoNavBar } from '@components';
+import { Box, Flex, Text, Textarea, SolvoNavBar } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 
 const SUGGESTED_PROMPTS = [
@@ -164,8 +164,7 @@ export default function Home() {
             borderWidth="1px"
             borderColor={solvoColors.border}
           >
-            <Box
-              as="textarea"
+            <Textarea
               width="100%"
               minHeight="60px"
               border="none"
