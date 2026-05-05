@@ -1,6 +1,6 @@
 import { FlexProps } from '@chakra-ui/react';
 import { TextProps } from './text.type';
-import { TextareaProps } from './textarea.type';
+import { TextareaProps } from './textArea.type';
 import { ImageProps } from './image.type';
 
 export interface ItemDetailProps {
