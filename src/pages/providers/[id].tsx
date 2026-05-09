@@ -48,10 +48,10 @@ export default function ProviderProfile() {
       <SolvoNavBar />
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: '24px 16px', md: '32px 24px' }}>
-        <Link href="/search" style={{ textDecoration: 'none' }}>
+        <Link href="/" style={{ textDecoration: 'none' }}>
           <Flex align="center" gap="6px" color={solvoColors.textMuted} fontSize="sm" marginBottom="20px" _hover={{ color: solvoColors.text }}>
             <ArrowLeft size={14} />
-            Back to results
+            Back to chat
           </Flex>
         </Link>
 

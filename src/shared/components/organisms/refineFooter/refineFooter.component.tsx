@@ -1,14 +1,20 @@
 import * as React from 'react';
 import { useState } from 'react';
+import { useSetAtom } from 'jotai';
 import { Sparkles, Send, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Box, Flex, Text, Input } from '@atoms';
-import { solvoColors, solvoFonts, solvoShadows } from '@constants';
+import { solvoColors, solvoFonts, solvoShadows, MODEL_LIST, MODEL_META } from '@constants';
+import { aiUsageAtom, type ModelKey } from '@/shared/jotai';
 
 interface Message {
-  from: 'ai' | 'user';
+  from: 'ai' | 'user' | 'system';
   text: string;
+  model?: ModelKey;
 }
+
+const SYSTEM_PROMPT =
+  "You are Solvo's refinement assistant. Help the user adjust their service search by clarifying budget, location, dietary needs, timing, or by suggesting additional services. Keep replies short, friendly, and actionable.";
 
 const initialMessages: Message[] = [
   {
@@ -17,25 +23,92 @@ const initialMessages: Message[] = [
   },
 ];
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+
 const RefineFooter: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [model, setModel] = useState<ModelKey>('claude-haiku');
+  const [isThinking, setIsThinking] = useState(false);
+  const setUsage = useSetAtom(aiUsageAtom);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    const userMsg: Message = { from: 'user', text: input };
-    setMessages((m) => [...m, userMsg]);
+  const activeMeta = MODEL_META[model];
+
+  const handleSend = async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isThinking) return;
+
+    const userMsg: Message = { from: 'user', text: trimmed };
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
     setInput('');
-    setTimeout(() => {
+    setIsThinking(true);
+
+    try {
+      const apiMessages = nextMessages
+        .filter((m) => m.from === 'user' || m.from === 'ai')
+        .map((m) => ({
+          role: m.from === 'ai' ? ('assistant' as const) : ('user' as const),
+          content: m.text,
+        }));
+
+      const res = await fetch(`${API_URL}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          system: SYSTEM_PROMPT,
+          messages: apiMessages,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Request failed (${res.status})`);
+      }
+
+      const data: {
+        content: string;
+        model: ModelKey;
+        usage?: { inputTokens?: number; outputTokens?: number };
+      } = await res.json();
+
       setMessages((m) => [
         ...m,
         {
           from: 'ai',
-          text: "Got it — I'll update the results to focus on that. Anything else to adjust?",
+          text: data.content || '(empty response)',
+          model: data.model ?? model,
         },
       ]);
-    }, 800);
+
+      // Track usage in the persistent atom
+      setUsage((prev) => {
+        const current = prev[model];
+        return {
+          ...prev,
+          [model]: {
+            requests: current.requests + 1,
+            inputTokens: current.inputTokens + (data.usage?.inputTokens ?? 0),
+            outputTokens: current.outputTokens + (data.usage?.outputTokens ?? 0),
+            lastUsedAt: new Date().toISOString(),
+          },
+        };
+      });
+    } catch (err) {
+      setMessages((m) => [
+        ...m,
+        {
+          from: 'system',
+          text:
+            err instanceof Error
+              ? `Couldn't reach the assistant — ${err.message}. Try again.`
+              : "Couldn't reach the assistant. Try again.",
+        },
+      ]);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   return (
@@ -77,7 +150,7 @@ const RefineFooter: React.FC = () => {
             exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={{ duration: 0.25 }}
             style={{
-              width: 360,
+              width: 380,
               borderRadius: 24,
               background: 'white',
               overflow: 'hidden',
@@ -121,7 +194,7 @@ const RefineFooter: React.FC = () => {
                       bg={solvoColors.emerald}
                     />
                     <Text fontSize="xs" color={solvoColors.textSubtle}>
-                      Online
+                      {activeMeta.fullName} · Online
                     </Text>
                   </Flex>
                 </Box>
@@ -137,25 +210,126 @@ const RefineFooter: React.FC = () => {
               </Box>
             </Flex>
 
+            <Flex
+              padding="10px 16px"
+              gap="6px"
+              borderBottom="1px solid"
+              borderColor={solvoColors.border}
+              bg="white"
+            >
+              {MODEL_LIST.map((opt) => {
+                const active = opt.key === model;
+                return (
+                  <Flex
+                    key={opt.key}
+                    as="button"
+                    align="center"
+                    justify="center"
+                    padding="6px 12px"
+                    borderRadius="full"
+                    fontSize="xs"
+                    fontWeight="500"
+                    cursor={isThinking ? 'not-allowed' : 'pointer'}
+                    opacity={isThinking && !active ? 0.5 : 1}
+                    bg={active ? solvoColors.indigo : 'transparent'}
+                    color={active ? 'white' : solvoColors.textMuted}
+                    borderWidth="1px"
+                    borderColor={active ? solvoColors.indigo : solvoColors.border}
+                    title={opt.fullName}
+                    onClick={() => !isThinking && setModel(opt.key)}
+                    _hover={
+                      !isThinking && !active
+                        ? { borderColor: solvoColors.indigoBorder, color: solvoColors.text }
+                        : undefined
+                    }
+                  >
+                    {opt.shortLabel}
+                  </Flex>
+                );
+              })}
+            </Flex>
+
             <Box maxHeight="288px" overflowY="auto" padding="16px">
               <Flex direction="column" gap="12px">
-                {messages.map((m, i) => (
-                  <Flex
-                    key={i}
-                    justify={m.from === 'ai' ? 'flex-start' : 'flex-end'}
-                  >
-                    <Box
-                      maxWidth="80%"
+                {messages.map((m, i) => {
+                  if (m.from === 'system') {
+                    return (
+                      <Flex key={i} justify="center">
+                        <Box
+                          maxWidth="90%"
+                          padding="8px 12px"
+                          borderRadius="10px"
+                          fontSize="xs"
+                          bg={solvoColors.roseLight}
+                          color={solvoColors.roseText}
+                        >
+                          {m.text}
+                        </Box>
+                      </Flex>
+                    );
+                  }
+                  return (
+                    <Flex
+                      key={i}
+                      direction="column"
+                      align={m.from === 'ai' ? 'flex-start' : 'flex-end'}
+                      gap="4px"
+                    >
+                      {m.from === 'ai' && m.model && (
+                        <Text
+                          fontSize="10px"
+                          fontWeight="600"
+                          color={solvoColors.indigo}
+                          letterSpacing="0.04em"
+                          textTransform="uppercase"
+                          paddingLeft="4px"
+                        >
+                          {MODEL_META[m.model].fullName}
+                        </Text>
+                      )}
+                      <Box
+                        maxWidth="80%"
+                        padding="10px 14px"
+                        borderRadius="14px"
+                        fontSize="sm"
+                        bg={m.from === 'ai' ? solvoColors.indigoLight : solvoColors.text}
+                        color={m.from === 'ai' ? solvoColors.text : 'white'}
+                      >
+                        {m.text}
+                      </Box>
+                    </Flex>
+                  );
+                })}
+
+                {isThinking && (
+                  <Flex justify="flex-start">
+                    <Flex
+                      align="center"
+                      gap="4px"
                       padding="10px 14px"
                       borderRadius="14px"
-                      fontSize="sm"
-                      bg={m.from === 'ai' ? solvoColors.indigoLight : solvoColors.text}
-                      color={m.from === 'ai' ? solvoColors.text : 'white'}
+                      bg={solvoColors.indigoLight}
                     >
-                      {m.text}
-                    </Box>
+                      {[0, 1, 2].map((i) => (
+                        <motion.div
+                          key={i}
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            background: solvoColors.indigo,
+                          }}
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{
+                            duration: 1.2,
+                            repeat: Infinity,
+                            delay: i * 0.2,
+                          }}
+                        />
+                      ))}
+                    </Flex>
                   </Flex>
-                ))}
+                )}
               </Flex>
             </Box>
 
@@ -174,7 +348,10 @@ const RefineFooter: React.FC = () => {
                 fontSize="sm"
                 fontFamily={solvoFonts.sans}
                 value={input}
-                placeholder="Type your refinement..."
+                disabled={isThinking}
+                placeholder={
+                  isThinking ? 'Thinking…' : 'Type your refinement...'
+                }
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
                 onKeyDown={(e: React.KeyboardEvent) => {
                   if (e.key === 'Enter') handleSend();
@@ -188,9 +365,9 @@ const RefineFooter: React.FC = () => {
                 width="36px"
                 height="36px"
                 borderRadius="10px"
-                bg={solvoColors.text}
+                bg={isThinking ? solvoColors.borderHover : solvoColors.text}
                 color="white"
-                cursor="pointer"
+                cursor={isThinking ? 'not-allowed' : 'pointer'}
                 onClick={handleSend}
               >
                 <Send size={14} />

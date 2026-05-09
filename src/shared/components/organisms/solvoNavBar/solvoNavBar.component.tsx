@@ -6,16 +6,33 @@ import { solvoColors } from '@constants';
 
 export interface SolvoNavBarProps {
   activePath?: string;
+  /** When provided, the logo navigates in-app instead of via Next.js router */
+  onGoHome?: () => void;
+  /** When provided, the "Chat" nav item starts a new chat instead of navigating */
+  onNewChat?: () => void;
 }
 
 const navItems = [
-  { label: 'Browse', href: '/search?query=' },
+  { label: 'Chat', href: '/' },
   { label: 'Packages', href: '/packages' },
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'For providers', href: '/provider' },
 ];
 
-const SolvoNavBar: React.FC<SolvoNavBarProps> = ({ activePath = '/' }) => {
+/** Shared style for the plain-button nav links so they match the Link ones */
+const navButtonStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  padding: 0,
+  textDecoration: 'none',
+};
+
+const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
+  activePath = '/',
+  onGoHome,
+  onNewChat,
+}) => {
   return (
     <Box
       position="sticky"
@@ -37,28 +54,54 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({ activePath = '/' }) => {
         justify="space-between"
         padding="14px 24px"
       >
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <Logo size="md" />
-        </Link>
+        {/* Logo — in-app callback when available, plain link otherwise */}
+        {onGoHome ? (
+          <button onClick={onGoHome} style={navButtonStyle} title="Home">
+            <Logo size="md" />
+          </button>
+        ) : (
+          <Link href="/" style={{ textDecoration: 'none', cursor: 'pointer' }}>
+            <Logo size="md" />
+          </Link>
+        )}
 
+        {/* Nav items */}
         <Flex gap="32px" align="center" display={{ base: 'none', md: 'flex' }}>
           {navItems.map((item) => {
             const isActive = activePath === item.href.split('?')[0];
+            const textEl = (
+              <Text
+                fontSize="sm"
+                fontWeight="500"
+                color={isActive ? solvoColors.indigo : solvoColors.textMuted}
+                _hover={{ color: solvoColors.indigo }}
+              >
+                {item.label}
+              </Text>
+            );
+
+            // "Chat" item gets the in-app callback when provided
+            if (item.label === 'Chat' && onNewChat) {
+              return (
+                <button
+                  key={item.label}
+                  onClick={onNewChat}
+                  style={navButtonStyle}
+                >
+                  {textEl}
+                </button>
+              );
+            }
+
             return (
               <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
-                <Text
-                  fontSize="sm"
-                  fontWeight="500"
-                  color={isActive ? solvoColors.indigo : solvoColors.textMuted}
-                  _hover={{ color: solvoColors.indigo }}
-                >
-                  {item.label}
-                </Text>
+                {textEl}
               </Link>
             );
           })}
         </Flex>
 
+        {/* Avatar placeholder */}
         <Flex
           width="36px"
           height="36px"

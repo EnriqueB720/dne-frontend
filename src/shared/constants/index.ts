@@ -3,6 +3,7 @@ import { Language } from '@generated';
 export * from './global-state.constant';
 export * from './solvo-theme';
 export * from './solvo-mocks';
+export * from './ai-models.constant';
 
 const DEFAULT_LANGUAGE: Language = Language.Spanish;
 const PARAM: string = '';

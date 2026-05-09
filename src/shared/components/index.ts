@@ -44,8 +44,11 @@ export type { ProviderData, PackageData } from '@molecules';
 
 import {
   PostGrid,
-  RefineFooter,
   SolvoNavBar,
+  ChatSidebar,
+  ChatThread,
+  ChatComposer,
+  PackagePanel,
 } from '@organisms';
 
 export {
@@ -87,6 +90,9 @@ export {
   LoadingState,
   ProviderCard,
   PackageCard,
-  RefineFooter,
   SolvoNavBar,
+  ChatSidebar,
+  ChatThread,
+  ChatComposer,
+  PackagePanel,
 }
