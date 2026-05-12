@@ -1,0 +1,17 @@
+mutation createRequest($data: RequestCreateInput!) {
+  createRequest(data: $data) {
+    requestId
+    customerId
+    categoryId
+    rawQuery
+    isComplete
+    city
+    serviceDate
+    guestCount
+    budgetMin
+    budgetMax
+    status
+    createdAt
+    updatedAt
+  }
+}

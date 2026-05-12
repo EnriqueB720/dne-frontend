@@ -67,7 +67,7 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
 
       StorageService.setJwtToken(data?.login!.access_token!);
 
-      const user = new User(data?.login!.user!);
+      const user = new User(data?.login!.user! as any);
       setUser(user);
 
       setIsAuthenticated(true);
@@ -131,7 +131,7 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
 
         StorageService.setJwtToken(data?.refreshUser!.access_token!);
 
-        const user = new User(data?.refreshUser!.user!);
+        const user = new User(data?.refreshUser!.user! as any);
         setUser(user);
 
         setIsAuthenticated(true);

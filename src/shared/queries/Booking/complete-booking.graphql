@@ -1,0 +1,7 @@
+mutation completeBooking($data: BookingCompleteInput!) {
+  completeBooking(data: $data) {
+    bookingId
+    status
+    completedAt
+  }
+}

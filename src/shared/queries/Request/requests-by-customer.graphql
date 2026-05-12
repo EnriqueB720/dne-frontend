@@ -1,0 +1,17 @@
+query requestsByCustomer($customerId: Int!, $status: RequestStatus) {
+  requestsByCustomer(customerId: $customerId, status: $status) {
+    requestId
+    rawQuery
+    city
+    serviceDate
+    guestCount
+    budgetMin
+    budgetMax
+    status
+    createdAt
+    quotes {
+      quoteId
+      status
+    }
+  }
+}

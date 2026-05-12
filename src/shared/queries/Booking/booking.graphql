@@ -1,0 +1,26 @@
+query booking($where: BookingWhereInput!) {
+  booking(where: $where) {
+    bookingId
+    requestId
+    quoteId
+    customerId
+    supplierId
+    serviceDate
+    serviceEndDate
+    location
+    guestCount
+    totalPrice
+    platformFee
+    supplierPayout
+    currency
+    status
+    paymentStatus
+    phoneRevealedAt
+    cancellationReason
+    cancelledAt
+    cancelledBy
+    completedAt
+    createdAt
+    updatedAt
+  }
+}

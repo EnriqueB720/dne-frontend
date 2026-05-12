@@ -1,0 +1,6 @@
+query suppliers {
+  suppliers {
+    supplierId
+    companyName
+  }
+}

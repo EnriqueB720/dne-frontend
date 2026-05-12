@@ -1,0 +1,24 @@
+query quote($where: QuoteWhereInput!) {
+  quote(where: $where) {
+    quoteId
+    requestId
+    supplierId
+    totalPrice
+    currency
+    message
+    validUntil
+    status
+    viewedAt
+    respondedAt
+    createdAt
+    updatedAt
+    items {
+      quoteItemId
+      serviceId
+      description
+      quantity
+      unitPrice
+      total
+    }
+  }
+}

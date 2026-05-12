@@ -13,7 +13,7 @@ export interface ProfileCardProps {
   email: string;
   phone: string;
   avatarSrc?: string;
-  avatarSize?: string;
+  avatarSize?: '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
   nameLabel?: string;
   emailLabel?: string;
   phoneLabel?: string;

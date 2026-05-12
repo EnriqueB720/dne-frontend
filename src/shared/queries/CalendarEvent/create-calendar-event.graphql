@@ -1,0 +1,14 @@
+mutation createCalendarEvent($data: CalendarEventCreateInput!) {
+  createCalendarEvent(data: $data) {
+    calendarEventId
+    supplierId
+    eventType
+    title
+    notes
+    startsAt
+    endsAt
+    allDay
+    location
+    status
+  }
+}

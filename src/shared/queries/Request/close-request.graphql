@@ -1,0 +1,8 @@
+mutation closeRequest($data: RequestCloseInput!) {
+  closeRequest(data: $data) {
+    requestId
+    status
+    closedAt
+    closedReason
+  }
+}

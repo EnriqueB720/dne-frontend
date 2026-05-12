@@ -17,6 +17,7 @@ import Text from './text/text.component';
 import Textarea from './textArea/textArea.component';
 import FileUpload from './fileUpload/fileUpload.component';
 import {PasswordInput} from './chakraPasswordInput/password-input.component';
+import Pill from './pill/pill.component';
 
 export {
   Avatar,
@@ -38,4 +39,5 @@ export {
   Stack,
   Text,
   Textarea,
+  Pill,
 };

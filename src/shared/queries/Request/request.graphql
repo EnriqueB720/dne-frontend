@@ -1,0 +1,25 @@
+query request($where: RequestWhereInput!) {
+  request(where: $where) {
+    requestId
+    customerId
+    categoryId
+    category {
+      categoryId
+      categoryName
+    }
+    rawQuery
+    conversationTurns
+    isComplete
+    city
+    serviceDate
+    guestCount
+    budgetMin
+    budgetMax
+    status
+    expiresAt
+    closedAt
+    closedReason
+    createdAt
+    updatedAt
+  }
+}

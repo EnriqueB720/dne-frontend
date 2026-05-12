@@ -2,7 +2,7 @@ query refreshUser($data: String!) {
   refreshUser(data: $data) {
     access_token
     expiresAt
-   user {
+    user {
       userId
       email
       language
@@ -11,6 +11,9 @@ query refreshUser($data: String!) {
       phone
       role
       profilePicture
+      isCustomer
+      isSupplier
+      isAdmin
       subscription {
         subscriptionId
         plan {
@@ -25,18 +28,10 @@ query refreshUser($data: String!) {
       supplier {
         supplierId
         companyName
-        posts {
-          postId
-          title
-          description
-          price
-          media_url
-          createdAt
-          category{
-            categoryId
-            categoryName
-          }
-        }
+      }
+      customer {
+        customerId
+        defaultCity
       }
     }
   }
