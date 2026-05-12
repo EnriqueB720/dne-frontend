@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { useAtom } from 'jotai';
+import AuthContext from '@/shared/contexts/auth.context';
 import { motion } from 'framer-motion';
 import { Plus, Star, Inbox, Sparkles, RotateCcw } from 'lucide-react';
 import {
@@ -45,6 +46,9 @@ const formatDate = (iso?: string) => {
 };
 
 export default function Dashboard() {
+  const { user } = useContext(AuthContext);
+  const displayName = user?.name?.split(' ')[0] ?? 'there';
+
   const [tab, setTab] = useState<TabId>('active');
   const [usage, setUsage] = useAtom(aiUsageAtom);
 
@@ -91,7 +95,7 @@ export default function Dashboard() {
               color={solvoColors.text}
               letterSpacing="-0.01em"
             >
-              Hello, Laura.
+              Hello, {displayName}.
             </Text>
           </Box>
           <Flex

@@ -1,5 +1,16 @@
 mutation signup($data: SignUpInput!) {
   signup(data: $data) {
     userId
+    email
+    name
+    role
+    isCustomer
+    isSupplier
+    customer {
+      customerId
+    }
+    supplier {
+      supplierId
+    }
   }
 }

@@ -30,6 +30,8 @@ export interface ChatThreadProps {
   packageKeys?: Set<string>;
   /** Called when user clicks "Add/Remove" on a provider card */
   onTogglePackage?: (provider: ProviderData) => void;
+  /** Called when user clicks "Select" on a provider card — starts a Request. */
+  onSelectProvider?: (provider: ProviderData, message: UiMessage) => void;
 }
 
 /** Render the "SOLVO UNDERSTOOD" interpretation block */
@@ -75,6 +77,7 @@ const ChatThread: React.FC<ChatThreadProps> = ({
   waitingForAI,
   packageKeys = new Set(),
   onTogglePackage,
+  onSelectProvider,
 }) => {
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
@@ -82,6 +85,13 @@ const ChatThread: React.FC<ChatThreadProps> = ({
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, waitingForAI]);
+
+  // Show the "SOLVO UNDERSTOOD" interpretation card only on the FIRST AI message
+  // that carries a parsedQuery. Follow-up messages still receive parsedQuery so
+  // their Select buttons can fire createRequest, but we don't re-render the card.
+  const firstParsedIdx = messages.findIndex(
+    (m) => m.role === 'assistant' && !!m.parsedQuery,
+  );
 
   return (
     <Box
@@ -150,8 +160,8 @@ const ChatThread: React.FC<ChatThreadProps> = ({
                         </Text>
                       )}
 
-                      {/* Parsed query interpretation card */}
-                      {msg.parsedQuery && (
+                      {/* Parsed query interpretation card — only on the first AI message */}
+                      {msg.parsedQuery && i === firstParsedIdx && (
                         <ParsedQueryCard parsed={msg.parsedQuery} />
                       )}
 
@@ -187,6 +197,11 @@ const ChatThread: React.FC<ChatThreadProps> = ({
                                 index={pi}
                                 isInPackage={packageKeys.has(key)}
                                 onTogglePackage={onTogglePackage}
+                                onSelect={
+                                  onSelectProvider
+                                    ? (prov) => onSelectProvider(prov, msg)
+                                    : undefined
+                                }
                               />
                             );
                           })}

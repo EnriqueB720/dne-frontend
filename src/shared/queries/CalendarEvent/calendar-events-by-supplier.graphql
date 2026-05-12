@@ -1,0 +1,17 @@
+query calendarEventsBySupplier($supplierId: Int!, $from: DateTime, $to: DateTime) {
+  calendarEventsBySupplier(supplierId: $supplierId, from: $from, to: $to) {
+    calendarEventId
+    supplierId
+    eventType
+    title
+    notes
+    startsAt
+    endsAt
+    allDay
+    timezone
+    bookingId
+    quoteId
+    location
+    status
+  }
+}

@@ -1,0 +1,16 @@
+query bookingsByCustomer($customerId: Int!, $status: BookingStatus) {
+  bookingsByCustomer(customerId: $customerId, status: $status) {
+    bookingId
+    requestId
+    quoteId
+    supplierId
+    serviceDate
+    location
+    guestCount
+    totalPrice
+    currency
+    status
+    paymentStatus
+    createdAt
+  }
+}

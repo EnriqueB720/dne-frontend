@@ -4,6 +4,8 @@ import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
 import AuthProvider from '@/shared/contexts/auth.provider'
 import { ApolloClient, HttpLink, InMemoryCache } from '@apollo/client';
 import { ApolloProvider } from "@apollo/client/react";
+import 'react-international-phone/style.css';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 
 export default function App({ Component, pageProps }: AppProps) {

@@ -1,0 +1,17 @@
+query bookingsBySupplier($supplierId: Int!, $status: BookingStatus) {
+  bookingsBySupplier(supplierId: $supplierId, status: $status) {
+    bookingId
+    requestId
+    quoteId
+    customerId
+    serviceDate
+    location
+    guestCount
+    totalPrice
+    supplierPayout
+    currency
+    status
+    paymentStatus
+    createdAt
+  }
+}

@@ -1,0 +1,3 @@
+mutation markQuotesViewed($data: QuoteMarkViewedInput!) {
+  markQuotesViewed(data: $data)
+}

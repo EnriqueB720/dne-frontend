@@ -2,7 +2,7 @@ query login($data: LoginUserInput!) {
   login(data: $data) {
     access_token
     expiresAt
-   user {
+    user {
       userId
       email
       language
@@ -11,6 +11,9 @@ query login($data: LoginUserInput!) {
       phone
       role
       profilePicture
+      isCustomer
+      isSupplier
+      isAdmin
       subscription {
         subscriptionId
         plan {
@@ -25,18 +28,10 @@ query login($data: LoginUserInput!) {
       supplier {
         supplierId
         companyName
-        posts {
-          postId
-          title
-          description
-          price
-          media_url
-          createdAt
-          category{
-            categoryId
-            categoryName
-          }
-        }
+      }
+      customer {
+        customerId
+        defaultCity
       }
     }
   }

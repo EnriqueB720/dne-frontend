@@ -1,0 +1,20 @@
+mutation createQuote($data: QuoteCreateInput!) {
+  createQuote(data: $data) {
+    quoteId
+    requestId
+    supplierId
+    totalPrice
+    currency
+    message
+    validUntil
+    status
+    createdAt
+    items {
+      quoteItemId
+      description
+      quantity
+      unitPrice
+      total
+    }
+  }
+}

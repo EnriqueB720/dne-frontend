@@ -1,0 +1,12 @@
+query quotesBySupplier($supplierId: Int!, $status: QuoteStatus) {
+  quotesBySupplier(supplierId: $supplierId, status: $status) {
+    quoteId
+    requestId
+    totalPrice
+    currency
+    message
+    validUntil
+    status
+    createdAt
+  }
+}

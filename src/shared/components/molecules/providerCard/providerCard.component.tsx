@@ -27,6 +27,8 @@ export interface ProviderData {
   email?: string;
   /** Optional contact phone — populated when the AI suggests a plausible one. */
   phone?: string;
+  /** True when this card represents a real supplier from the DB (vs. AI-invented). */
+  isRealSupplier?: boolean;
 }
 
 function buildSearchUrl(provider: ProviderData): string {

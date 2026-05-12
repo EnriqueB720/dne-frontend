@@ -1,0 +1,19 @@
+mutation acceptQuote($data: QuoteAcceptInput!) {
+  acceptQuote(data: $data) {
+    bookingId
+    requestId
+    quoteId
+    customerId
+    supplierId
+    serviceDate
+    location
+    guestCount
+    totalPrice
+    platformFee
+    supplierPayout
+    currency
+    status
+    paymentStatus
+    createdAt
+  }
+}

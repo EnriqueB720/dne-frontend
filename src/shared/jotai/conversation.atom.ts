@@ -10,6 +10,8 @@ export interface UiMessage extends Omit<ConversationMessage, 'messageId' | 'conv
   providers?: ProviderData[];
   /** Parsed query shown as interpretation card for the first turn. */
   parsedQuery?: ParsedQuery;
+  /** Whether the providers attached to this bubble are real DB suppliers ('db') or AI-invented ('ai'). */
+  providerSource?: 'db' | 'ai';
 }
 
 export interface ConversationState {

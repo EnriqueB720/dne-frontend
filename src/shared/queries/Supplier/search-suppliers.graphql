@@ -1,0 +1,29 @@
+query searchSuppliers($data: SupplierSearchInput!) {
+  searchSuppliers(data: $data) {
+    supplierId
+    companyName
+    slug
+    tagline
+    description
+    city
+    rating
+    reviewCount
+    responseTimeMinutes
+    minCapacity
+    maxCapacity
+    verified
+    premium
+    businessPhone
+    businessEmail
+    whatsappNumber
+    websiteUrl
+    services {
+      serviceId
+      name
+      description
+      basePrice
+      currency
+      pricingModel
+    }
+  }
+}
