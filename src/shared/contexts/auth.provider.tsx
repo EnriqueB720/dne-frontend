@@ -9,6 +9,7 @@ import { AuthProviderProps } from '@types';
 import { useLoginLazyQuery, useSignupMutation, useRefreshUserLazyQuery } from '@generated';
 import { StorageService } from '@services';
 import { useTranslation } from '@hooks';
+import { mergeGuestConversations } from '@/shared/services/conversation.service';
 
 
 const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
@@ -71,6 +72,11 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       setUser(user);
 
       setIsAuthenticated(true);
+
+      // Best-effort: claim any chats the user started as a guest on this
+      // device. Non-blocking — login succeeds even if this fails.
+      mergeGuestConversations().catch(() => {});
+
       return true;
 
     } catch (error: any) {
@@ -135,6 +141,11 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
         setUser(user);
 
         setIsAuthenticated(true);
+
+        // Also claim guest chats on refresh — covers the case where the
+        // user authenticated in another tab or restored a session via
+        // localStorage without going through the login flow.
+        mergeGuestConversations().catch(() => {});
       } else {
         setIsAuthenticated(false);
         setUser(undefined);

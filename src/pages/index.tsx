@@ -52,21 +52,28 @@ import {
 } from '@generated';
 import Link from 'next/link';
 import AuthContext from '@/shared/contexts/auth.context';
+import { useUserLocation } from '@hooks';
 
 // ── System prompt for chat AI ──────────────────────────────────────────────
 const SOLVO_CHAT_SYSTEM_PROMPT = `You are Solvo, an AI concierge for a service marketplace in Costa Rica.
 
 RULES — follow exactly:
 1. LANGUAGE: Detect the language of the user's latest message and reply in that EXACT language. If their message is in English, reply in English. If Spanish, reply in Spanish. Never mix languages.
-2. BREVITY: Keep every response to 1–3 sentences maximum.
-3. PROVIDER CARDS: Provider option cards are shown AUTOMATICALLY below your message — do NOT list or describe specific businesses yourself. Just acknowledge the user's request and invite them to check the cards.
-4. QUESTIONS: Ask at most ONE clarifying question per turn. If you already have a service type and a city, do not ask more questions — just say you found matches.
+2. BREVITY: Keep responses to 1–3 sentences for service requests. For conversational questions you may use up to 4–5 sentences if needed to answer properly.
+3. TWO MODES OF REPLY:
+   a) Service request (the user is asking you to find / refine / compare providers for a specific service): provider option cards will appear AUTOMATICALLY below your message — do NOT list or describe specific businesses yourself. Acknowledge the request and invite them to check the cards.
+   b) Conversation (general questions about how Solvo works, what's verified, pricing in general, greetings, thanks, off-topic chit-chat): NO cards will appear. Answer the question fully and helpfully in plain text. Do NOT mention "the cards" or "the options below" in this mode.
+4. QUESTIONS: Ask at most ONE clarifying question per turn. If a service request already has a service type and a city, do not ask more questions — just say you found matches.
 5. FORMAT: No bullet points, no markdown headers, no numbered lists.
 
-Example good responses:
+Service-request examples:
 - "Here are Chinese restaurant options in San José for 2 people around ₡20,000. Let me know if you'd like to adjust anything!"
 - "Got it — I've updated the options to focus on budget-friendly picks. Anything else to refine?"
-- "Sure! Here are cleaning services available in Escazú this weekend."`;
+
+Conversational examples:
+- User: "How does Solvo work?" → "You describe what you need in your own words and I match you with verified providers in your area. They send quotes, you pick one, and you can chat with them through the platform."
+- User: "Are these providers verified?" → "Yes — every provider in our network goes through an identity check. The 'In our network' badge on a card means that provider is verified by us."
+- User: "Thanks!" → "You're welcome! Let me know whenever you need something else."`;
 
 // ── Static hero data ────────────────────────────────────────────────────────
 const SUGGESTED_PROMPTS = [
@@ -607,6 +614,13 @@ export default function Home() {
   const [createRequest, createRequestState] = useCreateRequestMutation();
   const [createQuote, createQuoteState] = useCreateQuoteMutation();
   const [searchSuppliers] = useSearchSuppliersLazyQuery({ fetchPolicy: 'network-only' });
+
+  // Device geolocation — requested lazily on the first send so the user
+  // sees the browser permission prompt in the context of a real action,
+  // not as soon as they land on the page. The cached fix is reused for up
+  // to 30 minutes by the hook's internal TTL.
+  const { location: deviceLocation, status: locationStatus, request: requestLocation } =
+    useUserLocation();
   const [createdRequest, setCreatedRequest] = React.useState<{
     requestId: number;
     providerName: string;
@@ -776,18 +790,27 @@ export default function Home() {
     setPkgState({ items: [] });
   }, [setPkgState]);
 
-  // ── Load conversations on mount ────────────────────────────────────────
+  // ── Load conversations on mount + whenever auth state flips ───────────
+  // Re-running on `isAuthenticated` change is what makes login show the
+  // user's chats (which are scoped server-side by userId) and logout fall
+  // back to the device-scoped guest list.
   React.useEffect(() => {
     listConversations()
       .then((convs) => {
+        setConversations(convs);
         if (convs.length > 0) {
-          setConversations(convs);
           setCurrentConvId(convs[0].conversationId);
           setMode('chat');
+        } else {
+          setCurrentConvId(null);
         }
       })
-      .catch(() => {/* network error — stay in hero mode */});
-  }, []);
+      .catch((err) => {
+        // Surface to console so a misconfigured backend / GraphQL error
+        // doesn't silently leave the user looking at an empty sidebar.
+        console.error('[chat] failed to load conversations:', err);
+      });
+  }, [isAuthenticated]);
 
   // ── Load messages when conversation changes ────────────────────────────
   React.useEffect(() => {
@@ -818,7 +841,9 @@ export default function Home() {
           })),
         );
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[chat] failed to load conversation messages:', err);
+      });
   }, [currentConvId]);
 
   // ── Send message ───────────────────────────────────────────────────────
@@ -852,6 +877,15 @@ export default function Home() {
       // Switch to chat mode immediately
       setMode('chat');
 
+      // Kick off geolocation in parallel with the chat round-trip. We use
+      // whatever fix we already have for THIS round (no awaiting) so the
+      // user never waits on the geolocation prompt — but the next turn
+      // will benefit from the resolved coordinates.
+      const locationForThisTurn = deviceLocation;
+      if (!deviceLocation && locationStatus !== 'denied' && locationStatus !== 'requesting') {
+        requestLocation().catch(() => {});
+      }
+
       try {
         // Create conversation if needed
         let convId = currentConvId;
@@ -881,8 +915,21 @@ export default function Home() {
           providers: ProviderData[];
         } | null> = shouldGenerateProviders
           ? (async () => {
-              const parseResult = await parseQueryWithAi(contextQuery, currentModel);
+              const parseResult = await parseQueryWithAi(
+                contextQuery,
+                currentModel,
+                locationForThisTurn,
+              );
               const parsed = parseResult.parsed;
+
+              // Conversational turn (greeting, follow-up question, "how does
+              // this work?"). The chat text response handles it on its own;
+              // we skip provider generation entirely so no cards appear.
+              if (parsed.intent === 'chat') {
+                // eslint-disable-next-line no-console
+                console.log('[intent] chat — skipping provider generation');
+                return null;
+              }
 
               // Normalize location: AI sometimes returns "Santa Ana, Costa Rica"
               // or "in Santa Ana" — take the first comma-separated token, strip
@@ -919,7 +966,7 @@ export default function Home() {
                   }
                   return rows;
                 })(),
-                generateProvidersWithAi(parsed, currentModel),
+                generateProvidersWithAi(parsed, currentModel, locationForThisTurn),
               ]);
 
               const dbSuppliers: any[] =
@@ -1018,7 +1065,16 @@ export default function Home() {
         setWaitingForAI(false);
       }
     },
-    [currentConvId, messages, waitingForAI, currentModel],
+    [
+      currentConvId,
+      messages,
+      waitingForAI,
+      currentModel,
+      deviceLocation,
+      locationStatus,
+      requestLocation,
+      searchSuppliers,
+    ],
   );
 
   // ── Go back to hero landing ────────────────────────────────────────────

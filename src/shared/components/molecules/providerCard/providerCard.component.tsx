@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   Star, ShieldCheck, Clock, MapPin, Check, MessageCircle,
   ArrowRight, Globe, Mail, Phone, PackagePlus, PackageCheck,
+  Database,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Box, Flex, Text } from '@atoms';
@@ -175,7 +176,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
 
           {/* Right column: info + actions */}
           <Box flex="1" minWidth="0">
-            <Flex align="center" gap="8px" marginBottom="6px">
+            <Flex align="center" gap="8px" marginBottom="6px" wrap="wrap">
               <Text fontSize="lg" fontWeight="600" color={solvoColors.text}>
                 {provider.name}
               </Text>
@@ -183,6 +184,25 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                 <Box color={solvoColors.indigo}>
                   <ShieldCheck size={16} />
                 </Box>
+              )}
+              {/* "From our network" — distinguishes real DB suppliers from
+                  AI-invented suggestions. Sits next to the verified shield
+                  so users can scan trust signals at a glance. */}
+              {provider.isRealSupplier && (
+                <Flex
+                  align="center"
+                  gap="4px"
+                  padding="2px 8px"
+                  borderRadius="full"
+                  bg={solvoColors.indigoLight}
+                  color={solvoColors.indigo}
+                  fontSize="11px"
+                  fontWeight="600"
+                  title="This provider is part of the Solvo network"
+                >
+                  <Database size={11} />
+                  In our network
+                </Flex>
               )}
               {/* "In package" badge */}
               {isInPackage && (

@@ -1,12 +1,35 @@
 import type { ModelKey } from '../jotai/ai-usage.atom';
 import type { ProviderData } from '@components';
+import type { DeviceLocation } from '@hooks';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+
+/**
+ * Build a one-line snippet describing the user's approximate device
+ * location, suitable for appending to either the parser or provider prompts.
+ * Returns an empty string if no location is available so callers can
+ * unconditionally concatenate.
+ */
+function formatDeviceLocationHint(loc?: DeviceLocation | null): string {
+  if (!loc) return '';
+  const lat = loc.lat.toFixed(4);
+  const lng = loc.lng.toFixed(4);
+  const acc = Math.round(loc.accuracyMeters);
+  return `Device approximate location (use as fallback when the user doesn't mention a city): latitude ${lat}, longitude ${lng}, accuracy ~${acc}m. Infer the most likely Costa Rican neighborhood/canton from these coordinates.`;
+}
 
 export interface ChatUsage {
   inputTokens?: number;
   outputTokens?: number;
 }
+
+/**
+ * Whether the user is asking us to find providers for them (in which case
+ * the UI shows provider cards) or having a conversational exchange (where
+ * the AI just answers in text — no cards generated). Refinements of an
+ * earlier service request still count as `service_request`.
+ */
+export type QueryIntent = 'service_request' | 'chat';
 
 export interface ParsedQuery {
   service: string;
@@ -15,6 +38,7 @@ export interface ParsedQuery {
   budget: string;
   when: string;
   dietary?: string;
+  intent: QueryIntent;
 }
 
 export interface ParseQueryResult {
@@ -24,22 +48,27 @@ export interface ParseQueryResult {
 }
 
 const PARSE_SYSTEM_PROMPT = `You are an intent parser for Solvo, a service marketplace in Costa Rica.
-The user will provide a free-text request describing a service they need.
-Extract structured fields and respond with ONLY a JSON object — no prose, no markdown fences, no commentary.
+The user will provide a free-text message in a multi-turn conversation. Classify their INTENT and, when applicable, extract structured fields. Respond with ONLY a JSON object — no prose, no markdown fences, no commentary.
 
 Schema:
 {
-  "service": "short service category like 'Catering', 'DJ', 'Cleaning', 'AC repair', etc. — 1-3 words",
+  "intent": "either 'service_request' (the user wants us to find/recommend providers, or is refining/expanding an earlier service search) or 'chat' (the user is asking a general question, having small talk, or asking how Solvo works without naming a service to find)",
+  "service": "short service category like 'Catering', 'DJ', 'Cleaning', 'AC repair', etc. — 1-3 words. Use empty string '' when intent is 'chat' or no service category is implied.",
   "people": "string number of people (e.g. '35 people'), OR an empty string '' if not mentioned. NEVER write the word 'unspecified'.",
-  "location": "string location/neighborhood if mentioned (e.g. 'Santa Ana'), OR an empty string '' if not mentioned",
+  "location": "string location/neighborhood if mentioned (e.g. 'Santa Ana'). If the user did NOT mention a location AND device coordinates are provided in the user message, infer the most likely Costa Rican canton/neighborhood from those coordinates. Otherwise empty string ''.",
   "budget": "string budget formatted as '₡XXX,XXX' if mentioned, OR an empty string '' if not mentioned. NEVER write the word 'unspecified'.",
   "when": "string time/date if mentioned (e.g. 'Saturday', 'next week'), OR an empty string '' if not mentioned",
   "dietary": "OPTIONAL: dietary or special needs as a short phrase, omit the field entirely if none"
 }
 
-Rules:
-- Always include service.
+Intent rules — apply in this order:
+- "I need X" / "Find me X" / "Plan a Y" / "Show me cheaper options" / "What about Saturday?" (refining an earlier search) → service_request.
+- Pure questions about how Solvo works, what's verified, follow-up clarifications, greetings, thanks, off-topic chat → chat.
+- When in doubt and the message names a concrete service category (catering, DJ, photographer, plumber, etc.) → service_request.
+
+Other rules:
 - For unknown fields, use empty string '' — do NOT invent values, do NOT write 'unspecified', 'flexible', 'any', etc.
+- The user's stated location ALWAYS wins over device coordinates. Only fall back to coordinates when the user didn't mention a location.
 - Keep stated values short and human-readable.
 - Output must be valid JSON parseable by JSON.parse — NOTHING else.`;
 
@@ -49,6 +78,7 @@ const FALLBACK_QUERY: ParsedQuery = {
   location: '',
   budget: '',
   when: '',
+  intent: 'service_request',
 };
 
 function stripJsonFences(text: string): string {
@@ -62,11 +92,17 @@ function stripJsonFences(text: string): string {
 export async function parseQueryWithAi(
   query: string,
   model: ModelKey,
+  deviceLocation?: DeviceLocation | null,
 ): Promise<ParseQueryResult> {
   const trimmed = query.trim();
   if (!trimmed) {
     return { parsed: FALLBACK_QUERY, model };
   }
+
+  const locationHint = formatDeviceLocationHint(deviceLocation);
+  const userMessage = locationHint
+    ? `${trimmed}\n\n[${locationHint}]`
+    : trimmed;
 
   const res = await fetch(`${API_URL}/chat`, {
     method: 'POST',
@@ -74,7 +110,7 @@ export async function parseQueryWithAi(
     body: JSON.stringify({
       model,
       system: PARSE_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: trimmed }],
+      messages: [{ role: 'user', content: userMessage }],
     }),
   });
 
@@ -105,7 +141,13 @@ export async function parseQueryWithAi(
   let parsed: ParsedQuery;
   try {
     const obj = JSON.parse(cleaned);
+    // Coerce anything the model returns into our two-valued intent. Default
+    // to `service_request` since that's the more common case and keeping
+    // provider generation on for ambiguous turns is the safer error.
+    const rawIntent = String(obj.intent ?? '').toLowerCase().trim();
+    const intent: QueryIntent = rawIntent === 'chat' ? 'chat' : 'service_request';
     parsed = {
+      intent,
       service: String(obj.service ?? FALLBACK_QUERY.service),
       people: isEmpty(obj.people) ? '' : String(obj.people),
       location: isEmpty(obj.location) ? '' : String(obj.location),
@@ -326,13 +368,15 @@ function sanitizeProvider(raw: unknown, index: number): ProviderData | null {
 export async function generateProvidersWithAi(
   parsed: ParsedQuery,
   model: ModelKey,
+  deviceLocation?: DeviceLocation | null,
 ): Promise<GenerateProvidersResult> {
+  const locationHint = formatDeviceLocationHint(deviceLocation);
   const userMessage = `Service request:
 - Service: ${parsed.service}
 - People: ${parsed.people}
 - Location: ${parsed.location}
 - Budget: ${parsed.budget}
-- When: ${parsed.when}${parsed.dietary ? `\n- Dietary/special needs: ${parsed.dietary}` : ''}
+- When: ${parsed.when}${parsed.dietary ? `\n- Dietary/special needs: ${parsed.dietary}` : ''}${locationHint ? `\n\n[${locationHint} Bias the inventory's "location" field toward the cantons near these coordinates when the user didn't specify a city.]` : ''}
 
 Generate 4 matching providers as a JSON array.`;
 
