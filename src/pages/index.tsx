@@ -60,19 +60,29 @@ const SOLVO_CHAT_SYSTEM_PROMPT = `You are Solvo, an AI concierge for a service m
 RULES — follow exactly:
 1. LANGUAGE: Detect the language of the user's latest message and reply in that EXACT language. If their message is in English, reply in English. If Spanish, reply in Spanish. Never mix languages.
 2. BREVITY: Keep responses to 1–3 sentences for service requests. For conversational questions you may use up to 4–5 sentences if needed to answer properly.
-3. TWO MODES OF REPLY:
-   a) Service request (the user is asking you to find / refine / compare providers for a specific service): provider option cards will appear AUTOMATICALLY below your message — do NOT list or describe specific businesses yourself. Acknowledge the request and invite them to check the cards.
-   b) Conversation (general questions about how Solvo works, what's verified, pricing in general, greetings, thanks, off-topic chit-chat): NO cards will appear. Answer the question fully and helpfully in plain text. Do NOT mention "the cards" or "the options below" in this mode.
-4. QUESTIONS: Ask at most ONE clarifying question per turn. If a service request already has a service type and a city, do not ask more questions — just say you found matches.
-5. FORMAT: No bullet points, no markdown headers, no numbered lists.
+3. TIMING — CRITICAL: Your reply and the provider cards are delivered TOGETHER, in the SAME message, at the SAME instant. There is NO "later". NEVER say "hold on", "one moment", "please wait", "I'll find", "let me search", "give me a second", or anything implying results are still coming. Always speak in the PRESENT or PAST tense about what is already on screen.
+4. TWO MODES OF REPLY:
+   a) Service request (the user asked you to find / refine / compare providers): a "## Search result" block below tells you EXACTLY how many provider cards are shown to the user right now.
+      - If the count is 1 or more: the cards are ALREADY visible below your message. Acknowledge what you found in present tense ("Here are 4 Italian options near Santo Domingo") and invite them to look. Do NOT list or describe the specific businesses yourself.
+      - If the count is 0: there are NO cards. Tell the user plainly that you couldn't find matches for their specific request, and offer to broaden it (a nearby area, a different service, a higher budget). Do NOT pretend results exist.
+   b) Conversation (general questions about how Solvo works, what's verified, pricing in general, greetings, thanks, off-topic chit-chat, AND questions about a specific provider already shown): NO cards will appear. Answer fully in plain text. Do NOT mention "the cards" or "the options below" in this mode.
+5. PROVIDER FACTS — NO HALLUCINATION:
+   - When the user asks about a specific named provider (e.g. "where is PikiTiki?", "how much does Sabor Catering charge?"), you may ONLY answer using the data in the "## Known providers" / "## Search result" block below, when present.
+   - If the named provider IS in that block, answer using its fields verbatim. Do not invent addresses, hours, or services that aren't there.
+   - If the named provider is NOT in that block (or no block is present), say you don't have detailed info on that provider on hand and offer to search for similar providers. Never make up the answer.
+   - NEVER guess what category a named provider belongs to. Use ONLY the data you have.
+6. QUESTIONS: Ask at most ONE clarifying question per turn.
+7. FORMAT: No bullet points, no markdown headers, no numbered lists.
 
 Service-request examples:
-- "Here are Chinese restaurant options in San José for 2 people around ₡20,000. Let me know if you'd like to adjust anything!"
-- "Got it — I've updated the options to focus on budget-friendly picks. Anything else to refine?"
+- (4 cards shown) "Here are 4 Italian options near Santo Domingo, Heredia — take a look below and tell me if you'd like to adjust anything."
+- (0 cards shown) "I couldn't find Italian options near Santo Domingo specifically. Want me to widen the search to the rest of Heredia, or try a different cuisine?"
+- (5 cards shown) "I've updated the options to focus on budget-friendly picks below."
 
 Conversational examples:
 - User: "How does Solvo work?" → "You describe what you need in your own words and I match you with verified providers in your area. They send quotes, you pick one, and you can chat with them through the platform."
-- User: "Are these providers verified?" → "Yes — every provider in our network goes through an identity check. The 'In our network' badge on a card means that provider is verified by us."
+- User: "Where is PikiTiki located?" (PikiTiki in the block as Santa Ana) → "PikiTiki is in Santa Ana. Want me to show you more options nearby?"
+- User: "Where is XYZ Cafe?" (XYZ Cafe NOT in the block) → "I don't have details on XYZ Cafe handy — want me to look for similar providers instead?"
 - User: "Thanks!" → "You're welcome! Let me know whenever you need something else."`;
 
 // ── Static hero data ────────────────────────────────────────────────────────
@@ -153,6 +163,117 @@ function dbSupplierToProviderData(s: any, index: number): ProviderData {
     phone: s.businessPhone ?? s.whatsappNumber ?? undefined,
     isRealSupplier: true,
   };
+}
+
+// ── AI grounding from provider cards ──────────────────────────────────────
+//
+// When the user asks follow-up questions about a specific provider that's
+// already been shown ("where is PikiTiki located?", "how much does Sabor
+// Catering charge?"), the AI needs the actual data to answer factually —
+// otherwise it hallucinates. We format the providers as a compact reference
+// block appended to the system prompt.
+
+/** Format a provider list into a compact, one-line-per-provider block. */
+function formatProvidersForGrounding(providers: ProviderData[]): string {
+  return providers
+    .map((p, idx) => {
+      const parts: string[] = [
+        `${idx + 1}. ${p.name}`,
+        `location: ${p.location}`,
+        `price: ${p.priceLabel}`,
+        `rating: ${p.rating} (${p.reviews} reviews)`,
+        `response: ${p.responseTime}`,
+      ];
+      if (p.includes.length > 0) {
+        parts.push(`includes: ${p.includes.join(', ')}`);
+      }
+      if (p.tags.length > 0) parts.push(`tags: ${p.tags.join(', ')}`);
+      if (p.phone) parts.push(`phone: ${p.phone}`);
+      if (p.email) parts.push(`email: ${p.email}`);
+      if (p.website) parts.push(`website: ${p.website}`);
+      parts.push(
+        p.isRealSupplier ? 'source: in our network' : 'source: AI suggestion',
+      );
+      return parts.join(' | ');
+    })
+    .join('\n');
+}
+
+/**
+ * Walk message history backwards and format the most recent assistant
+ * message that carried provider cards. Used for conversational turns where
+ * the user references a provider shown earlier.
+ */
+function buildProviderGrounding(messages: UiMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== 'assistant') continue;
+    if (!m.providers || m.providers.length === 0) continue;
+    return formatProvidersForGrounding(m.providers);
+  }
+  return '';
+}
+
+/**
+ * Conversational-turn framing: grounds the AI in providers shown earlier so
+ * it can answer "where is X?" factually. No card-count framing — this turn
+ * isn't producing cards.
+ */
+function withGrounding(grounding: string): string {
+  if (!grounding) return SOLVO_CHAT_SYSTEM_PROMPT;
+  return `${SOLVO_CHAT_SYSTEM_PROMPT}\n\n## Known providers (answer questions about these specific businesses using ONLY this data — do not invent details):\n${grounding}`;
+}
+
+/**
+ * Service-request framing: tells the AI EXACTLY how many cards are being
+ * shown alongside its message (including zero), so it speaks accurately and
+ * never promises results that aren't there. Built AFTER the search + AI fill
+ * resolve, so the count is final.
+ */
+function withSearchResult(
+  providers: ProviderData[],
+  parsed: ParsedQuery,
+): string {
+  const count = providers.length;
+  const requestLine = [
+    parsed.service && `service: ${parsed.service}`,
+    parsed.location && `location: ${parsed.location}`,
+    parsed.people && `people: ${parsed.people}`,
+    parsed.budget && `budget: ${parsed.budget}`,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+
+  if (count === 0) {
+    return (
+      `${SOLVO_CHAT_SYSTEM_PROMPT}\n\n## Search result\n` +
+      `0 provider cards are shown. The search for [${requestLine || 'this request'}] returned nothing. ` +
+      `Tell the user plainly you couldn't find matches and offer to broaden the search — DO NOT imply results are still loading.`
+    );
+  }
+
+  // Honesty check: did EVERY card actually match the requested location?
+  // The backend ranks city-matches first but degrades gracefully to
+  // "service matches elsewhere", so the cards may be in nearby areas.
+  let locationNote = '';
+  if (parsed.location) {
+    const wanted = parsed.location.toLowerCase();
+    const allMatch = providers.every((p) =>
+      p.location.toLowerCase().includes(wanted),
+    );
+    if (!allMatch) {
+      locationNote =
+        ` NOTE: not all of these are located in "${parsed.location}" exactly — some are in nearby areas. ` +
+        `Be honest about that (e.g. "I didn't find any right in ${parsed.location}, but here are some close by").`;
+    }
+  }
+
+  return (
+    `${SOLVO_CHAT_SYSTEM_PROMPT}\n\n## Search result\n` +
+    `${count} provider card${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} shown to the user RIGHT NOW, below your message, for [${requestLine || 'this request'}].` +
+    locationNote +
+    ` Acknowledge them in present tense. The cards:\n${formatProvidersForGrounding(providers)}`
+  );
 }
 
 // ── Hero section (extracted for clarity) ──────────────────────────────────
@@ -609,6 +730,18 @@ export default function Home() {
   const [waitingForAI, setWaitingForAI] = React.useState(false);
   const [currentModel, setCurrentModel] = React.useState<ModelKey>('claude-haiku');
 
+  // When handleSend creates a brand-new conversation, it sets currentConvId
+  // mid-send — which would trigger the "load messages" effect and overwrite
+  // the optimistic user message with the (still empty) DB state. We stamp the
+  // freshly-created id here so that effect skips exactly one fetch; local
+  // state already holds the correct messages for that turn.
+  const skipNextMessageLoadRef = React.useRef<string | null>(null);
+
+  // Controls the in-flight AI turn so the "stop" button can cancel the
+  // underlying network requests (parse / search / generate / send), not just
+  // hide the spinner.
+  const abortRef = React.useRef<AbortController | null>(null);
+
   // ── Request creation (from "Select" on a provider card) ────────────────
   const { user, isAuthenticated } = React.useContext(AuthContext);
   const [createRequest, createRequestState] = useCreateRequestMutation();
@@ -818,6 +951,14 @@ export default function Home() {
       setMessages([]);
       return;
     }
+    // Skip exactly one fetch for a conversation we just created mid-send —
+    // its messages already live in local state (the optimistic user message
+    // + the AI reply). Fetching here would race the persistence and wipe the
+    // user's first message from the UI.
+    if (skipNextMessageLoadRef.current === currentConvId) {
+      skipNextMessageLoadRef.current = null;
+      return;
+    }
     getConversation(currentConvId)
       .then((conv) => {
         setMessages(
@@ -886,6 +1027,12 @@ export default function Home() {
         requestLocation().catch(() => {});
       }
 
+      // Fresh AbortController for this turn — the "stop" button aborts it,
+      // which cancels every in-flight request that was handed `signal`.
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const signal = controller.signal;
+
       try {
         // Create conversation if needed
         let convId = currentConvId;
@@ -894,126 +1041,152 @@ export default function Home() {
             content.length > 60 ? `${content.slice(0, 57)}…` : content;
           const conv = await createConversation(title, currentModel);
           convId = conv.conversationId;
+          // Tell the load-messages effect to skip this id's fetch — local
+          // state already holds the optimistic user message for this turn,
+          // and the AI reply is appended below. Without this, the effect
+          // races persistence and the user's first message disappears.
+          skipNextMessageLoadRef.current = convId;
           setCurrentConvId(convId);
           setConversations((prev) => [conv, ...prev]);
         }
 
-        // AI text response (always)
-        const aiTextPromise = apiSendMessage(
-          convId,
-          content,
-          currentModel,
-          SOLVO_CHAT_SYSTEM_PROMPT,
-        );
-
-        // Provider generation — hybrid: run BOTH the DB search and the AI
-        // invention in parallel, then merge with DB results first. AI results
-        // act as additional "suggestions" / alternatives.
+        // Total provider cards we ever want to show per turn.
         const TOTAL_CARDS = 5;
-        const providerPromise: Promise<{
-          parsed: ParsedQuery;
-          providers: ProviderData[];
-        } | null> = shouldGenerateProviders
-          ? (async () => {
-              const parseResult = await parseQueryWithAi(
-                contextQuery,
+
+        // ── Step 1: parse intent + fields FIRST ──────────────────────────
+        // Everything downstream (whether to search, whether to ground the
+        // chat AI in DB results) depends on this, so it can't run in
+        // parallel with the chat call anymore.
+        const parseResult = await parseQueryWithAi(
+          contextQuery,
+          currentModel,
+          locationForThisTurn,
+          signal,
+        );
+        const parsed = parseResult.parsed;
+
+        let aiResult: Awaited<ReturnType<typeof apiSendMessage>>;
+        let provData: { parsed: ParsedQuery; providers: ProviderData[] } | null =
+          null;
+
+        if (parsed.intent === 'chat' || !shouldGenerateProviders) {
+          // ── Conversational turn ────────────────────────────────────────
+          // No cards. Ground the AI in whatever providers were shown
+          // earlier so it can answer "where is PikiTiki?" factually.
+          // eslint-disable-next-line no-console
+          console.log('[intent] chat — no provider generation');
+          aiResult = await apiSendMessage(
+            convId,
+            content,
+            currentModel,
+            withGrounding(buildProviderGrounding(currentMessages)),
+            signal,
+          );
+        } else {
+          // ── Service request: DB-first, AI fills only the gap ───────────
+          const rawLocation = (parsed.location || '').trim();
+          const normalizedCity = rawLocation
+            .split(',')[0]
+            .replace(/^(in|at|near|around)\s+/i, '')
+            .trim();
+          const guests = parsed.people
+            ? parseInt(parsed.people.replace(/\D/g, ''), 10)
+            : NaN;
+          const searchVars = {
+            serviceQuery: parsed.service?.trim() || null,
+            city: normalizedCity || null,
+            guestCount:
+              Number.isFinite(guests) && guests > 0 ? guests : null,
+            limit: TOTAL_CARDS,
+          };
+          // eslint-disable-next-line no-console
+          console.log('[DB] searchSuppliers input:', searchVars);
+
+          // Step 2: DB search (awaited up front — it's fast, and the chat
+          // AI needs the results to answer without contradicting the cards).
+          // The backend handles location matching: accent-insensitive,
+          // city-matches ranked first, and it degrades gracefully to
+          // "service matches elsewhere" rather than returning nothing — so
+          // no client-side retry is needed.
+          let dbSuppliers: any[] = [];
+          try {
+            const res = await searchSuppliers({
+              variables: { data: searchVars as any },
+              context: { fetchOptions: { signal } },
+            });
+            dbSuppliers = res?.data?.searchSuppliers ?? [];
+          } catch (dbErr) {
+            // eslint-disable-next-line no-console
+            console.error('[DB] searchSuppliers ERROR:', dbErr);
+          }
+
+          const dbProviders = dbSuppliers.map((s, i) =>
+            dbSupplierToProviderData(s, i),
+          );
+          // Strict: DB results are authoritative. AI only fills the gap up
+          // to TOTAL_CARDS — and not at all when the DB already covers it.
+          const needFromAi = Math.max(0, TOTAL_CARDS - dbProviders.length);
+          // eslint-disable-next-line no-console
+          console.log(
+            `[providers] db=${dbProviders.length} needFromAi=${needFromAi}`,
+          );
+
+          // Step 3: AI top-up sized to exactly the gap. Awaited BEFORE the
+          // chat reply so the chat AI knows the final card count — otherwise
+          // it hedges with "hold on a moment..." and the user waits for
+          // results that already (didn't) arrive.
+          let fillRes: Awaited<ReturnType<typeof generateProvidersWithAi>> | null =
+            null;
+          if (needFromAi > 0) {
+            try {
+              fillRes = await generateProvidersWithAi(
+                parsed,
                 currentModel,
                 locationForThisTurn,
+                needFromAi,
+                signal,
               );
-              const parsed = parseResult.parsed;
-
-              // Conversational turn (greeting, follow-up question, "how does
-              // this work?"). The chat text response handles it on its own;
-              // we skip provider generation entirely so no cards appear.
-              if (parsed.intent === 'chat') {
-                // eslint-disable-next-line no-console
-                console.log('[intent] chat — skipping provider generation');
-                return null;
-              }
-
-              // Normalize location: AI sometimes returns "Santa Ana, Costa Rica"
-              // or "in Santa Ana" — take the first comma-separated token, strip
-              // common prefixes, trim.
-              const rawLocation = (parsed.location || '').trim();
-              const normalizedCity = rawLocation
-                .split(',')[0]
-                .replace(/^(in|at|near|around)\s+/i, '')
-                .trim();
-
-              const guests = parsed.people ? parseInt(parsed.people.replace(/\D/g, ''), 10) : NaN;
-              const searchVars = {
-                serviceQuery: parsed.service?.trim() || null,
-                city: normalizedCity || null,
-                guestCount: Number.isFinite(guests) && guests > 0 ? guests : null,
-                limit: TOTAL_CARDS,
-              };
-
+            } catch (err) {
               // eslint-disable-next-line no-console
-              console.log('[DB] searchSuppliers input:', searchVars);
+              console.error('[AI] generateProvidersWithAi ERROR:', err);
+              fillRes = null;
+            }
+          }
 
-              // Fire both in parallel
-              const [dbSettled, aiSettled] = await Promise.allSettled([
-                (async () => {
-                  // Primary DB search
-                  const res = await searchSuppliers({ variables: { data: searchVars as any } });
-                  const rows: any[] = res?.data?.searchSuppliers ?? [];
-                  if (rows.length === 0 && searchVars.serviceQuery && searchVars.city) {
-                    // Retry without city if service+city was too strict
-                    const retry = await searchSuppliers({
-                      variables: { data: { ...searchVars, city: null } as any },
-                    });
-                    return (retry?.data?.searchSuppliers ?? []) as any[];
-                  }
-                  return rows;
-                })(),
-                generateProvidersWithAi(parsed, currentModel, locationForThisTurn),
-              ]);
+          // Step 4: merge — DB first, AI fills, dedupe by name, cap, and
+          // flag EXACTLY one card as recommended.
+          const aiProviders: ProviderData[] = fillRes?.providers ?? [];
+          const dbNames = new Set(
+            dbProviders.map((p) => p.name.toLowerCase()),
+          );
+          const dedupedAi = aiProviders
+            .filter((p) => !dbNames.has(p.name.toLowerCase()))
+            // Negative ids so AI cards never collide with real supplierIds.
+            .map((p, i) => ({ ...p, id: -1000 - i, isRealSupplier: false }));
 
-              const dbSuppliers: any[] =
-                dbSettled.status === 'fulfilled' ? dbSettled.value : [];
-              const aiProviders: ProviderData[] =
-                aiSettled.status === 'fulfilled' ? aiSettled.value.providers : [];
+          const merged = [...dbProviders, ...dedupedAi]
+            .slice(0, TOTAL_CARDS)
+            // Single source of truth for the "recommended" ribbon — only the
+            // first card gets it, every other card is explicitly cleared.
+            .map((p, i) => ({ ...p, recommended: i === 0 }));
 
-              if (dbSettled.status === 'rejected') {
-                // eslint-disable-next-line no-console
-                console.error('[DB] searchSuppliers ERROR:', dbSettled.reason);
-              }
-              if (aiSettled.status === 'rejected') {
-                // eslint-disable-next-line no-console
-                console.error('[AI] generateProvidersWithAi ERROR:', aiSettled.reason);
-              }
-              // eslint-disable-next-line no-console
-              console.log(
-                `[providers] db=${dbSuppliers.length} ai=${aiProviders.length} — merging (db first)`,
-              );
+          provData = { parsed, providers: merged };
 
-              // Map DB rows to ProviderData
-              const dbProviders = dbSuppliers.map((s, i) => dbSupplierToProviderData(s, i));
-
-              // Dedupe AI providers against DB providers by lowercased name
-              const dbNames = new Set(dbProviders.map((p) => p.name.toLowerCase()));
-              const dedupedAi = aiProviders
-                .filter((p) => !dbNames.has(p.name.toLowerCase()))
-                // Remap AI ids to a negative range so they can never collide with
-                // real supplierIds (used as React keys + provider.id elsewhere).
-                .map((p, i) => ({ ...p, id: -1000 - i, isRealSupplier: false }));
-
-              // Merge with DB first, cap to TOTAL_CARDS
-              const merged = [...dbProviders, ...dedupedAi].slice(0, TOTAL_CARDS);
-
-              // First card always gets "recommended" + "AI Match" pill
-              if (merged.length > 0) {
-                merged[0] = { ...merged[0], recommended: true };
-              }
-
-              return { parsed, providers: merged };
-            })()
-          : Promise.resolve(null);
-
-        const [aiResult, provData] = await Promise.all([
-          aiTextPromise,
-          providerPromise,
-        ]);
+          // Step 5: NOW call the chat AI — grounded in the FINAL card set
+          // (count included, even when it's zero). This is what keeps the
+          // reply honest: "Here are 4 options" / "I couldn't find any".
+          // eslint-disable-next-line no-console
+          console.log(
+            `[providers] final card count = ${merged.length}`,
+          );
+          aiResult = await apiSendMessage(
+            convId,
+            content,
+            currentModel,
+            withSearchResult(merged, parsed),
+            signal,
+          );
+        }
 
         const aiMsg: UiMessage = {
           messageId: aiResult.messageId,
@@ -1053,15 +1226,30 @@ export default function Home() {
             ),
         );
       } catch (_err) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: '⚠️ Something went wrong. Please try again.',
-            createdAt: new Date().toISOString(),
-          },
-        ]);
+        if (controller.signal.aborted) {
+          // Intentional stop — leave a quiet marker instead of an error.
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: '⏹ Stopped.',
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: '⚠️ Something went wrong. Please try again.',
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+        }
       } finally {
+        // Only clear the ref if it's still THIS turn's controller — a newer
+        // turn may have replaced it.
+        if (abortRef.current === controller) abortRef.current = null;
         setWaitingForAI(false);
       }
     },
@@ -1076,6 +1264,16 @@ export default function Home() {
       searchSuppliers,
     ],
   );
+
+  // ── Stop the in-flight AI turn ─────────────────────────────────────────
+  // Aborts the controller (cancelling parse / search / generate / send) and
+  // drops the spinner. handleSend's catch sees `signal.aborted` and adds the
+  // quiet "Stopped." marker rather than an error.
+  const handleStop = React.useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setWaitingForAI(false);
+  }, []);
 
   // ── Go back to hero landing ────────────────────────────────────────────
   const handleGoHome = React.useCallback(() => {
@@ -1550,6 +1748,7 @@ export default function Home() {
         </Flex>
         <ChatComposer
           onSend={handleSend}
+          onStop={handleStop}
           disabled={waitingForAI}
           model={currentModel}
           onModelChange={setCurrentModel}

@@ -267,6 +267,7 @@ export async function sendMessage(
   content: string,
   model?: ModelKey,
   system?: string,
+  signal?: AbortSignal,
 ): Promise<SendMessageResult> {
   const { data, errors } = await client().mutate<{
     sendAiMessage: SendMessageResult;
@@ -276,6 +277,9 @@ export async function sendMessage(
       data: { conversationId, content, model, system },
       deviceId: getOrCreateDeviceId(),
     },
+    // Forward the abort signal into the underlying fetch so a "stop" click
+    // actually cancels the in-flight AI request, not just the UI spinner.
+    ...(signal ? { context: { fetchOptions: { signal } } } : {}),
   });
   if (errors?.length) throw errors[0];
   if (!data?.sendAiMessage) {
