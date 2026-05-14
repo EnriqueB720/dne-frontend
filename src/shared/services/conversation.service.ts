@@ -1,5 +1,6 @@
-import { ApolloClient, gql, NormalizedCacheObject } from '@apollo/client';
+import { gql } from '@apollo/client';
 import type { ModelKey } from '../jotai/ai-usage.atom';
+import { getApolloClient } from './apollo.client';
 
 // ── Device ID ──────────────────────────────────────────────────────────────
 //
@@ -176,36 +177,15 @@ const MERGE_GUEST_AI_CONVERSATIONS = gql`
   }
 `;
 
-// ── Apollo client accessor ─────────────────────────────────────────────────
-//
-// The page-level `useApolloClient()` is the canonical way to get the client
-// in React components, but the existing call sites in pages/index.tsx import
-// these functions standalone. To keep that pattern working we expose a
-// module-level setter that _app.tsx (or any provider) can call once.
-//
-// In practice we lazily grab the client from the Apollo cache global on first
-// use: when @apollo/client v3 boots, it exposes the active client via the
-// `client` field on any rendered component's context. We avoid that fragility
-// by requiring callers to set it explicitly.
-
-let _client: ApolloClient<NormalizedCacheObject> | null = null;
-
-export function setConversationApolloClient(
-  client: ApolloClient<NormalizedCacheObject>,
-) {
-  _client = client;
-}
-
-function client(): ApolloClient<NormalizedCacheObject> {
-  if (!_client) {
-    throw new Error(
-      'Apollo client not initialised for conversation.service. Call ' +
-        'setConversationApolloClient(client) once after constructing the ' +
-        'ApolloClient (see pages/_app.tsx).',
-    );
+const ROLLBACK_LAST_AI_TURN = gql`
+  mutation rollbackLastAiTurn($conversationId: String!, $deviceId: String) {
+    rollbackLastAiTurn(conversationId: $conversationId, deviceId: $deviceId)
   }
-  return _client;
-}
+`;
+
+// The shared module-level client (set once in _app.tsx) — these service
+// functions run outside the React tree, so they can't use `useApolloClient`.
+const client = getApolloClient;
 
 // ── API ────────────────────────────────────────────────────────────────────
 
@@ -268,13 +248,16 @@ export async function sendMessage(
   model?: ModelKey,
   system?: string,
   signal?: AbortSignal,
+  cachedSystem?: string,
 ): Promise<SendMessageResult> {
   const { data, errors } = await client().mutate<{
     sendAiMessage: SendMessageResult;
   }>({
     mutation: SEND_AI_MESSAGE,
     variables: {
-      data: { conversationId, content, model, system },
+      // `system` is the per-turn dynamic prompt; `cachedSystem` is the stable
+      // base prompt the backend marks for provider-side prompt caching.
+      data: { conversationId, content, model, system, cachedSystem },
       deviceId: getOrCreateDeviceId(),
     },
     // Forward the abort signal into the underlying fetch so a "stop" click
@@ -286,6 +269,24 @@ export async function sendMessage(
     throw new Error('sendAiMessage returned no data');
   }
   return data.sendAiMessage;
+}
+
+/**
+ * Undo the most recent turn server-side — used when the user hits "stop".
+ * Deletes the trailing user message (and the assistant reply if it already
+ * landed). Best-effort: callers fire-and-forget.
+ */
+export async function rollbackLastTurn(
+  conversationId: string,
+): Promise<number> {
+  const { data, errors } = await client().mutate<{
+    rollbackLastAiTurn: number;
+  }>({
+    mutation: ROLLBACK_LAST_AI_TURN,
+    variables: { conversationId, deviceId: getOrCreateDeviceId() },
+  });
+  if (errors?.length) throw errors[0];
+  return data?.rollbackLastAiTurn ?? 0;
 }
 
 export async function deleteConversation(id: string): Promise<void> {

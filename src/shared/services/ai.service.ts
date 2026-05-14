@@ -1,8 +1,59 @@
+import { gql } from '@apollo/client';
 import type { ModelKey } from '../jotai/ai-usage.atom';
 import type { ProviderData } from '@components';
 import type { DeviceLocation } from '@hooks';
+import { getApolloClient } from './apollo.client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+/**
+ * Stateless model completion over GraphQL (the `aiComplete` mutation —
+ * replaces the legacy `POST /chat` REST call). `cachedSystem` carries the
+ * stable base prompt so the backend can mark it for provider-side prompt
+ * caching; `system` is reserved for any per-call dynamic context.
+ */
+const AI_COMPLETE = gql`
+  mutation aiComplete($data: AiCompletionInput!) {
+    aiComplete(data: $data) {
+      content
+      model
+      usage {
+        inputTokens
+        outputTokens
+      }
+    }
+  }
+`;
+
+interface AiCompleteResult {
+  content: string;
+  model: ModelKey;
+  usage?: ChatUsage;
+}
+
+async function runCompletion(
+  model: ModelKey,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  opts: { system?: string; cachedSystem?: string; signal?: AbortSignal } = {},
+): Promise<AiCompleteResult> {
+  const { data, errors } = await getApolloClient().mutate<{
+    aiComplete: { content: string; model: ModelKey; usage?: ChatUsage };
+  }>({
+    mutation: AI_COMPLETE,
+    variables: {
+      data: {
+        model,
+        messages,
+        system: opts.system,
+        cachedSystem: opts.cachedSystem,
+      },
+    },
+    ...(opts.signal
+      ? { context: { fetchOptions: { signal: opts.signal } } }
+      : {}),
+  });
+  if (errors?.length) throw errors[0];
+  if (!data?.aiComplete) throw new Error('aiComplete returned no data');
+  return data.aiComplete;
+}
 
 /**
  * Build a one-line snippet describing the user's approximate device
@@ -229,23 +280,14 @@ export async function parseQueryWithAi(
     ? `${trimmed}\n\n[${locationHint}]`
     : trimmed;
 
-  const res = await fetch(`${API_URL}/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      system: PARSE_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
-    }),
-    signal,
-  });
-
-  if (!res.ok) {
-    throw new Error(`Parse request failed (${res.status})`);
-  }
-
-  const data: { content: string; model: ModelKey; usage?: ChatUsage } =
-    await res.json();
+  // PARSE_SYSTEM_PROMPT is fully static, so it's passed as `cachedSystem`
+  // for provider-side prompt caching — the per-turn variation lives in the
+  // user message (the location hint), not the system prompt.
+  const data = await runCompletion(
+    model,
+    [{ role: 'user', content: userMessage }],
+    { cachedSystem: PARSE_SYSTEM_PROMPT, signal },
+  );
 
   const cleaned = stripJsonFences(data.content);
 
@@ -333,9 +375,15 @@ export interface GenerateProvidersResult {
  * The provider-generation prompt is count-aware: the caller only asks the AI
  * to invent as many providers as the DB search came up short by. When the DB
  * fully covers the request, AI generation is skipped entirely upstream.
+ *
+ * IMPORTANT: AI-generated providers must NOT carry fabricated contact data
+ * (phone / email / website). Those are AI *suggestions* — actionable fake
+ * info (a fake phone number someone might actually call) is misleading and
+ * potentially harmful. Real, contactable details only ever come from real DB
+ * suppliers. The prompt below deliberately omits contact fields.
  */
 function buildProvidersSystemPrompt(count: number): string {
-  return `You are Solvo, a service marketplace assistant in Costa Rica. Given a user's parsed service request, invent ${count} plausible local service provider${count === 1 ? '' : 's'}.
+  return `You are Solvo, a service marketplace assistant in Costa Rica. Given a user's parsed service request, suggest ${count} plausible local service provider${count === 1 ? '' : 's'} as illustrative options.
 
 Respond with ONLY a JSON array of ${count} object${count === 1 ? '' : 's'} — no prose, no markdown fences, no commentary.
 
@@ -354,11 +402,7 @@ Here is a complete example of one valid output item — match this STYLE exactly
   "responseTime": "Replies in ~8 min",
   "location": "Santa Ana, 4 km away",
   "avatar": "🍽️",
-  "website": "https://saborcatering.cr",
-  "email": "hola@saborcatering.cr",
-  "phone": "+506 2289-4521",
-  "verified": true,
-  "recommended": true
+  "verified": false
 }
 
 Field rules:
@@ -372,10 +416,8 @@ Field rules:
 - "responseTime": exactly "Replies in ~N min" where N is an integer between 5 and 45
 - "location": "Neighborhood, X km away". IMPORTANT: when the user's request includes a location, EVERY provider's neighborhood MUST be that location or an immediately adjacent one — never a far-away city.
 - "avatar": single emoji that matches the service category
-- "website": OPTIONAL plausible URL with https:// and a .cr or .com domain matching the business name. Omit the field entirely if you cannot invent a natural-sounding domain. NEVER use placeholder URLs (no example.com, no your-website, no TBD). If unsure, omit it — the system will fall back to a web-search link.
-- "email": OPTIONAL plausible business email matching the domain when possible. Use lowercase. NEVER use placeholder emails. Omit the field if you cannot invent a natural one.
-- "phone": OPTIONAL Costa Rican phone number in the format "+506 XXXX-XXXX" (8 digits split by a hyphen). Costa Rican landlines start with 2; mobiles start with 6, 7, or 8. NEVER use 555 numbers. Omit the field if you cannot invent a realistic number.
-- "verified": always true
+- "verified": always false — these are AI suggestions, not verified listings
+- DO NOT include "website", "email", or "phone" — never invent contact details. These are suggestions only; real contact info comes solely from verified providers.
 - "recommended": omit it — the caller decides which card is the recommended one
 
 Output exactly ${count} item${count === 1 ? '' : 's'}. These are SUPPLEMENTARY suggestions shown after real verified providers, so keep them realistic and modest.`;
@@ -407,66 +449,10 @@ const ALLOWED_TAGS = new Set([
   'Eco-friendly',
 ]);
 
-// Returns a normalized URL string if valid, or null. Auto-prepends https://
-// when the AI returns a bare domain like "saborcatering.cr".
-function normalizeWebsite(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  let v = value.trim();
-  if (!v) return null;
-
-  if (/example\.(com|cr|org|net)/i.test(v)) return null;
-  if (/your-?website|placeholder|TBD|N\/A/i.test(v)) return null;
-
-  v = v.replace(/^["'<(]+|["'>)]+$/g, '');
-
-  if (!/^https?:\/\//i.test(v)) {
-    if (/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}(\/.*)?$/i.test(v)) {
-      v = `https://${v}`;
-    } else {
-      return null;
-    }
-  }
-
-  try {
-    const u = new URL(v);
-    if (!u.hostname.includes('.')) return null;
-    return u.toString().replace(/\/$/, '');
-  } catch {
-    return null;
-  }
-}
-
-function normalizeEmail(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const v = value.trim().toLowerCase();
-  if (!v) return null;
-
-  // Reject obvious placeholders
-  if (/example\.(com|cr|org|net)/i.test(v)) return null;
-  if (/test@|your-?email|placeholder|TBD|N\/A/i.test(v)) return null;
-
-  // Basic shape: local@domain.tld
-  if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(v)) return null;
-  return v;
-}
-
-function normalizePhone(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const v = value.trim();
-  if (!v) return null;
-
-  // Reject placeholder strings
-  if (/your-?phone|placeholder|TBD|N\/A|XXX|123-?4567|555-?\d{4}/i.test(v)) {
-    return null;
-  }
-
-  // Must have at least 8 digits (Costa Rican local numbers)
-  const digits = v.replace(/\D/g, '');
-  if (digits.length < 8) return null;
-  if (digits.length > 15) return null; // E.164 max is 15
-
-  return v;
-}
+// NOTE: the old normalizeWebsite / normalizeEmail / normalizePhone helpers
+// were removed — AI-suggested providers no longer carry contact info at all
+// (see buildProvidersSystemPrompt + sanitizeProvider), so there's nothing to
+// normalize. Real contact details come exclusively from DB suppliers.
 
 function sanitizePriceLabel(value: unknown): string {
   if (typeof value !== 'string') return '₡250,000';
@@ -491,10 +477,6 @@ function sanitizeProvider(raw: unknown, index: number): ProviderData | null {
       ? (r.includes as unknown[]).map((i) => String(i)).slice(0, 4)
       : [];
 
-    const website = normalizeWebsite(r.website) ?? undefined;
-    const email = normalizeEmail(r.email) ?? undefined;
-    const phone = normalizePhone(r.phone) ?? undefined;
-
     return {
       id: Number(r.id ?? index + 1),
       name: String(r.name ?? `Provider ${index + 1}`),
@@ -506,13 +488,18 @@ function sanitizeProvider(raw: unknown, index: number): ProviderData | null {
       responseTime: String(r.responseTime ?? 'Replies in ~15 min'),
       location: String(r.location ?? 'Costa Rica'),
       avatar: String(r.avatar ?? '✨'),
-      verified: r.verified !== false,
+      // AI-suggested providers are never "verified" — verification is a
+      // real-supplier trust signal.
+      verified: false,
       // `recommended` is NOT decided here — the merge step downstream owns
       // that, so exactly one card across the whole (DB + AI) list is flagged.
       recommended: false,
-      website,
-      email,
-      phone,
+      // Contact details are NEVER fabricated for AI suggestions — actionable
+      // fake info is misleading. These stay undefined; only real DB suppliers
+      // carry phone / email / website.
+      website: undefined,
+      email: undefined,
+      phone: undefined,
     };
   } catch {
     return null;
@@ -546,23 +533,13 @@ export async function generateProvidersWithAi(
 
 Generate ${wanted} matching provider${wanted === 1 ? '' : 's'} as a JSON array.`;
 
-  const res = await fetch(`${API_URL}/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      system: buildProvidersSystemPrompt(wanted),
-      messages: [{ role: 'user', content: userMessage }],
-    }),
-    signal,
-  });
-
-  if (!res.ok) {
-    throw new Error(`Provider generation failed (${res.status})`);
-  }
-
-  const data: { content: string; model: ModelKey; usage?: ChatUsage } =
-    await res.json();
+  // buildProvidersSystemPrompt(wanted) is stable for a given count, so it's
+  // passed as `cachedSystem` — turns asking for the same N share the cache.
+  const data = await runCompletion(
+    model,
+    [{ role: 'user', content: userMessage }],
+    { cachedSystem: buildProvidersSystemPrompt(wanted), signal },
+  );
 
   const cleaned = stripJsonFences(data.content);
 

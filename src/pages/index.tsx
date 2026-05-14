@@ -43,6 +43,7 @@ import {
   sendMessage as apiSendMessage,
   deleteConversation as apiDeleteConversation,
   updateMessageProviders,
+  rollbackLastTurn,
   type ConversationSummary,
 } from '@/shared/services/conversation.service';
 import {
@@ -214,23 +215,29 @@ function buildProviderGrounding(messages: UiMessage[]): string {
   return '';
 }
 
+// The chat AI's system prompt is split into two parts so the backend can
+// cache the stable half (provider-side prompt caching, see #1):
+//   - cachedSystem  = SOLVO_CHAT_SYSTEM_PROMPT (constant, every turn)
+//   - system        = the per-turn dynamic CONTEXT block built below
+// The two builders return ONLY that dynamic block (or '' for none).
+
 /**
- * Conversational-turn framing: grounds the AI in providers shown earlier so
+ * Conversational-turn context: grounds the AI in providers shown earlier so
  * it can answer "where is X?" factually. No card-count framing — this turn
  * isn't producing cards.
  */
-function withGrounding(grounding: string): string {
-  if (!grounding) return SOLVO_CHAT_SYSTEM_PROMPT;
-  return `${SOLVO_CHAT_SYSTEM_PROMPT}\n\n## Known providers (answer questions about these specific businesses using ONLY this data — do not invent details):\n${grounding}`;
+function groundingContext(grounding: string): string {
+  if (!grounding) return '';
+  return `## Known providers (answer questions about these specific businesses using ONLY this data — do not invent details):\n${grounding}`;
 }
 
 /**
- * Service-request framing: tells the AI EXACTLY how many cards are being
+ * Service-request context: tells the AI EXACTLY how many cards are being
  * shown alongside its message (including zero), so it speaks accurately and
  * never promises results that aren't there. Built AFTER the search + AI fill
  * resolve, so the count is final.
  */
-function withSearchResult(
+function searchResultContext(
   providers: ProviderData[],
   parsed: ParsedQuery,
 ): string {
@@ -246,7 +253,7 @@ function withSearchResult(
 
   if (count === 0) {
     return (
-      `${SOLVO_CHAT_SYSTEM_PROMPT}\n\n## Search result\n` +
+      `## Search result\n` +
       `0 provider cards are shown. The search for [${requestLine || 'this request'}] returned nothing. ` +
       `Tell the user plainly you couldn't find matches and offer to broaden the search — DO NOT imply results are still loading.`
     );
@@ -269,7 +276,7 @@ function withSearchResult(
   }
 
   return (
-    `${SOLVO_CHAT_SYSTEM_PROMPT}\n\n## Search result\n` +
+    `## Search result\n` +
     `${count} provider card${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} shown to the user RIGHT NOW, below your message, for [${requestLine || 'this request'}].` +
     locationNote +
     ` Acknowledge them in present tense. The cards:\n${formatProvidersForGrounding(providers)}`
@@ -741,6 +748,9 @@ export default function Home() {
   // underlying network requests (parse / search / generate / send), not just
   // hide the spinner.
   const abortRef = React.useRef<AbortController | null>(null);
+  // The conversation id of the in-flight turn — handleStop needs it to roll
+  // the aborted turn back server-side (closure-safe; refs don't go stale).
+  const activeTurnConvIdRef = React.useRef<string | null>(null);
 
   // ── Request creation (from "Select" on a provider card) ────────────────
   const { user, isAuthenticated } = React.useContext(AuthContext);
@@ -1049,6 +1059,8 @@ export default function Home() {
           setCurrentConvId(convId);
           setConversations((prev) => [conv, ...prev]);
         }
+        // Record the turn's conversation id so handleStop can roll it back.
+        activeTurnConvIdRef.current = convId;
 
         // Total provider cards we ever want to show per turn.
         const TOTAL_CARDS = 5;
@@ -1079,8 +1091,9 @@ export default function Home() {
             convId,
             content,
             currentModel,
-            withGrounding(buildProviderGrounding(currentMessages)),
+            groundingContext(buildProviderGrounding(currentMessages)),
             signal,
+            SOLVO_CHAT_SYSTEM_PROMPT,
           );
         } else {
           // ── Service request: DB-first, AI fills only the gap ───────────
@@ -1183,8 +1196,9 @@ export default function Home() {
             convId,
             content,
             currentModel,
-            withSearchResult(merged, parsed),
+            searchResultContext(merged, parsed),
             signal,
+            SOLVO_CHAT_SYSTEM_PROMPT,
           );
         }
 
@@ -1226,17 +1240,9 @@ export default function Home() {
             ),
         );
       } catch (_err) {
-        if (controller.signal.aborted) {
-          // Intentional stop — leave a quiet marker instead of an error.
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content: '⏹ Stopped.',
-              createdAt: new Date().toISOString(),
-            },
-          ]);
-        } else {
+        // On an intentional stop, handleStop already rolled the turn back
+        // (local + server) — leave no trace here. Only surface real errors.
+        if (!controller.signal.aborted) {
           setMessages((prev) => [
             ...prev,
             {
@@ -1266,13 +1272,29 @@ export default function Home() {
   );
 
   // ── Stop the in-flight AI turn ─────────────────────────────────────────
-  // Aborts the controller (cancelling parse / search / generate / send) and
-  // drops the spinner. handleSend's catch sees `signal.aborted` and adds the
-  // quiet "Stopped." marker rather than an error.
+  // Aborts the controller (cancelling parse / search / generate / send),
+  // drops the spinner, and ROLLS THE TURN BACK — both locally (remove the
+  // optimistic user message) and server-side (delete the persisted user
+  // message, since `sendAiMessage` saves it before calling the model). The
+  // result: stopping leaves no half-finished turn behind.
   const handleStop = React.useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     setWaitingForAI(false);
+
+    // Drop the optimistic user message from local state.
+    setMessages((prev) =>
+      prev.length > 0 && prev[prev.length - 1].role === 'user'
+        ? prev.slice(0, -1)
+        : prev,
+    );
+
+    // And undo it server-side (best-effort — fire and forget).
+    const convId = activeTurnConvIdRef.current;
+    if (convId) {
+      rollbackLastTurn(convId).catch(() => {/* non-critical */});
+    }
+    activeTurnConvIdRef.current = null;
   }, []);
 
   // ── Go back to hero landing ────────────────────────────────────────────

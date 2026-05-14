@@ -2,7 +2,7 @@ import * as React from 'react';
 import {
   Star, ShieldCheck, Clock, MapPin, Check, MessageCircle,
   ArrowRight, Globe, Mail, Phone, PackagePlus, PackageCheck,
-  Database,
+  Database, Sparkles,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Box, Flex, Text } from '@atoms';
@@ -185,10 +185,12 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                   <ShieldCheck size={16} />
                 </Box>
               )}
-              {/* "From our network" — distinguishes real DB suppliers from
-                  AI-invented suggestions. Sits next to the verified shield
-                  so users can scan trust signals at a glance. */}
-              {provider.isRealSupplier && (
+              {/* Trust-signal badge — distinguishes real DB suppliers from
+                  AI-generated suggestions so users can scan at a glance.
+                  "In our network" = a real, contactable verified supplier;
+                  "AI suggestion" = an illustrative idea with no contact
+                  details (we never fabricate phone/email/website). */}
+              {provider.isRealSupplier ? (
                 <Flex
                   align="center"
                   gap="4px"
@@ -202,6 +204,23 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                 >
                   <Database size={11} />
                   In our network
+                </Flex>
+              ) : (
+                <Flex
+                  align="center"
+                  gap="4px"
+                  padding="2px 8px"
+                  borderRadius="full"
+                  bg={solvoColors.bg}
+                  color={solvoColors.textSubtle}
+                  fontSize="11px"
+                  fontWeight="600"
+                  borderWidth="1px"
+                  borderColor={solvoColors.border}
+                  title="An AI-generated suggestion — not a verified listing. Contact details aren't available."
+                >
+                  <Sparkles size={11} />
+                  AI suggestion
                 </Flex>
               )}
               {/* "In package" badge */}

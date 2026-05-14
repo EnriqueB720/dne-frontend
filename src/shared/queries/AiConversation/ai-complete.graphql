@@ -1,0 +1,10 @@
+mutation aiComplete($data: AiCompletionInput!) {
+  aiComplete(data: $data) {
+    content
+    model
+    usage {
+      inputTokens
+      outputTokens
+    }
+  }
+}

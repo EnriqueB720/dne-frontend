@@ -5,7 +5,7 @@ import AuthProvider from '@/shared/contexts/auth.provider'
 import { ApolloClient, HttpLink, InMemoryCache, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { ApolloProvider } from "@apollo/client/react";
-import { setConversationApolloClient } from '@/shared/services/conversation.service';
+import { setApolloClient } from '@/shared/services/apollo.client';
 import 'react-international-phone/style.css';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
@@ -34,10 +34,10 @@ const apolloClient = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
-// Expose the client to the chat service, which uses raw client.query /
-// client.mutate so it can be called from non-React paths (jotai atoms,
-// async effects, etc.).
-setConversationApolloClient(apolloClient);
+// Expose the client to the service layer (conversation.service, ai.service),
+// which uses raw client.query / client.mutate so it can be called from
+// non-React paths (jotai atoms, async effects, etc.).
+setApolloClient(apolloClient);
 
 
 export default function App({ Component, pageProps }: AppProps) {
