@@ -1,0 +1,6 @@
+mutation restoreConversation($data: ConversationRestoreInput!) {
+  restoreConversation(data: $data) {
+    conversationId
+    status
+  }
+}

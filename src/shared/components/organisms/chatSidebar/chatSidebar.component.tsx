@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, MessageSquare, Trash2, Sparkles } from 'lucide-react';
+import { MessageSquare, MoreVertical, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
-import { solvoColors, solvoFonts } from '@constants';
+import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import type { ConversationSummary } from '@/shared/services/conversation.service';
 
 export interface ChatSidebarProps {
@@ -37,6 +37,65 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 }) => {
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
+  // Row menu state — mirrors the pattern used in /messages
+  const [menuFor, setMenuFor] = React.useState<string | null>(null);
+  const [confirmDeleteFor, setConfirmDeleteFor] = React.useState<string | null>(null);
+  const [menuAnchor, setMenuAnchor] = React.useState<{ top: number; left: number } | null>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  const closeMenu = React.useCallback(() => {
+    setMenuFor(null);
+    setConfirmDeleteFor(null);
+    setMenuAnchor(null);
+  }, []);
+
+  const openMenuAtElement = (el: HTMLElement, conversationId: string) => {
+    const rect = el.getBoundingClientRect();
+    const POPOVER_WIDTH = 240;
+    const left = Math.max(
+      8,
+      Math.min(window.innerWidth - POPOVER_WIDTH - 8, rect.right - POPOVER_WIDTH),
+    );
+    setMenuAnchor({ top: rect.bottom + 4, left });
+    setMenuFor(conversationId);
+    setConfirmDeleteFor(null);
+  };
+
+  const openMenuAtMouse = (e: React.MouseEvent, conversationId: string) => {
+    e.preventDefault();
+    const POPOVER_WIDTH = 240;
+    const left = Math.max(8, Math.min(window.innerWidth - POPOVER_WIDTH - 8, e.clientX));
+    setMenuAnchor({ top: e.clientY, left });
+    setMenuFor(conversationId);
+    setConfirmDeleteFor(null);
+  };
+
+  React.useEffect(() => {
+    if (menuFor === null) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        closeMenu();
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMenu();
+    };
+    const handleScroll = () => closeMenu();
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [menuFor, closeMenu]);
+
+  const handleDelete = (id: string) => {
+    onDelete(id);
+    closeMenu();
+  };
+
   return (
     <Box
       width="260px"
@@ -48,6 +107,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       borderColor={solvoColors.border}
       bg="white"
       overflow="hidden"
+      position="relative"
     >
       {/* Header */}
       <Flex
@@ -133,15 +193,18 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             {conversations.map((conv, i) => {
               const isActive = conv.conversationId === currentConvId;
               const isHovered = hoveredId === conv.conversationId;
+              const isMenuOpen = menuFor === conv.conversationId;
               const lastMsg = conv.messages?.[0];
 
               return (
                 <motion.div
                   key={conv.conversationId}
+                  layout
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ delay: i * 0.03 }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0 }}
+                  transition={{ delay: i * 0.03, duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+                  style={{ overflow: 'hidden' }}
                 >
                   <Box
                     position="relative"
@@ -151,6 +214,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     marginBottom="2px"
                     bg={isActive ? solvoColors.indigoLight : isHovered ? solvoColors.bg : 'transparent'}
                     onClick={() => onSelect(conv.conversationId)}
+                    onContextMenu={(e) => openMenuAtMouse(e, conv.conversationId)}
                     onMouseEnter={() => setHoveredId(conv.conversationId)}
                     onMouseLeave={() => setHoveredId(null)}
                     transition="background 0.15s"
@@ -168,6 +232,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
+                            paddingRight: '20px',
                           }}
                         >
                           {conv.title}
@@ -188,9 +253,17 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                       </Box>
                     </Flex>
 
-                    {/* Delete button (shown on hover) */}
-                    {isHovered && (
+                    {/* Kebab button — always rendered on hover / when menu is open */}
+                    {(isHovered || isMenuOpen) && (
                       <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isMenuOpen) closeMenu();
+                          else openMenuAtElement(e.currentTarget, conv.conversationId);
+                        }}
+                        aria-label="Conversation actions"
+                        title="Conversation actions"
                         style={{
                           position: 'absolute',
                           right: '8px',
@@ -199,8 +272,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          width: '24px',
-                          height: '24px',
+                          width: '22px',
+                          height: '22px',
                           borderRadius: '6px',
                           cursor: 'pointer',
                           border: 'none',
@@ -208,13 +281,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                           padding: 0,
                           color: solvoColors.textSubtle,
                         }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(conv.conversationId);
-                        }}
-                        title="Delete conversation"
                       >
-                        <Trash2 size={13} />
+                        <MoreVertical size={14} />
                       </button>
                     )}
                   </Box>
@@ -236,6 +304,103 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
           Powered by AI · Costa Rica
         </Text>
       </Box>
+
+      {/* Floating row-action menu — page-level fixed so it isn't clipped by the sidebar's overflow */}
+      <AnimatePresence>
+        {menuFor !== null && menuAnchor && (
+          <motion.div
+            ref={menuRef as any}
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.97 }}
+            transition={{ duration: 0.15, ease: [0.2, 0.8, 0.2, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              top: menuAnchor.top,
+              left: menuAnchor.left,
+              zIndex: 1000,
+              width: '240px',
+              background: solvoColors.surface,
+              border: `1px solid ${solvoColors.border}`,
+              borderRadius: '12px',
+              padding: '6px',
+              boxShadow: solvoShadows.floatingPanel,
+            }}
+          >
+            {confirmDeleteFor === menuFor ? (
+              <Box padding="8px 10px">
+                <Text fontSize="xs" color={solvoColors.text} fontWeight={600} marginBottom="4px">
+                  Delete this chat?
+                </Text>
+                <Text fontSize="11px" color={solvoColors.textSubtle} marginBottom="10px">
+                  This conversation will be permanently deleted. This can't be undone.
+                </Text>
+                <Flex gap="6px">
+                  <button
+                    type="button"
+                    onClick={closeMenu}
+                    style={{
+                      flex: 1,
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: solvoColors.surface,
+                      color: solvoColors.text,
+                      border: `1px solid ${solvoColors.border}`,
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      fontFamily: solvoFonts.sans,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(menuFor)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: solvoColors.roseText,
+                      color: solvoColors.surface,
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      fontFamily: solvoFonts.sans,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Delete
+                  </button>
+                </Flex>
+              </Box>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteFor(menuFor)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontFamily: solvoFonts.sans,
+                }}
+              >
+                <Flex align="center" gap="8px" color={solvoColors.roseText}>
+                  <Trash2 size={13} />
+                  <Text fontSize="13px" fontWeight={600}>
+                    Delete conversation
+                  </Text>
+                </Flex>
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Box>
   );
 };

@@ -8,5 +8,17 @@ query quotesBySupplier($supplierId: Int!, $status: QuoteStatus) {
     validUntil
     status
     createdAt
+    request {
+      requestId
+      rawQuery
+      city
+      customer {
+        customerId
+        user {
+          userId
+          name
+        }
+      }
+    }
   }
 }

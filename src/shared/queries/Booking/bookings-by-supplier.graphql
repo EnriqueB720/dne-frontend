@@ -13,5 +13,16 @@ query bookingsBySupplier($supplierId: Int!, $status: BookingStatus) {
     status
     paymentStatus
     createdAt
+    customer {
+      customerId
+      user {
+        userId
+        name
+      }
+    }
+    request {
+      requestId
+      rawQuery
+    }
   }
 }

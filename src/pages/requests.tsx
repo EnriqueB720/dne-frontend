@@ -1,7 +1,8 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell } from 'lucide-react';
+import { Bell, MessageSquare } from 'lucide-react';
 import { Box, Flex, Text, Pill, SolvoNavBar } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
@@ -10,11 +11,13 @@ import {
   QuoteStatus,
   useRequestLazyQuery,
   useRequestsByCustomerLazyQuery,
+  useRequestsBySupplierLazyQuery,
   useUpdateRequestStatusMutation,
   useCloseRequestMutation,
   useQuotesByRequestLazyQuery,
   useAcceptQuoteMutation,
   useMarkQuotesViewedMutation,
+  useCreateConversationMutation,
 } from '@generated';
 
 const STATUS_OPTIONS: RequestStatus[] = [
@@ -80,6 +83,13 @@ const formatDate = (iso?: string | null) =>
 export default function RequestsTestPage() {
   const { isAuthenticated, user } = useContext(AuthContext);
   const customerId = user?.customerId ?? null;
+  const supplierId = user?.supplierId ?? null;
+  // Customer takes priority if the user has both profiles (rare)
+  const role: 'customer' | 'supplier' | null = customerId
+    ? 'customer'
+    : supplierId
+      ? 'supplier'
+      : null;
 
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
@@ -87,9 +97,14 @@ export default function RequestsTestPage() {
   const [toast, setToast] = useState<{ count: number; ts: number } | null>(null);
   const previousUnreadByRequest = useRef<Map<number, number>>(new Map());
 
-  const [fetchRequests, listState] = useRequestsByCustomerLazyQuery({
+  const [fetchByCustomer, customerListState] = useRequestsByCustomerLazyQuery({
     fetchPolicy: 'network-only',
-    pollInterval: 15_000, // poll every 15s for new quotes
+    pollInterval: 15_000,
+    notifyOnNetworkStatusChange: true,
+  });
+  const [fetchBySupplier, supplierListState] = useRequestsBySupplierLazyQuery({
+    fetchPolicy: 'network-only',
+    pollInterval: 15_000,
     notifyOnNetworkStatusChange: true,
   });
   const [fetchRequest, detailState] = useRequestLazyQuery({ fetchPolicy: 'network-only' });
@@ -98,21 +113,51 @@ export default function RequestsTestPage() {
   const [fetchQuotes, quotesState] = useQuotesByRequestLazyQuery({ fetchPolicy: 'network-only' });
   const [acceptQuote, acceptState] = useAcceptQuoteMutation();
   const [markQuotesViewed] = useMarkQuotesViewedMutation();
+  const [createConversation, createConvState] = useCreateConversationMutation();
+  const router = useRouter();
+  const listState = role === 'supplier' ? supplierListState : customerListState;
 
-  const requests = listState.data?.requestsByCustomer ?? [];
+  const handleMessageSupplier = async (sId: number, rId: number) => {
+    try {
+      const { data } = await createConversation({
+        variables: { data: { requestId: rId, supplierId: sId } as any },
+      });
+      const convId = data?.createConversation.conversationId;
+      if (convId) {
+        router.push({ pathname: '/messages', query: { id: convId } });
+      }
+    } catch (err: any) {
+      setFeedback({ kind: 'err', text: err?.message ?? 'Failed to start conversation' });
+    }
+  };
+
+  const requests: any[] =
+    role === 'supplier'
+      ? (supplierListState.data?.requestsBySupplier ?? [])
+      : (customerListState.data?.requestsByCustomer ?? []);
   const detail = detailState.data?.request;
   const quotes = quotesState.data?.quotesByRequest ?? [];
 
-  // Per-request unread (SENT) count
+  // Supplier-side: their own quote for the selected request (filtered from the list)
+  const mySupplierQuote = (() => {
+    if (role !== 'supplier' || !supplierId) return null;
+    return quotes.find((q: any) => q.supplierId === supplierId) ?? null;
+  })();
+
+  // Per-request unread (SENT) quotes — only meaningful for the CUSTOMER (the
+  // recipient of quotes). Suppliers are the senders so they have nothing unread.
   const unreadByRequest = new Map<number, number>();
-  for (const r of requests as any[]) {
-    const sentCount =
-      r.quotes?.filter((q: { status: string }) => q.status === 'SENT').length ?? 0;
-    unreadByRequest.set(r.requestId, sentCount);
+  if (role === 'customer') {
+    for (const r of requests as any[]) {
+      const sentCount =
+        r.quotes?.filter((q: { status: string }) => q.status === 'SENT').length ?? 0;
+      unreadByRequest.set(r.requestId, sentCount);
+    }
   }
 
   // Detect unread quotes (on first load) or new unread quotes (between polls) → fire toast
   useEffect(() => {
+    if (role !== 'customer') return;
     if (requests.length === 0) return;
 
     let delta = 0;
@@ -125,7 +170,7 @@ export default function RequestsTestPage() {
     }
     previousUnreadByRequest.current = new Map(unreadByRequest);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(Array.from(unreadByRequest.entries()))]);
+  }, [role, JSON.stringify(Array.from(unreadByRequest.entries()))]);
 
   // Auto-dismiss toast after 5s
   useEffect(() => {
@@ -135,20 +180,30 @@ export default function RequestsTestPage() {
   }, [toast]);
 
   const handleLoadRequests = async () => {
-    if (!customerId) return;
-    await fetchRequests({
-      variables: {
-        customerId,
-        status: filterStatus === '' ? null : filterStatus,
-      },
-    });
+    const status = filterStatus === '' ? null : filterStatus;
+    if (role === 'customer' && customerId) {
+      await fetchByCustomer({ variables: { customerId, status } });
+    } else if (role === 'supplier' && supplierId) {
+      await fetchBySupplier({ variables: { supplierId, status } });
+    }
   };
 
-  // Auto-load whenever the logged-in customer becomes available or the filter changes
+  // Auto-load whenever the logged-in user becomes available or the filter changes
   useEffect(() => {
-    if (customerId) handleLoadRequests();
+    if (role && (customerId || supplierId)) handleLoadRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId, filterStatus]);
+  }, [role, customerId, supplierId, filterStatus]);
+
+  // Deep-link: open a specific request when the URL has ?id=N (used by /messages "View request →")
+  useEffect(() => {
+    const idFromUrl = router.query.id;
+    if (!idFromUrl) return;
+    const idNum = Array.isArray(idFromUrl) ? Number(idFromUrl[0]) : Number(idFromUrl);
+    if (Number.isFinite(idNum) && idNum > 0 && idNum !== selectedRequestId) {
+      handleSelectRequest(idNum).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.id]);
 
   const handleSelectRequest = async (requestId: number) => {
     setSelectedRequestId(requestId);
@@ -250,17 +305,17 @@ export default function RequestsTestPage() {
     );
   }
 
-  if (!customerId) {
+  if (!role) {
     return (
       <Box minHeight="100vh" bg={solvoColors.bg}>
         <SolvoNavBar activePath="/requests" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
             <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
-              This page is for customers
+              No requests to show
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
-              Your account doesn't have a customer profile. Suppliers can manage quotes from <Link href="/quotes" style={{ color: solvoColors.indigo, fontWeight: 600 }}>/quotes</Link> instead.
+              Your account has neither a customer nor a supplier profile yet.
             </Text>
           </Box>
         </Flex>
@@ -277,10 +332,12 @@ export default function RequestsTestPage() {
           Hi, {user.name}
         </Text>
         <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text} marginBottom="6px">
-          My requests
+          {role === 'supplier' ? 'Requests you quoted on' : 'My requests'}
         </Text>
         <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
-          Requests are created from the AI chat on the home page — click "Select" on a provider card there. Manage and accept quotes here.
+          {role === 'supplier'
+            ? 'Every request where you sent a quote, with the full customer details and your quote status.'
+            : 'Requests are created from the AI chat on the home page — click "Select" on a provider card there. Manage and accept quotes here.'}
         </Text>
 
         {/* Filter bar */}
@@ -342,7 +399,9 @@ export default function RequestsTestPage() {
 
               {requests.length === 0 ? (
                 <Text fontSize="sm" color={solvoColors.textSubtle}>
-                  No requests yet. Start a new one from the AI chat on the home page.
+                  {role === 'supplier'
+                    ? "No requests yet. They appear here once you've quoted on a customer's request."
+                    : 'No requests yet. Start a new one from the AI chat on the home page.'}
                 </Text>
               ) : (
                 <Flex direction="column" gap="8px">
@@ -386,7 +445,13 @@ export default function RequestsTestPage() {
                           <Box minWidth="0" flex="1">
                             <Flex align="center" gap="6px" marginBottom="2px">
                               <Text fontSize="sm" fontWeight={600} color={solvoColors.text} truncate>
-                                #{r.requestId} — {r.rawQuery}
+                                {role === 'supplier'
+                                  ? (
+                                      (r as any).customer?.user?.name
+                                        ? `${(r as any).customer.user.name} — ${r.rawQuery}`
+                                        : r.rawQuery
+                                    )
+                                  : r.rawQuery}
                               </Text>
                               {unread > 0 && (
                                 <Box
@@ -465,60 +530,87 @@ export default function RequestsTestPage() {
                   {detail.closedAt && <DetailRow label="Closed" value={formatDate(detail.closedAt)} />}
                   {detail.closedReason && <DetailRow label="Reason" value={detail.closedReason} />}
 
-                  <Box marginTop="16px">
-                    <label style={labelStyle}>Change status</label>
-                    <select
-                      value={detail.status}
-                      onChange={(e) => handleUpdateStatus(e.target.value as RequestStatus)}
-                      disabled={busy}
-                      style={inputBaseStyle}
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </Box>
+                  {/* Customer-only management actions */}
+                  {role === 'customer' && (
+                    <>
+                      <Box marginTop="16px">
+                        <label style={labelStyle}>Change status</label>
+                        <select
+                          value={detail.status}
+                          onChange={(e) => handleUpdateStatus(e.target.value as RequestStatus)}
+                          disabled={busy}
+                          style={inputBaseStyle}
+                        >
+                          {STATUS_OPTIONS.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </Box>
 
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    disabled={busy || detail.status === RequestStatus.Closed}
-                    style={{
-                      ...buttonBaseStyle,
-                      width: '100%',
-                      marginTop: '12px',
-                      background: solvoColors.surface,
-                      color: solvoColors.text,
-                      border: `1px solid ${solvoColors.border}`,
-                      opacity: busy || detail.status === RequestStatus.Closed ? 0.5 : 1,
-                    }}
-                  >
-                    Close request
-                  </button>
+                      <button
+                        type="button"
+                        onClick={handleClose}
+                        disabled={busy || detail.status === RequestStatus.Closed}
+                        style={{
+                          ...buttonBaseStyle,
+                          width: '100%',
+                          marginTop: '12px',
+                          background: solvoColors.surface,
+                          color: solvoColors.text,
+                          border: `1px solid ${solvoColors.border}`,
+                          opacity: busy || detail.status === RequestStatus.Closed ? 0.5 : 1,
+                        }}
+                      >
+                        Close request
+                      </button>
+                    </>
+                  )}
+
+                  {/* Supplier-only message action */}
+                  {role === 'supplier' && supplierId && (
+                    <button
+                      type="button"
+                      onClick={() => handleMessageSupplier(supplierId, detail.requestId)}
+                      disabled={busy || createConvState.loading}
+                      style={{
+                        ...buttonBaseStyle,
+                        width: '100%',
+                        marginTop: '16px',
+                        background: solvoColors.indigo,
+                        color: solvoColors.surface,
+                        opacity: busy || createConvState.loading ? 0.5 : 1,
+                      }}
+                    >
+                      Message customer
+                    </button>
+                  )}
                 </>
               )}
             </Box>
 
-            {/* Quotes received */}
+            {/* Quotes section — customers see all, suppliers see their own only */}
             {detail && (
               <Box style={sectionStyle} marginTop="20px">
                 <Flex justify="space-between" align="center" marginBottom="12px">
                   <Text fontFamily={solvoFonts.serif} fontSize="20px">
-                    Quotes received
+                    {role === 'supplier' ? 'Your quote' : 'Quotes received'}
                   </Text>
                   <Text fontSize="xs" color={solvoColors.textSubtle}>
-                    {quotes.length}
+                    {role === 'supplier' ? (mySupplierQuote ? 1 : 0) : quotes.length}
                   </Text>
                 </Flex>
 
-                {quotes.length === 0 ? (
+                {(role === 'supplier' ? (mySupplierQuote ? [mySupplierQuote] : []) : quotes).length === 0 ? (
                   <Text fontSize="sm" color={solvoColors.textSubtle}>
-                    No quotes yet for this request.
+                    {role === 'supplier'
+                      ? 'No quote from you yet on this request.'
+                      : 'No quotes yet for this request.'}
                   </Text>
                 ) : (
                   <Flex direction="column" gap="8px">
-                    {quotes.map((q) => {
+                    {(role === 'supplier' ? [mySupplierQuote!] : quotes).map((q: any) => {
                       const canAccept =
+                        role === 'customer' &&
                         (q.status === QuoteStatus.Sent || q.status === QuoteStatus.Viewed) &&
                         detail.status !== RequestStatus.Booked &&
                         detail.status !== RequestStatus.Closed;
@@ -531,7 +623,9 @@ export default function RequestsTestPage() {
                         >
                           <Flex justify="space-between" align="center" marginBottom="6px">
                             <Text fontSize="sm" fontWeight={600}>
-                              Quote #{q.quoteId} · Supplier #{q.supplierId}
+                              {role === 'customer'
+                                ? ((q as any).supplier?.companyName ?? `Supplier #${q.supplierId}`)
+                                : `Your quote #${q.quoteId}`}
                             </Text>
                             <Box
                               padding="2px 8px"
@@ -552,23 +646,48 @@ export default function RequestsTestPage() {
                               "{q.message}"
                             </Text>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => handleAcceptQuote(q.quoteId)}
-                            disabled={busy || !canAccept}
-                            style={{
-                              ...buttonBaseStyle,
-                              width: '100%',
-                              marginTop: '6px',
-                              padding: '8px 12px',
-                              fontSize: '13px',
-                              background: solvoColors.indigo,
-                              color: solvoColors.surface,
-                              opacity: busy || !canAccept ? 0.5 : 1,
-                            }}
-                          >
-                            Accept quote
-                          </button>
+                          {role === 'customer' && (
+                          <Flex gap="6px" marginTop="6px">
+                            <button
+                              type="button"
+                              onClick={() => handleAcceptQuote(q.quoteId)}
+                              disabled={busy || !canAccept}
+                              style={{
+                                ...buttonBaseStyle,
+                                flex: 1,
+                                padding: '8px 12px',
+                                fontSize: '13px',
+                                background: solvoColors.indigo,
+                                color: solvoColors.surface,
+                                opacity: busy || !canAccept ? 0.5 : 1,
+                              }}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleMessageSupplier(q.supplierId, selectedRequestId!)
+                              }
+                              disabled={busy || createConvState.loading}
+                              style={{
+                                ...buttonBaseStyle,
+                                padding: '8px 12px',
+                                fontSize: '13px',
+                                background: solvoColors.surface,
+                                color: solvoColors.text,
+                                border: `1px solid ${solvoColors.border}`,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                opacity: busy || createConvState.loading ? 0.5 : 1,
+                              }}
+                            >
+                              <MessageSquare size={13} />
+                              Message
+                            </button>
+                          </Flex>
+                          )}
                         </Box>
                       );
                     })}

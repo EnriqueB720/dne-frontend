@@ -340,8 +340,13 @@ export default function BookingsPage() {
                       >
                         <Flex justify="space-between" align="center" gap="10px">
                           <Box minWidth="0" flex="1">
-                            <Text fontSize="sm" fontWeight={600} color={solvoColors.text}>
-                              Booking #{b.bookingId} · Request #{b.requestId}
+                            <Text fontSize="sm" fontWeight={600} color={solvoColors.text} truncate>
+                              {mode === 'customer'
+                                ? ((b as any).supplier?.companyName ?? `Supplier #${b.supplierId}`)
+                                : ((b as any).customer?.user?.name ?? `Customer #${b.customerId}`)}
+                            </Text>
+                            <Text fontSize="xs" color={solvoColors.textSubtle} marginTop="2px" truncate>
+                              {(b as any).request?.rawQuery ?? `Request #${b.requestId}`}
                             </Text>
                             <Text fontSize="xs" color={solvoColors.textSubtle} marginTop="2px">
                               {b.location} · {b.currency} {b.totalPrice} · {formatDate(b.serviceDate)}
@@ -386,8 +391,14 @@ export default function BookingsPage() {
                   <DetailRow label="Payment" value={detail.paymentStatus} />
                   <DetailRow label="Request" value={`#${detail.requestId}`} />
                   <DetailRow label="Quote" value={`#${detail.quoteId}`} />
-                  <DetailRow label="Customer" value={`#${detail.customerId}`} />
-                  <DetailRow label="Supplier" value={`#${detail.supplierId}`} />
+                  <DetailRow
+                    label="Customer"
+                    value={(detail as any).customer?.user?.name ?? `#${detail.customerId}`}
+                  />
+                  <DetailRow
+                    label="Supplier"
+                    value={(detail as any).supplier?.companyName ?? `#${detail.supplierId}`}
+                  />
                   <DetailRow label="Service date" value={formatDate(detail.serviceDate)} />
                   {detail.serviceEndDate && <DetailRow label="End date" value={formatDate(detail.serviceEndDate)} />}
                   <DetailRow label="Location" value={detail.location} />

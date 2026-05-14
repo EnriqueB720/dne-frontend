@@ -32,6 +32,7 @@ const navItems = [
   { label: 'Requests', href: '/requests' },
   { label: 'Quotes', href: '/quotes' },
   { label: 'Bookings', href: '/bookings' },
+  { label: 'Messages', href: '/messages' },
   { label: 'Calendar', href: '/calendar' },
   { label: 'Dashboard', href: '/dashboard' },
 ];

@@ -1,0 +1,3 @@
+mutation markMessagesAsRead($data: MarkMessagesReadInput!) {
+  markMessagesAsRead(data: $data)
+}

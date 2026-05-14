@@ -8,5 +8,12 @@ query quotesByRequest($requestId: Int!, $status: QuoteStatus) {
     validUntil
     status
     createdAt
+    supplier {
+      supplierId
+      companyName
+      city
+      rating
+      reviewCount
+    }
   }
 }

@@ -1,5 +1,7 @@
 import { useContext, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { MessageSquare } from 'lucide-react';
 import { Box, Flex, Text, SolvoNavBar } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
@@ -9,6 +11,7 @@ import {
   useQuoteLazyQuery,
   useQuotesBySupplierLazyQuery,
   useWithdrawQuoteMutation,
+  useCreateConversationMutation,
 } from '@generated';
 
 const STATUS_OPTIONS: QuoteStatus[] = [
@@ -99,6 +102,23 @@ export default function QuotesPage() {
   const [fetchList, listState] = useQuotesBySupplierLazyQuery({ fetchPolicy: 'network-only' });
   const [fetchDetail, detailState] = useQuoteLazyQuery({ fetchPolicy: 'network-only' });
   const [withdrawQuote, withdrawState] = useWithdrawQuoteMutation();
+  const [createConversation, createConvState] = useCreateConversationMutation();
+  const router = useRouter();
+
+  const handleMessageCustomer = async (requestId: number) => {
+    if (!supplierId) return;
+    try {
+      const { data } = await createConversation({
+        variables: { data: { requestId, supplierId } as any },
+      });
+      const convId = data?.createConversation.conversationId;
+      if (convId) {
+        router.push({ pathname: '/messages', query: { id: convId } });
+      }
+    } catch (err: any) {
+      setFeedback({ kind: 'err', text: err?.message ?? 'Failed to start conversation' });
+    }
+  };
 
   const list = listState.data?.quotesBySupplier ?? [];
   const detail = detailState.data?.quote;
@@ -457,9 +477,14 @@ export default function QuotesPage() {
                       >
                         <Flex justify="space-between" align="center" gap="10px">
                           <Box minWidth="0" flex="1">
-                            <Text fontSize="sm" fontWeight={600} color={solvoColors.text}>
-                              Quote #{q.quoteId} · Request #{q.requestId}
+                            <Text fontSize="sm" fontWeight={600} color={solvoColors.text} truncate>
+                              {(q as any).request?.customer?.user?.name ?? 'Customer'}
                             </Text>
+                            {(q as any).request?.rawQuery && (
+                              <Text fontSize="xs" color={solvoColors.textMuted} marginTop="2px" truncate>
+                                {(q as any).request.rawQuery}
+                              </Text>
+                            )}
                             <Text fontSize="xs" color={solvoColors.textSubtle} marginTop="2px">
                               {q.currency} {q.totalPrice} · valid until {formatDate(q.validUntil)}
                             </Text>
@@ -498,9 +523,17 @@ export default function QuotesPage() {
                   <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.04em" textTransform="uppercase">
                     Quote #{detail.quoteId}
                   </Text>
+                  {(detail as any).request?.rawQuery && (
+                    <Text fontFamily={solvoFonts.serif} fontSize="18px" color={solvoColors.text} marginTop="4px" marginBottom="8px">
+                      {(detail as any).request.rawQuery}
+                    </Text>
+                  )}
 
                   <DetailRow label="Status" value={detail.status} />
-                  <DetailRow label="Request" value={`#${detail.requestId}`} />
+                  <DetailRow
+                    label="Customer"
+                    value={(detail as any).request?.customer?.user?.name ?? `#${(detail as any).request?.customerId ?? '?'}`}
+                  />
                   <DetailRow label="Total" value={`${detail.currency} ${detail.totalPrice}`} />
                   <DetailRow label="Valid until" value={formatDate(detail.validUntil)} />
                   <DetailRow label="Viewed" value={formatDate(detail.viewedAt)} />
@@ -524,6 +557,27 @@ export default function QuotesPage() {
 
                   <button
                     type="button"
+                    onClick={() => handleMessageCustomer(detail.requestId)}
+                    disabled={busy || createConvState.loading}
+                    style={{
+                      ...buttonBaseStyle,
+                      width: '100%',
+                      marginTop: '16px',
+                      background: solvoColors.indigo,
+                      color: solvoColors.surface,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      opacity: busy || createConvState.loading ? 0.5 : 1,
+                    }}
+                  >
+                    <MessageSquare size={14} />
+                    Message customer
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={handleWithdraw}
                     disabled={
                       busy ||
@@ -534,7 +588,7 @@ export default function QuotesPage() {
                     style={{
                       ...buttonBaseStyle,
                       width: '100%',
-                      marginTop: '16px',
+                      marginTop: '8px',
                       background: solvoColors.surface,
                       color: solvoColors.text,
                       border: `1px solid ${solvoColors.border}`,
