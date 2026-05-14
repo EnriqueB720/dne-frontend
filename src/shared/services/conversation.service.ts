@@ -183,6 +183,18 @@ const ROLLBACK_LAST_AI_TURN = gql`
   }
 `;
 
+const LINK_AI_CONVERSATION_TO_REQUEST = gql`
+  mutation linkAiConversationToRequest(
+    $data: AiConversationLinkInput!
+    $deviceId: String
+  ) {
+    linkAiConversationToRequest(data: $data, deviceId: $deviceId) {
+      conversationId
+      requestId
+    }
+  }
+`;
+
 // The shared module-level client (set once in _app.tsx) — these service
 // functions run outside the React tree, so they can't use `useApolloClient`.
 const client = getApolloClient;
@@ -287,6 +299,25 @@ export async function rollbackLastTurn(
   });
   if (errors?.length) throw errors[0];
   return data?.rollbackLastAiTurn ?? 0;
+}
+
+/**
+ * Link the conversation to the Request it produced (called on "Select").
+ * Best-effort: the request is already created, this just connects it back
+ * to the originating chat — callers fire-and-forget.
+ */
+export async function linkConversationToRequest(
+  conversationId: string,
+  requestId: number,
+): Promise<void> {
+  const { errors } = await client().mutate({
+    mutation: LINK_AI_CONVERSATION_TO_REQUEST,
+    variables: {
+      data: { conversationId, requestId },
+      deviceId: getOrCreateDeviceId(),
+    },
+  });
+  if (errors?.length) throw errors[0];
 }
 
 export async function deleteConversation(id: string): Promise<void> {

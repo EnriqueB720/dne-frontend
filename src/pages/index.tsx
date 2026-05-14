@@ -44,6 +44,7 @@ import {
   deleteConversation as apiDeleteConversation,
   updateMessageProviders,
   rollbackLastTurn,
+  linkConversationToRequest,
   type ConversationSummary,
 } from '@/shared/services/conversation.service';
 import {
@@ -868,6 +869,15 @@ export default function Home() {
       const requestId = data?.createRequest.requestId;
       if (!requestId) throw new Error('Failed to create request');
 
+      // Link this Request back to the conversation that produced it, so the
+      // AI chat connects to the Request → Quote → Booking pipeline.
+      // Best-effort — the request is already created either way.
+      if (currentConvId) {
+        linkConversationToRequest(currentConvId, requestId).catch(() => {
+          /* non-critical — request exists, link is just a convenience */
+        });
+      }
+
       // Auto-create a quote when the provider is a real DB supplier
       if (selectModal.isRealSupplier && selectModal.provider.id > 0) {
         const validUntil = new Date();
@@ -896,7 +906,7 @@ export default function Home() {
     } catch (err: any) {
       setRequestError(err?.message ?? 'Failed to create request');
     }
-  }, [selectModal, user, isAuthenticated, createRequest, createQuote]);
+  }, [selectModal, user, isAuthenticated, createRequest, createQuote, currentConvId]);
 
   // ── Package builder ────────────────────────────────────────────────────
   const [pkgState, setPkgState] = useAtom(packageAtom);
