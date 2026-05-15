@@ -1,11 +1,14 @@
 import * as React from 'react';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Square } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
 import { solvoColors, solvoFonts, MODEL_LIST, MODEL_META } from '@constants';
 import type { ModelKey } from '@/shared/jotai/ai-usage.atom';
 
 export interface ChatComposerProps {
   onSend: (content: string) => void;
+  /** Abort the in-flight AI turn. When provided, the send button becomes a
+   *  stop button while `disabled` (i.e. "Solvo is thinking…") is true. */
+  onStop?: () => void;
   disabled?: boolean;
   model: ModelKey;
   onModelChange: (m: ModelKey) => void;
@@ -13,6 +16,7 @@ export interface ChatComposerProps {
 
 const ChatComposer: React.FC<ChatComposerProps> = ({
   onSend,
+  onStop,
   disabled = false,
   model,
   onModelChange,
@@ -87,27 +91,56 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
               overflow: 'auto',
             }}
           />
-          <button
-            onClick={submit}
-            disabled={disabled || !value.trim()}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '10px',
-              border: 'none',
-              background:
-                disabled || !value.trim() ? solvoColors.border : solvoColors.text,
-              color: 'white',
-              cursor: disabled || !value.trim() ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              transition: 'background 0.15s',
-            }}
-          >
-            <ArrowUp size={16} />
-          </button>
+          {disabled && onStop ? (
+            // While Solvo is thinking, the action button becomes a STOP
+            // button that aborts the in-flight AI turn.
+            <button
+              onClick={onStop}
+              aria-label="Stop generating"
+              title="Stop generating"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '10px',
+                border: 'none',
+                background: solvoColors.text,
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'background 0.15s',
+              }}
+            >
+              <Square size={14} fill="white" />
+            </button>
+          ) : (
+            <button
+              onClick={submit}
+              disabled={disabled || !value.trim()}
+              aria-label="Send message"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '10px',
+                border: 'none',
+                background:
+                  disabled || !value.trim()
+                    ? solvoColors.border
+                    : solvoColors.text,
+                color: 'white',
+                cursor: disabled || !value.trim() ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'background 0.15s',
+              }}
+            >
+              <ArrowUp size={16} />
+            </button>
+          )}
         </Box>
 
         {/* Model picker row */}

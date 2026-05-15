@@ -1,0 +1,11 @@
+mutation createAiConversation($data: AiConversationCreateInput!) {
+  createAiConversation(data: $data) {
+    conversationId
+    title
+    model
+    deviceId
+    userId
+    createdAt
+    updatedAt
+  }
+}
