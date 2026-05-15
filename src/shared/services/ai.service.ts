@@ -282,6 +282,22 @@ function referencesShownResults(message: string): boolean {
   return ORDINAL_RESULT_REF_RE.test(message.trim());
 }
 
+/**
+ * Phrasing that asks ABOUT the supplier network/inventory in general —
+ * "are there any suppliers in our network?", "do you have providers in
+ * Heredia?", "qué proveedores tienen?". Deterministic override so the
+ * `network_inquiry` intent works even when a weaker model (e.g.
+ * gpt-4o-mini) misclassifies it as a service request. Requires explicit
+ * supplier/provider/network vocabulary so it doesn't catch generic
+ * "do you have ..." questions.
+ */
+const NETWORK_INQUIRY_RE =
+  /\b(?:(?:in|en)\s+(?:our|your|su|la|nuestra)\s+(?:network|red)|are there (?:any )?(?:suppliers?|providers?|proveedor(?:es)?)|hay (?:alg[úu]n[oa]?s?\s+)?(?:proveedor(?:es)?|suppliers?|negocios?)|who(?:'s| is)?\s+(?:in|on)\s+(?:our|your)\s+network|what\s+(?:suppliers?|providers?|services?|categories|categor[íi]as)\s+(?:do you have|are (?:there|available)|tienen|hay)|qu[ée]\s+(?:proveedor(?:es)?|servicios?|categor[íi]as)\s+(?:tienen|hay|ofrecen)|tienen\s+(?:proveedor(?:es)?|suppliers?))\b/i;
+
+function looksLikeNetworkInquiry(message: string): boolean {
+  return NETWORK_INQUIRY_RE.test(message.trim());
+}
+
 function stripJsonFences(text: string): string {
   return text
     .trim()
@@ -346,10 +362,12 @@ export async function parseQueryWithAi(
           ? 'network_inquiry'
           : 'service_request';
 
-    // Belt-and-suspenders: override the LLM when the latest user turn is
-    // unambiguously `chat`. We pass the FULL conversation context to the LLM
-    // (the parser is multi-turn) but the overrides only look at the last
-    // user utterance, re-derived by taking the segment after the final ". ".
+    // Belt-and-suspenders: deterministically override the LLM's intent for
+    // unambiguous phrasings. Weaker models (e.g. gpt-4o-mini) misclassify
+    // these often, so we don't trust the model alone. We pass the FULL
+    // conversation context to the LLM (the parser is multi-turn) but the
+    // overrides only look at the last user utterance, re-derived by taking
+    // the segment after the final ". ".
     const lastTurn = trimmed.split(/\.\s+/).pop() ?? trimmed;
     if (
       looksLikeQuestionAboutNamedEntity(lastTurn) ||
@@ -357,7 +375,17 @@ export async function parseQueryWithAi(
       // never a new search.
       referencesShownResults(lastTurn)
     ) {
+      // Highest priority — a question about a specific named provider or
+      // about results already shown is always conversational.
       intent = 'chat';
+    } else if (
+      // "are there suppliers in our network?" — asking ABOUT the network.
+      // Skip when an explicit search verb is present ("find me suppliers in
+      // your network" → the user wants options/cards, not a text answer).
+      looksLikeNetworkInquiry(lastTurn) &&
+      !SEARCH_VERB_RE.test(lastTurn)
+    ) {
+      intent = 'network_inquiry';
     }
 
     // Deterministic location override: if the user explicitly typed a place
