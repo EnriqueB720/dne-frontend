@@ -75,12 +75,17 @@ export interface ChatUsage {
 }
 
 /**
- * Whether the user is asking us to find providers for them (in which case
- * the UI shows provider cards) or having a conversational exchange (where
- * the AI just answers in text — no cards generated). Refinements of an
- * earlier service request still count as `service_request`.
+ * How a turn should be handled:
+ *  - `service_request`  — the user wants provider options → UI shows cards.
+ *  - `network_inquiry`  — the user is asking ABOUT the supplier network
+ *                         ("do you have DJs in Heredia?", "are there
+ *                         suppliers near me?") → we search the DB and let
+ *                         the AI answer in text, but show NO cards.
+ *  - `chat`             — general conversation, or a question about results
+ *                         ALREADY shown ("compare the first and last one")
+ *                         → no DB search, no cards.
  */
-export type QueryIntent = 'service_request' | 'chat';
+export type QueryIntent = 'service_request' | 'network_inquiry' | 'chat';
 
 export interface ParsedQuery {
   service: string;
@@ -103,8 +108,8 @@ The user will provide a free-text message in a multi-turn conversation. Classify
 
 Schema:
 {
-  "intent": "either 'service_request' (the user wants us to find/recommend providers, or is refining/expanding an earlier service search) or 'chat' (the user is asking a general question, having small talk, or asking how Solvo works without naming a service to find)",
-  "service": "short service category like 'Catering', 'DJ', 'Cleaning', 'AC repair', etc. — 1-3 words. Use empty string '' when intent is 'chat' or no service category is implied.",
+  "intent": "one of 'service_request', 'network_inquiry', or 'chat' — see the intent rules below",
+  "service": "short service category like 'Catering', 'DJ', 'Cleaning', 'AC repair', etc. — 1-3 words. Use empty string '' when no service category is implied.",
   "people": "string number of people (e.g. '35 people'), OR an empty string '' if not mentioned. NEVER write the word 'unspecified'.",
   "location": "string location/neighborhood if mentioned (e.g. 'Santa Ana'). If the user did NOT mention a location AND device coordinates are provided in the user message, infer the most likely Costa Rican canton/neighborhood from those coordinates. Otherwise empty string ''.",
   "budget": "string budget formatted as '₡XXX,XXX' if mentioned, OR an empty string '' if not mentioned. NEVER write the word 'unspecified'.",
@@ -114,40 +119,47 @@ Schema:
 
 Intent rules — apply in this order (first match wins):
 
-1. If the message is a QUESTION ABOUT a specific named provider/business, it is ALWAYS chat — even if a service-category word appears in or near the name. The user wants information about that specific business, not a new search.
-   Question signals (English): "where is", "what does", "how much does", "is X verified", "tell me about", "does X do", followed by a capitalized business name.
-   Question signals (Español): "dónde está", "dónde queda", "dónde se ubica", "cuánto cobra", "qué incluye", "qué tal", "cómo es", "háblame de", "y X?" (referent follow-up), "y qué tal X?".
-   Name patterns that count as a specific business — NOT a service category — even though they contain a category word:
-   - "DJ <Name>"  → name (e.g. "DJ Carlos Mora", "DJ Mauricio")
-   - "Chef <Name>" / "Doctor <Name>" / "Dr. <Name>" / "Studio <Name>"
-   - Any multi-word capitalized phrase like "Piki Tiki", "Sabor Catering", "Studio Luz", "TecnoFrío"
-   - The phrase appears in quotes or right after "about", "de", "sobre"
-   Examples → chat:
-   - "Where is PikiTiki located?"
-   - "Donde esta DJ Carlos Mora ubicado?"   ← "DJ Carlos Mora" is a NAME, not a service ask
-   - "y Piki Tiki?"                          ← referent follow-up
-   - "¿Cuánto cobra Sabor Catering?"
-   - "Tell me more about Studio Luz"
-   - "Does TecnoFrío do weekends?"
-   - "Háblame de Pro Events DJ Costa Rica"
+1. CHAT — a question about results ALREADY shown, or about a specific named provider, or general conversation. These need NO new search.
+   1a. References to already-shown results: "the first result", "the last one", "second option", "compare them", "what's the difference between these", "which is cheaper", "primer resultado", "última opción", "compara los dos". The user is asking about cards already on screen — NOT requesting new ones.
+       Examples → chat:
+       - "Throw me a comparison between the first result and the last one"
+       - "Which of these is cheaper?"
+       - "Compare the first two options"
+       - "¿Cuál de estos me recomiendas?"
+   1b. Questions ABOUT a specific named provider/business — even if a service-category word appears in or near the name ("DJ Carlos Mora", "Studio Luz", "Piki Tiki", "Sabor Catering").
+       Signals (EN): "where is", "what does", "how much does", "is X verified", "tell me about", "does X do".
+       Signals (ES): "dónde está", "dónde queda", "cuánto cobra", "qué incluye", "qué tal", "háblame de", "y X?".
+       Examples → chat:
+       - "Where is PikiTiki located?"
+       - "Donde esta DJ Carlos Mora ubicado?"
+       - "y Piki Tiki?"
+       - "¿Cuánto cobra Sabor Catering?"
+   1c. General conversation: how Solvo works, what "verified" means in general, greetings, thanks, off-topic chat.
 
-2. Requests to search / find / list / show / recommend providers, or to refine an earlier search, are service_request.
-   English signals: "I need", "find me", "show me", "recommend", "plan a", "any X under ₡…".
-   Español signals: "necesito", "busco", "muéstrame", "recomiéndame", "quiero", "encuéntrame", "cuál es el mejor".
+2. NETWORK_INQUIRY — the user is asking ABOUT the supplier network/inventory in general (not naming a specific business, not picking one): whether suppliers exist, what's available, coverage. We will search the DB and answer in text — no cards.
+   Signals (EN): "do you have", "are there any (suppliers/providers)", "what (suppliers/services/categories) do you have", "is there anyone who", "who's in your network".
+   Signals (ES): "tienen", "hay (proveedores/suppliers)", "qué (proveedores/servicios) tienen", "hay alguien que", "tienen suppliers en".
+   Examples → network_inquiry:
+   - "Are there any suppliers in our network?"
+   - "Do you have DJs in Heredia?"
+   - "What categories of services do you cover?"
+   - "¿Tienen proveedores de catering en San José?"
+   - "Is there anyone who does AC repair?"
+
+3. SERVICE_REQUEST — the user wants us to find/recommend providers FOR THEM to pick from, or is refining an earlier search. This is the "show me options I can act on" intent.
+   Signals (EN): "I need", "find me", "show me", "recommend me", "plan a", "get me", "any X under ₡…".
+   Signals (ES): "necesito", "busco", "muéstrame", "recomiéndame", "quiero", "encuéntrame", "consígueme".
    Examples → service_request:
    - "I need catering for 35"
    - "Find me a DJ"
    - "Necesito un DJ para sábado"
    - "Plan a birthday party"
    - "Show me cheaper options" (refining)
-   - "Más opciones bajo ₡200,000" (refining)
    - "What about Saturday?" (refining)
 
-3. Pure questions about how Solvo works, what verified means in general, follow-up clarifications, greetings, thanks, off-topic chat → chat.
+4. When genuinely in doubt and the message names a concrete service CATEGORY without any specific business name and isn't clearly a question about the network → service_request.
 
-4. When in doubt and the message names a concrete service CATEGORY (catering, DJ, photographer, plumber, etc.) without any specific capitalized business name → service_request.
-
-Critical heuristic: if the message starts with an interrogative ("where/dónde", "what/qué", "how/cómo", "when/cuándo", "who/quién", or starts with "y " / "and " as a referent) AND contains a capitalized name, default to chat. Don't be fooled by category words ("DJ", "chef", "catering") that appear INSIDE the name.
+Disambiguation: "are there DJs in Heredia?" is network_inquiry (asking IF the network has them). "find me a DJ in Heredia" is service_request (asking us to surface options). "compare the DJs you showed" is chat (about already-shown results).
 
 Other rules:
 - For unknown fields, use empty string '' — do NOT invent values, do NOT write 'unspecified', 'flexible', 'any', etc.
@@ -256,6 +268,20 @@ function looksLikeQuestionAboutNamedEntity(message: string): boolean {
   return false;
 }
 
+/**
+ * Unambiguous reference to a result ALREADY on screen — "the first result",
+ * "the last one", "second option", "primer resultado", "última opción". When
+ * the user is talking about cards already shown, the turn is `chat`: they
+ * want analysis of existing results, not a fresh search. Deterministic
+ * override for when the LLM gets fooled by words like "comparison".
+ */
+const ORDINAL_RESULT_REF_RE =
+  /\b(?:the\s+)?(?:first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th|primer[oa]?|segund[oa]|tercer[oa]?|cuart[oa]|quint[oa]|[úu]ltim[oa])\s+(?:result|one|option|provider|card|pick|resultado|opci[óo]n|proveedor|tarjeta)s?\b/i;
+
+function referencesShownResults(message: string): boolean {
+  return ORDINAL_RESULT_REF_RE.test(message.trim());
+}
+
 function stripJsonFences(text: string): string {
   return text
     .trim()
@@ -309,19 +335,28 @@ export async function parseQueryWithAi(
   let parsed: ParsedQuery;
   try {
     const obj = JSON.parse(cleaned);
-    // Coerce anything the model returns into our two-valued intent. Default
-    // to `service_request` since that's the more common case and keeping
+    // Coerce anything the model returns into our three-valued intent.
+    // Default to `service_request` for unrecognised values — keeping
     // provider generation on for ambiguous turns is the safer error.
     const rawIntent = String(obj.intent ?? '').toLowerCase().trim();
-    let intent: QueryIntent = rawIntent === 'chat' ? 'chat' : 'service_request';
+    let intent: QueryIntent =
+      rawIntent === 'chat'
+        ? 'chat'
+        : rawIntent === 'network_inquiry'
+          ? 'network_inquiry'
+          : 'service_request';
 
-    // Belt-and-suspenders: override the LLM if the latest user turn is
-    // clearly a question about a named entity. We pass the FULL conversation
-    // context to the LLM (parser is multi-turn) but the override should only
-    // look at the last user utterance, which we re-derive by taking the
-    // segment after the final ". " — same way `contextQuery` is built upstream.
+    // Belt-and-suspenders: override the LLM when the latest user turn is
+    // unambiguously `chat`. We pass the FULL conversation context to the LLM
+    // (the parser is multi-turn) but the overrides only look at the last
+    // user utterance, re-derived by taking the segment after the final ". ".
     const lastTurn = trimmed.split(/\.\s+/).pop() ?? trimmed;
-    if (looksLikeQuestionAboutNamedEntity(lastTurn)) {
+    if (
+      looksLikeQuestionAboutNamedEntity(lastTurn) ||
+      // "compare the first and last result" — about cards already on screen,
+      // never a new search.
+      referencesShownResults(lastTurn)
+    ) {
       intent = 'chat';
     }
 

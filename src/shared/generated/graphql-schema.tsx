@@ -18,6 +18,25 @@ export type Scalars = {
   DateTime: { input: any; output: any; }
 };
 
+export type AiChatMessageInput = {
+  content: Scalars['String']['input'];
+  role: Scalars['String']['input'];
+};
+
+export type AiCompletionInput = {
+  cachedSystem?: InputMaybe<Scalars['String']['input']>;
+  messages: Array<AiChatMessageInput>;
+  model: Scalars['String']['input'];
+  system?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type AiCompletionResult = {
+  __typename?: 'AiCompletionResult';
+  content: Scalars['String']['output'];
+  model: Scalars['String']['output'];
+  usage?: Maybe<AiMessageUsage>;
+};
+
 export type AiConversation = {
   __typename?: 'AiConversation';
   conversationId: Scalars['String']['output'];
@@ -35,6 +54,11 @@ export type AiConversationCreateInput = {
   deviceId?: InputMaybe<Scalars['String']['input']>;
   model: Scalars['String']['input'];
   title: Scalars['String']['input'];
+};
+
+export type AiConversationLinkInput = {
+  conversationId: Scalars['String']['input'];
+  requestId: Scalars['Int']['input'];
 };
 
 export type AiConversationUpdateInput = {
@@ -63,6 +87,7 @@ export type AiMessageProvidersUpdateInput = {
 };
 
 export type AiMessageSendInput = {
+  cachedSystem?: InputMaybe<Scalars['String']['input']>;
   content: Scalars['String']['input'];
   conversationId: Scalars['String']['input'];
   model?: InputMaybe<Scalars['String']['input']>;
@@ -237,6 +262,7 @@ export type LoginUserInput = {
 export type Mutation = {
   __typename?: 'Mutation';
   acceptQuote: Booking;
+  aiComplete: AiCompletionResult;
   cancelBooking: Booking;
   cancelCalendarEvent: CalendarEvent;
   closeRequest: Request;
@@ -253,7 +279,10 @@ export type Mutation = {
   createUser: User;
   deleteAiConversation: Scalars['Boolean']['output'];
   deletePost: Scalars['Boolean']['output'];
+  linkAiConversationToRequest: AiConversation;
   markQuotesViewed: Scalars['Float']['output'];
+  mergeGuestAiConversations: Scalars['Float']['output'];
+  rollbackLastAiTurn: Scalars['Float']['output'];
   sendAiMessage: SendAiMessageResult;
   signup: User;
   updateAiConversation: AiConversation;
@@ -267,6 +296,11 @@ export type Mutation = {
 
 export type MutationAcceptQuoteArgs = {
   data: QuoteAcceptInput;
+};
+
+
+export type MutationAiCompleteArgs = {
+  data: AiCompletionInput;
 };
 
 
@@ -351,8 +385,25 @@ export type MutationDeletePostArgs = {
 };
 
 
+export type MutationLinkAiConversationToRequestArgs = {
+  data: AiConversationLinkInput;
+  deviceId?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type MutationMarkQuotesViewedArgs = {
   data: QuoteMarkViewedInput;
+};
+
+
+export type MutationMergeGuestAiConversationsArgs = {
+  deviceId: Scalars['String']['input'];
+};
+
+
+export type MutationRollbackLastAiTurnArgs = {
+  conversationId: Scalars['String']['input'];
+  deviceId?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -926,6 +977,13 @@ export type UserWhereInput = {
   userId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type AiCompleteMutationVariables = Exact<{
+  data: AiCompletionInput;
+}>;
+
+
+export type AiCompleteMutation = { __typename?: 'Mutation', aiComplete: { __typename?: 'AiCompletionResult', content: string, model: string, usage?: { __typename?: 'AiMessageUsage', inputTokens?: number | null, outputTokens?: number | null } | null } };
+
 export type AiConversationQueryVariables = Exact<{
   conversationId: Scalars['String']['input'];
   deviceId?: InputMaybe<Scalars['String']['input']>;
@@ -955,6 +1013,29 @@ export type DeleteAiConversationMutationVariables = Exact<{
 
 
 export type DeleteAiConversationMutation = { __typename?: 'Mutation', deleteAiConversation: boolean };
+
+export type LinkAiConversationToRequestMutationVariables = Exact<{
+  data: AiConversationLinkInput;
+  deviceId?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type LinkAiConversationToRequestMutation = { __typename?: 'Mutation', linkAiConversationToRequest: { __typename?: 'AiConversation', conversationId: string, requestId?: number | null } };
+
+export type MergeGuestAiConversationsMutationVariables = Exact<{
+  deviceId: Scalars['String']['input'];
+}>;
+
+
+export type MergeGuestAiConversationsMutation = { __typename?: 'Mutation', mergeGuestAiConversations: number };
+
+export type RollbackLastAiTurnMutationVariables = Exact<{
+  conversationId: Scalars['String']['input'];
+  deviceId?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type RollbackLastAiTurnMutation = { __typename?: 'Mutation', rollbackLastAiTurn: number };
 
 export type SendAiMessageMutationVariables = Exact<{
   data: AiMessageSendInput;
@@ -1161,6 +1242,44 @@ export type SuppliersQueryVariables = Exact<{ [key: string]: never; }>;
 export type SuppliersQuery = { __typename?: 'Query', suppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string }> };
 
 
+export const AiCompleteDocument = gql`
+    mutation aiComplete($data: AiCompletionInput!) {
+  aiComplete(data: $data) {
+    content
+    model
+    usage {
+      inputTokens
+      outputTokens
+    }
+  }
+}
+    `;
+export type AiCompleteMutationFn = Apollo.MutationFunction<AiCompleteMutation, AiCompleteMutationVariables>;
+
+/**
+ * __useAiCompleteMutation__
+ *
+ * To run a mutation, you first call `useAiCompleteMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAiCompleteMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [aiCompleteMutation, { data, loading, error }] = useAiCompleteMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useAiCompleteMutation(baseOptions?: Apollo.MutationHookOptions<AiCompleteMutation, AiCompleteMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<AiCompleteMutation, AiCompleteMutationVariables>(AiCompleteDocument, options);
+      }
+export type AiCompleteMutationHookResult = ReturnType<typeof useAiCompleteMutation>;
+export type AiCompleteMutationResult = Apollo.MutationResult<AiCompleteMutation>;
+export type AiCompleteMutationOptions = Apollo.BaseMutationOptions<AiCompleteMutation, AiCompleteMutationVariables>;
 export const AiConversationDocument = gql`
     query aiConversation($conversationId: String!, $deviceId: String) {
   aiConversation(conversationId: $conversationId, deviceId: $deviceId) {
@@ -1348,6 +1467,104 @@ export function useDeleteAiConversationMutation(baseOptions?: Apollo.MutationHoo
 export type DeleteAiConversationMutationHookResult = ReturnType<typeof useDeleteAiConversationMutation>;
 export type DeleteAiConversationMutationResult = Apollo.MutationResult<DeleteAiConversationMutation>;
 export type DeleteAiConversationMutationOptions = Apollo.BaseMutationOptions<DeleteAiConversationMutation, DeleteAiConversationMutationVariables>;
+export const LinkAiConversationToRequestDocument = gql`
+    mutation linkAiConversationToRequest($data: AiConversationLinkInput!, $deviceId: String) {
+  linkAiConversationToRequest(data: $data, deviceId: $deviceId) {
+    conversationId
+    requestId
+  }
+}
+    `;
+export type LinkAiConversationToRequestMutationFn = Apollo.MutationFunction<LinkAiConversationToRequestMutation, LinkAiConversationToRequestMutationVariables>;
+
+/**
+ * __useLinkAiConversationToRequestMutation__
+ *
+ * To run a mutation, you first call `useLinkAiConversationToRequestMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useLinkAiConversationToRequestMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [linkAiConversationToRequestMutation, { data, loading, error }] = useLinkAiConversationToRequestMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *      deviceId: // value for 'deviceId'
+ *   },
+ * });
+ */
+export function useLinkAiConversationToRequestMutation(baseOptions?: Apollo.MutationHookOptions<LinkAiConversationToRequestMutation, LinkAiConversationToRequestMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<LinkAiConversationToRequestMutation, LinkAiConversationToRequestMutationVariables>(LinkAiConversationToRequestDocument, options);
+      }
+export type LinkAiConversationToRequestMutationHookResult = ReturnType<typeof useLinkAiConversationToRequestMutation>;
+export type LinkAiConversationToRequestMutationResult = Apollo.MutationResult<LinkAiConversationToRequestMutation>;
+export type LinkAiConversationToRequestMutationOptions = Apollo.BaseMutationOptions<LinkAiConversationToRequestMutation, LinkAiConversationToRequestMutationVariables>;
+export const MergeGuestAiConversationsDocument = gql`
+    mutation mergeGuestAiConversations($deviceId: String!) {
+  mergeGuestAiConversations(deviceId: $deviceId)
+}
+    `;
+export type MergeGuestAiConversationsMutationFn = Apollo.MutationFunction<MergeGuestAiConversationsMutation, MergeGuestAiConversationsMutationVariables>;
+
+/**
+ * __useMergeGuestAiConversationsMutation__
+ *
+ * To run a mutation, you first call `useMergeGuestAiConversationsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMergeGuestAiConversationsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [mergeGuestAiConversationsMutation, { data, loading, error }] = useMergeGuestAiConversationsMutation({
+ *   variables: {
+ *      deviceId: // value for 'deviceId'
+ *   },
+ * });
+ */
+export function useMergeGuestAiConversationsMutation(baseOptions?: Apollo.MutationHookOptions<MergeGuestAiConversationsMutation, MergeGuestAiConversationsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<MergeGuestAiConversationsMutation, MergeGuestAiConversationsMutationVariables>(MergeGuestAiConversationsDocument, options);
+      }
+export type MergeGuestAiConversationsMutationHookResult = ReturnType<typeof useMergeGuestAiConversationsMutation>;
+export type MergeGuestAiConversationsMutationResult = Apollo.MutationResult<MergeGuestAiConversationsMutation>;
+export type MergeGuestAiConversationsMutationOptions = Apollo.BaseMutationOptions<MergeGuestAiConversationsMutation, MergeGuestAiConversationsMutationVariables>;
+export const RollbackLastAiTurnDocument = gql`
+    mutation rollbackLastAiTurn($conversationId: String!, $deviceId: String) {
+  rollbackLastAiTurn(conversationId: $conversationId, deviceId: $deviceId)
+}
+    `;
+export type RollbackLastAiTurnMutationFn = Apollo.MutationFunction<RollbackLastAiTurnMutation, RollbackLastAiTurnMutationVariables>;
+
+/**
+ * __useRollbackLastAiTurnMutation__
+ *
+ * To run a mutation, you first call `useRollbackLastAiTurnMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRollbackLastAiTurnMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [rollbackLastAiTurnMutation, { data, loading, error }] = useRollbackLastAiTurnMutation({
+ *   variables: {
+ *      conversationId: // value for 'conversationId'
+ *      deviceId: // value for 'deviceId'
+ *   },
+ * });
+ */
+export function useRollbackLastAiTurnMutation(baseOptions?: Apollo.MutationHookOptions<RollbackLastAiTurnMutation, RollbackLastAiTurnMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RollbackLastAiTurnMutation, RollbackLastAiTurnMutationVariables>(RollbackLastAiTurnDocument, options);
+      }
+export type RollbackLastAiTurnMutationHookResult = ReturnType<typeof useRollbackLastAiTurnMutation>;
+export type RollbackLastAiTurnMutationResult = Apollo.MutationResult<RollbackLastAiTurnMutation>;
+export type RollbackLastAiTurnMutationOptions = Apollo.BaseMutationOptions<RollbackLastAiTurnMutation, RollbackLastAiTurnMutationVariables>;
 export const SendAiMessageDocument = gql`
     mutation sendAiMessage($data: AiMessageSendInput!, $deviceId: String) {
   sendAiMessage(data: $data, deviceId: $deviceId) {

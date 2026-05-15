@@ -63,15 +63,16 @@ RULES — follow exactly:
 1. LANGUAGE: Detect the language of the user's latest message and reply in that EXACT language. If their message is in English, reply in English. If Spanish, reply in Spanish. Never mix languages.
 2. BREVITY: Keep responses to 1–3 sentences for service requests. For conversational questions you may use up to 4–5 sentences if needed to answer properly.
 3. TIMING — CRITICAL: Your reply and the provider cards are delivered TOGETHER, in the SAME message, at the SAME instant. There is NO "later". NEVER say "hold on", "one moment", "please wait", "I'll find", "let me search", "give me a second", or anything implying results are still coming. Always speak in the PRESENT or PAST tense about what is already on screen.
-4. TWO MODES OF REPLY:
-   a) Service request (the user asked you to find / refine / compare providers): a "## Search result" block below tells you EXACTLY how many provider cards are shown to the user right now.
+4. THREE MODES OF REPLY — the context block below your prompt tells you which one applies:
+   a) Service request — a "## Search result" block tells you EXACTLY how many provider cards are shown to the user right now.
       - If the count is 1 or more: the cards are ALREADY visible below your message. Acknowledge what you found in present tense ("Here are 4 Italian options near Santo Domingo") and invite them to look. Do NOT list or describe the specific businesses yourself.
-      - If the count is 0: there are NO cards. Tell the user plainly that you couldn't find matches for their specific request, and offer to broaden it (a nearby area, a different service, a higher budget). Do NOT pretend results exist.
-   b) Conversation (general questions about how Solvo works, what's verified, pricing in general, greetings, thanks, off-topic chit-chat, AND questions about a specific provider already shown): NO cards will appear. Answer fully in plain text. Do NOT mention "the cards" or "the options below" in this mode.
+      - If the count is 0: there are NO cards. Tell the user plainly that you couldn't find matches, and offer to broaden it. Do NOT pretend results exist.
+   b) Network lookup — a "## Network lookup" block lists suppliers found in the Solvo network for an informational question ("do you have DJs in Heredia?", "are there suppliers in our network?"). NO cards are shown. Answer in plain text: summarise what the network has (counts, names, categories, locations) using ONLY the listed data. If the block says zero matches, say so honestly. Do NOT say "see the cards" — there are none.
+   c) Conversation — no context block, or a "## Known providers" block. General questions (how Solvo works, what's verified), greetings, thanks, comparisons of results ALREADY shown, or questions about a specific provider already shown. NO cards appear. Answer fully in plain text. Do NOT mention "the cards" or "the options below".
 5. PROVIDER FACTS — NO HALLUCINATION:
-   - When the user asks about a specific named provider (e.g. "where is PikiTiki?", "how much does Sabor Catering charge?"), you may ONLY answer using the data in the "## Known providers" / "## Search result" block below, when present.
-   - If the named provider IS in that block, answer using its fields verbatim. Do not invent addresses, hours, or services that aren't there.
-   - If the named provider is NOT in that block (or no block is present), say you don't have detailed info on that provider on hand and offer to search for similar providers. Never make up the answer.
+   - When the user asks about a specific named provider, or to compare providers, you may ONLY use the data in the "## Known providers" / "## Search result" / "## Network lookup" block below, when present.
+   - If the provider IS in that block, answer using its fields verbatim. Do not invent addresses, hours, or services that aren't there.
+   - If the provider is NOT in that block (or no block is present), say you don't have detailed info on it and offer to search. Never make up the answer.
    - NEVER guess what category a named provider belongs to. Use ONLY the data you have.
 6. QUESTIONS: Ask at most ONE clarifying question per turn.
 7. FORMAT: No bullet points, no markdown headers, no numbered lists.
@@ -79,11 +80,14 @@ RULES — follow exactly:
 Service-request examples:
 - (4 cards shown) "Here are 4 Italian options near Santo Domingo, Heredia — take a look below and tell me if you'd like to adjust anything."
 - (0 cards shown) "I couldn't find Italian options near Santo Domingo specifically. Want me to widen the search to the rest of Heredia, or try a different cuisine?"
-- (5 cards shown) "I've updated the options to focus on budget-friendly picks below."
+
+Network-lookup examples:
+- User: "Are there any suppliers in our network?" (block lists 8) → "Yes — there are verified suppliers across catering, DJs, photography and more. For example, Sabor Catering in Santa Ana and DJ Carlos Mix in Alajuela. Want me to pull up options for something specific?"
+- User: "Do you have AC repair in Cartago?" (block: 0 matches) → "I don't see any AC repair suppliers in Cartago in our network right now. Want me to check nearby areas?"
 
 Conversational examples:
 - User: "How does Solvo work?" → "You describe what you need in your own words and I match you with verified providers in your area. They send quotes, you pick one, and you can chat with them through the platform."
-- User: "Where is PikiTiki located?" (PikiTiki in the block as Santa Ana) → "PikiTiki is in Santa Ana. Want me to show you more options nearby?"
+- User: "Compare the first and last result" (both in the block) → "The first, Sabor Catering, is ₡210,000 with a 4.7 rating; the last, Cocina Express, is ₡175,000 at 4.4. Sabor costs more but rates higher — Cocina is the cheaper pick."
 - User: "Where is XYZ Cafe?" (XYZ Cafe NOT in the block) → "I don't have details on XYZ Cafe handy — want me to look for similar providers instead?"
 - User: "Thanks!" → "You're welcome! Let me know whenever you need something else."`;
 
@@ -281,6 +285,40 @@ function searchResultContext(
     `${count} provider card${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} shown to the user RIGHT NOW, below your message, for [${requestLine || 'this request'}].` +
     locationNote +
     ` Acknowledge them in present tense. The cards:\n${formatProvidersForGrounding(providers)}`
+  );
+}
+
+/**
+ * Network-lookup context: the user asked ABOUT the supplier network
+ * ("are there suppliers in our network?", "do you have DJs in Heredia?").
+ * We searched the DB and pass the matches as reference data — the AI
+ * answers in plain text. NO cards are rendered for this turn.
+ */
+function networkInquiryContext(
+  providers: ProviderData[],
+  parsed: ParsedQuery,
+): string {
+  const filterLine = [
+    parsed.service && `service: ${parsed.service}`,
+    parsed.location && `location: ${parsed.location}`,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+  const scope = filterLine ? ` for [${filterLine}]` : '';
+
+  if (providers.length === 0) {
+    return (
+      `## Network lookup\n` +
+      `A search of the Solvo supplier network${scope} returned NO matches. ` +
+      `Tell the user honestly there are no suppliers matching that in the network right now, and offer to check nearby areas or a different service. No cards are shown.`
+    );
+  }
+
+  return (
+    `## Network lookup\n` +
+    `The user is asking about the Solvo supplier network. A search${scope} found these ${providers.length} verified supplier(s). ` +
+    `Answer their question in plain text using ONLY this data — summarise counts, names, categories, locations as relevant. NO cards are shown to the user.\n` +
+    formatProvidersForGrounding(providers)
   );
 }
 
@@ -1015,11 +1053,6 @@ export default function Home() {
       // Capture current messages before the state update
       const currentMessages = messages;
 
-      // Marketplace flow: try to match real DB suppliers on every customer
-      // turn. The DB query is cheap and gracefully falls back to AI invention
-      // if nothing matches, so there's no downside to always searching.
-      const shouldGenerateProviders = true;
-
       // For the parser, pass the full conversation context so it can
       // accumulate info across multiple user turns.
       const contextQuery = [
@@ -1091,10 +1124,11 @@ export default function Home() {
         let provData: { parsed: ParsedQuery; providers: ProviderData[] } | null =
           null;
 
-        if (parsed.intent === 'chat' || !shouldGenerateProviders) {
+        if (parsed.intent === 'chat') {
           // ── Conversational turn ────────────────────────────────────────
           // No cards. Ground the AI in whatever providers were shown
-          // earlier so it can answer "where is PikiTiki?" factually.
+          // earlier so it can answer "where is PikiTiki?" / "compare the
+          // first and last result" factually.
           // eslint-disable-next-line no-console
           console.log('[intent] chat — no provider generation');
           aiResult = await apiSendMessage(
@@ -1105,6 +1139,57 @@ export default function Home() {
             signal,
             SOLVO_CHAT_SYSTEM_PROMPT,
           );
+        } else if (parsed.intent === 'network_inquiry') {
+          // ── Network lookup ─────────────────────────────────────────────
+          // The user is asking ABOUT the supplier network ("are there
+          // suppliers in our network?", "do you have DJs in Heredia?"). We
+          // search the DB and let the AI answer in text — but show NO cards;
+          // this is informational, not a pick-a-provider flow.
+          const rawLocation = (parsed.location || '').trim();
+          const normalizedCity = rawLocation
+            .split(',')[0]
+            .replace(/^(in|at|near|around)\s+/i, '')
+            .trim();
+          const searchVars = {
+            serviceQuery: parsed.service?.trim() || null,
+            city: normalizedCity || null,
+            guestCount: null,
+            // Pull a wider set than the card cap — this is reference data for
+            // the AI to summarise, not a list of cards.
+            limit: 10,
+          };
+          // eslint-disable-next-line no-console
+          console.log('[intent] network_inquiry — searchSuppliers:', searchVars);
+
+          let dbSuppliers: any[] = [];
+          try {
+            const res = await searchSuppliers({
+              variables: { data: searchVars as any },
+              context: { fetchOptions: { signal } },
+            });
+            dbSuppliers = res?.data?.searchSuppliers ?? [];
+          } catch (dbErr) {
+            // eslint-disable-next-line no-console
+            console.error('[DB] network_inquiry search ERROR:', dbErr);
+          }
+
+          const dbProviders = dbSuppliers.map((s, i) =>
+            dbSupplierToProviderData(s, i),
+          );
+          // eslint-disable-next-line no-console
+          console.log(
+            `[intent] network_inquiry — ${dbProviders.length} suppliers found, no cards`,
+          );
+
+          aiResult = await apiSendMessage(
+            convId,
+            content,
+            currentModel,
+            networkInquiryContext(dbProviders, parsed),
+            signal,
+            SOLVO_CHAT_SYSTEM_PROMPT,
+          );
+          // provData stays null — informational answer, no cards rendered.
         } else {
           // ── Service request: DB-first, AI fills only the gap ───────────
           const rawLocation = (parsed.location || '').trim();
