@@ -47,7 +47,6 @@ import {
 } from '@/shared/services/conversation.service';
 import {
   useCreateRequestMutation,
-  useCreateQuoteMutation,
   useSearchSuppliersLazyQuery,
 } from '@generated';
 import Link from 'next/link';
@@ -601,11 +600,13 @@ export default function Home() {
   const [messages, setMessages] = React.useState<UiMessage[]>([]);
   const [waitingForAI, setWaitingForAI] = React.useState(false);
   const [currentModel, setCurrentModel] = React.useState<ModelKey>('claude-haiku');
+  // Drawer state — only meaningful below `lg`; on lg+ panels are inline
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [packageOpen, setPackageOpen] = React.useState(false);
 
   // ── Request creation (from "Select" on a provider card) ────────────────
   const { user, isAuthenticated } = React.useContext(AuthContext);
   const [createRequest, createRequestState] = useCreateRequestMutation();
-  const [createQuote, createQuoteState] = useCreateQuoteMutation();
   const [searchSuppliers] = useSearchSuppliersLazyQuery({ fetchPolicy: 'network-only' });
   const [createdRequest, setCreatedRequest] = React.useState<{
     requestId: number;
@@ -624,7 +625,7 @@ export default function Home() {
     message: string;
     budget: string;
   } | null>(null);
-  const submittingRequest = createRequestState.loading || createQuoteState.loading;
+  const submittingRequest = createRequestState.loading;
 
   const handleSelectProvider = React.useCallback(
     (provider: ProviderData, msg: UiMessage) => {
@@ -711,35 +712,17 @@ export default function Home() {
       const requestId = data?.createRequest.requestId;
       if (!requestId) throw new Error('Failed to create request');
 
-      // Auto-create a quote when the provider is a real DB supplier
-      if (selectModal.isRealSupplier && selectModal.provider.id > 0) {
-        const validUntil = new Date();
-        validUntil.setDate(validUntil.getDate() + 14);
-        const priceDigits = selectModal.provider.priceLabel.replace(/[^\d]/g, '');
-        const totalPrice = priceDigits ? Number(priceDigits) : (budget ?? 0);
-
-        await createQuote({
-          variables: {
-            data: {
-              requestId,
-              supplierId: selectModal.provider.id,
-              totalPrice,
-              currency: 'CRC',
-              message: selectModal.message || `Quote for "${selectModal.rawQuery}".`,
-              validUntil: validUntil.toISOString(),
-            } as any,
-          },
-        }).catch(() => {
-          /* non-fatal — request is created, supplier can quote manually */
-        });
-      }
+      // The supplier owns pricing + availability, so we deliberately do NOT
+      // auto-create a quote on their behalf here. Creating the request fans
+      // out a `NEW_REQUEST_MATCH` notification — matched suppliers see the
+      // lead in their Open leads inbox on /requests and quote from there.
 
       setCreatedRequest({ requestId, providerName: selectModal.provider.name });
       setSelectModal(null);
     } catch (err: any) {
       setRequestError(err?.message ?? 'Failed to create request');
     }
-  }, [selectModal, user, isAuthenticated, createRequest, createQuote]);
+  }, [selectModal, user, isAuthenticated, createRequest]);
 
   // ── Package builder ────────────────────────────────────────────────────
   const [pkgState, setPkgState] = useAtom(packageAtom);
@@ -1139,7 +1122,7 @@ export default function Home() {
               {!selectModal.isRealSupplier && (
                 <Box padding="10px 12px" borderRadius="10px" bg={solvoColors.amberLight} marginBottom="14px">
                   <Text fontSize="xs" color={solvoColors.amberText}>
-                    This is an AI-suggested example. A request will be created, but no quote will auto-generate (the supplier doesn't exist in the DB yet).
+                    This is an AI-suggested example. A request will be created, but no real supplier will receive it (this one doesn't exist in the DB yet).
                   </Text>
                 </Box>
               )}
@@ -1460,12 +1443,20 @@ export default function Home() {
         onNew={handleNewChat}
         onDelete={handleDelete}
         onGoHome={handleGoHome}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       {/* Center: nav + thread (or empty state) + composer */}
-      <Flex direction="column" flex="1" overflow="hidden" height="100vh">
-        <SolvoNavBar activePath="/" onGoHome={handleGoHome} onNewChat={handleNewChat} hideLogo />
-        <Flex flex="1" overflow="hidden">
+      <Flex direction="column" flex="1" minWidth={0} overflow="hidden" height="100vh">
+        <SolvoNavBar
+          activePath="/"
+          onGoHome={handleGoHome}
+          onNewChat={handleNewChat}
+          hideLogo
+          onMenuClick={() => setSidebarOpen(true)}
+        />
+        <Flex flex="1" minWidth={0} overflow="hidden">
           {currentConvId === null && messages.length === 0 ? (
             <ChatEmptyState onSend={handleSend} onGoHome={handleGoHome} />
           ) : (
@@ -1489,6 +1480,8 @@ export default function Home() {
                   `Requesting quotes for ${pkgState.items.length} provider(s): ${pkgState.items.map((i) => i.name).join(', ')}`,
                 )
               }
+              isOpen={packageOpen}
+              onClose={() => setPackageOpen(false)}
             />
           )}
         </Flex>
@@ -1499,6 +1492,37 @@ export default function Home() {
           onModelChange={setCurrentModel}
         />
       </Flex>
+
+      {/* Floating "Package (N)" chip — only below lg, only when there's content */}
+      {(currentConvId !== null || messages.length > 0) && pkgState.items.length > 0 && (
+        <Box
+          display={{ base: 'flex', lg: 'none' }}
+          as="button"
+          position="fixed"
+          bottom="84px"
+          right="16px"
+          zIndex={900}
+          alignItems="center"
+          gap="6px"
+          padding="10px 14px"
+          borderRadius="9999px"
+          bg={solvoColors.text}
+          color={solvoColors.surface}
+          cursor="pointer"
+          style={{
+            border: 'none',
+            boxShadow: solvoShadows.floatingPanel,
+            fontFamily: solvoFonts.sans,
+            fontSize: '13px',
+            fontWeight: 600,
+          }}
+          onClick={() => setPackageOpen(true)}
+          aria-label={`Open package (${pkgState.items.length} items)`}
+        >
+          <Sparkles size={14} />
+          Package ({pkgState.items.length})
+        </Box>
+      )}
     </motion.div>
     {feedbackBanner}
     {selectModalEl}

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Package, Trash2, Send, ShoppingBag } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
-import { solvoColors, solvoFonts } from '@constants';
+import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import type { PackageItem } from '@/shared/jotai/package.atom';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -24,6 +24,12 @@ export interface PackagePanelProps {
   onClear: () => void;
   /** Called when user clicks "Request quotes" */
   onRequestQuotes?: () => void;
+  /**
+   * Drawer state for screens below `lg`. On `lg` and up the panel is always
+   * visible inline and these are ignored.
+   */
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -33,23 +39,60 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
   onRemove,
   onClear,
   onRequestQuotes,
+  isOpen = false,
+  onClose,
 }) => {
   const subtotal = items.reduce(
     (sum, item) => sum + parsePriceColones(item.priceLabel),
     0,
   );
 
+  // Close drawer on Escape (only matters below lg)
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
   return (
+    <>
+      {/* Backdrop — only rendered below lg, only visible when drawer is open */}
+      <Box
+        display={{ base: isOpen ? 'block' : 'none', lg: 'none' }}
+        position="fixed"
+        top={0}
+        right={0}
+        bottom={0}
+        left={0}
+        bg="rgba(28, 25, 23, 0.45)"
+        zIndex={1050}
+        onClick={onClose}
+        style={{
+          transition: 'opacity 0.2s ease',
+          opacity: isOpen ? 1 : 0,
+        }}
+      />
+
     <Box
-      width="280px"
+      width={{ base: '320px', lg: '280px' }}
       flexShrink={0}
-      height="100%"
-      display="flex"
+      height={{ base: '100vh', lg: '100%' }}
+      display={{ base: 'flex', lg: 'flex' }}
       flexDirection="column"
       borderLeft="1px solid"
       borderColor={solvoColors.border}
       bg="white"
       overflow="hidden"
+      position={{ base: 'fixed', lg: 'relative' }}
+      top={{ base: 0, lg: 'auto' }}
+      right={{ base: 0, lg: 'auto' }}
+      zIndex={{ base: 1100, lg: 'auto' }}
+      transform={{ base: isOpen ? 'translateX(0)' : 'translateX(100%)', lg: 'none' }}
+      boxShadow={{ base: isOpen ? solvoShadows.floatingPanel : 'none', lg: 'none' }}
+      style={{ transition: 'transform 0.25s ease-out, box-shadow 0.25s ease-out' }}
     >
       {/* Header */}
       <Flex
@@ -93,26 +136,47 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
           )}
         </Flex>
 
-        {items.length > 0 && (
-          <button
-            onClick={onClear}
-            title="Clear package"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '11px',
-              color: solvoColors.textSubtle,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px',
-            }}
+        <Flex align="center" gap="4px">
+          {items.length > 0 && (
+            <button
+              onClick={onClear}
+              title="Clear package"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                color: solvoColors.textSubtle,
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+              }}
+            >
+              <Trash2 size={13} />
+              Clear
+            </button>
+          )}
+
+          {/* Close button — only shown when in drawer mode (below lg) */}
+          <Box
+            display={{ base: 'flex', lg: 'none' }}
+            as="button"
+            alignItems="center"
+            justifyContent="center"
+            width="28px"
+            height="28px"
+            borderRadius="8px"
+            cursor="pointer"
+            color={solvoColors.textMuted}
+            style={{ border: 'none', background: 'transparent', padding: 0 }}
+            onClick={onClose}
+            title="Close package"
+            aria-label="Close package"
           >
-            <Trash2 size={13} />
-            Clear
-          </button>
-        )}
+            <X size={16} />
+          </Box>
+        </Flex>
       </Flex>
 
       {/* Item list */}
@@ -347,6 +411,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
         </Box>
       )}
     </Box>
+    </>
   );
 };
 

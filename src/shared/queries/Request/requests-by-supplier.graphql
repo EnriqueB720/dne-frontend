@@ -1,0 +1,26 @@
+query requestsBySupplier($supplierId: Int!, $status: RequestStatus) {
+  requestsBySupplier(supplierId: $supplierId, status: $status) {
+    requestId
+    customerId
+    rawQuery
+    city
+    serviceDate
+    guestCount
+    budgetMin
+    budgetMax
+    status
+    createdAt
+    quotes {
+      quoteId
+      status
+      supplierId
+    }
+    customer {
+      customerId
+      user {
+        userId
+        name
+      }
+    }
+  }
+}

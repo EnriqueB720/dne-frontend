@@ -1,0 +1,7 @@
+subscription quoteEventForSupplier($supplierId: Int!) {
+  quoteEventForSupplier(supplierId: $supplierId) {
+    eventType
+    quoteId
+    requestId
+  }
+}

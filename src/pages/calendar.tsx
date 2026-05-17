@@ -3,14 +3,16 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock, Calendar as CalendarIcon } from 'lucide-react';
 import { Calendar, dateFnsLocalizer, type View } from 'react-big-calendar';
-import format from 'date-fns/format';
-import parse from 'date-fns/parse';
-import startOfWeek from 'date-fns/startOfWeek';
-import getDay from 'date-fns/getDay';
-import startOfMonth from 'date-fns/startOfMonth';
-import endOfMonth from 'date-fns/endOfMonth';
-import addMonths from 'date-fns/addMonths';
-import subMonths from 'date-fns/subMonths';
+import {
+  addMonths,
+  endOfMonth,
+  format,
+  getDay,
+  parse,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
+} from 'date-fns';
 import { enUS } from 'date-fns/locale';
 
 import { Box, Flex, Text, SolvoNavBar } from '@components';

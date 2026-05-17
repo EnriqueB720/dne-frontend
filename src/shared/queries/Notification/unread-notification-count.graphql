@@ -1,0 +1,3 @@
+query unreadNotificationCount($userId: Int!) {
+  unreadNotificationCount(userId: $userId)
+}

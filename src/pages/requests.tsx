@@ -1,8 +1,9 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell } from 'lucide-react';
-import { Box, Flex, Text, Pill, SolvoNavBar } from '@components';
+import { Bell, MessageSquare } from 'lucide-react';
+import { Box, Flex, Text, Pill, SolvoNavBar, QuoteCreateModal } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -10,11 +11,18 @@ import {
   QuoteStatus,
   useRequestLazyQuery,
   useRequestsByCustomerLazyQuery,
+  useRequestsBySupplierLazyQuery,
+  useOpenRequestsForSupplierLazyQuery,
   useUpdateRequestStatusMutation,
   useCloseRequestMutation,
   useQuotesByRequestLazyQuery,
   useAcceptQuoteMutation,
   useMarkQuotesViewedMutation,
+  useCreateConversationMutation,
+  useRequestEventForCustomerSubscription,
+  useOpenRequestEventForSupplierSubscription,
+  useQuoteEventForCustomerSubscription,
+  useQuoteEventForSupplierSubscription,
 } from '@generated';
 
 const STATUS_OPTIONS: RequestStatus[] = [
@@ -80,16 +88,42 @@ const formatDate = (iso?: string | null) =>
 export default function RequestsTestPage() {
   const { isAuthenticated, user } = useContext(AuthContext);
   const customerId = user?.customerId ?? null;
+  const supplierId = user?.supplierId ?? null;
+  // Customer takes priority if the user has both profiles (rare)
+  const role: 'customer' | 'supplier' | null = customerId
+    ? 'customer'
+    : supplierId
+      ? 'supplier'
+      : null;
 
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState<RequestStatus | ''>('');
   const [toast, setToast] = useState<{ count: number; ts: number } | null>(null);
+  // Supplier-only: 'open' = leads they haven't quoted yet, 'mine' = quotes
+  // they already sent. Default to 'open' so new suppliers see something.
+  const [supplierTab, setSupplierTab] = useState<'open' | 'mine'>('open');
+  // When set, opens the QuoteCreateModal pre-filled for this request.
+  const [quoteModalFor, setQuoteModalFor] = useState<{
+    requestId: number;
+    preview?: string;
+    meta?: string;
+    customerName?: string;
+  } | null>(null);
   const previousUnreadByRequest = useRef<Map<number, number>>(new Map());
 
-  const [fetchRequests, listState] = useRequestsByCustomerLazyQuery({
+  // The lazy queries no longer poll — live updates come over GraphQL
+  // subscriptions wired below.
+  const [fetchByCustomer, customerListState] = useRequestsByCustomerLazyQuery({
     fetchPolicy: 'network-only',
-    pollInterval: 15_000, // poll every 15s for new quotes
+    notifyOnNetworkStatusChange: true,
+  });
+  const [fetchBySupplier, supplierListState] = useRequestsBySupplierLazyQuery({
+    fetchPolicy: 'network-only',
+    notifyOnNetworkStatusChange: true,
+  });
+  const [fetchOpenForSupplier, openListState] = useOpenRequestsForSupplierLazyQuery({
+    fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
   const [fetchRequest, detailState] = useRequestLazyQuery({ fetchPolicy: 'network-only' });
@@ -98,21 +132,58 @@ export default function RequestsTestPage() {
   const [fetchQuotes, quotesState] = useQuotesByRequestLazyQuery({ fetchPolicy: 'network-only' });
   const [acceptQuote, acceptState] = useAcceptQuoteMutation();
   const [markQuotesViewed] = useMarkQuotesViewedMutation();
+  const [createConversation, createConvState] = useCreateConversationMutation();
+  const router = useRouter();
+  const listState =
+    role === 'supplier'
+      ? supplierTab === 'open'
+        ? openListState
+        : supplierListState
+      : customerListState;
 
-  const requests = listState.data?.requestsByCustomer ?? [];
+  const handleMessageSupplier = async (sId: number, rId: number) => {
+    try {
+      const { data } = await createConversation({
+        variables: { data: { requestId: rId, supplierId: sId } as any },
+      });
+      const convId = data?.createConversation.conversationId;
+      if (convId) {
+        router.push({ pathname: '/messages', query: { id: convId } });
+      }
+    } catch (err: any) {
+      setFeedback({ kind: 'err', text: err?.message ?? 'Failed to start conversation' });
+    }
+  };
+
+  const requests: any[] =
+    role === 'supplier'
+      ? supplierTab === 'open'
+        ? (openListState.data?.openRequestsForSupplier ?? [])
+        : (supplierListState.data?.requestsBySupplier ?? [])
+      : (customerListState.data?.requestsByCustomer ?? []);
   const detail = detailState.data?.request;
   const quotes = quotesState.data?.quotesByRequest ?? [];
 
-  // Per-request unread (SENT) count
+  // Supplier-side: their own quote for the selected request (filtered from the list)
+  const mySupplierQuote = (() => {
+    if (role !== 'supplier' || !supplierId) return null;
+    return quotes.find((q: any) => q.supplierId === supplierId) ?? null;
+  })();
+
+  // Per-request unread (SENT) quotes — only meaningful for the CUSTOMER (the
+  // recipient of quotes). Suppliers are the senders so they have nothing unread.
   const unreadByRequest = new Map<number, number>();
-  for (const r of requests as any[]) {
-    const sentCount =
-      r.quotes?.filter((q: { status: string }) => q.status === 'SENT').length ?? 0;
-    unreadByRequest.set(r.requestId, sentCount);
+  if (role === 'customer') {
+    for (const r of requests as any[]) {
+      const sentCount =
+        r.quotes?.filter((q: { status: string }) => q.status === 'SENT').length ?? 0;
+      unreadByRequest.set(r.requestId, sentCount);
+    }
   }
 
   // Detect unread quotes (on first load) or new unread quotes (between polls) → fire toast
   useEffect(() => {
+    if (role !== 'customer') return;
     if (requests.length === 0) return;
 
     let delta = 0;
@@ -125,7 +196,7 @@ export default function RequestsTestPage() {
     }
     previousUnreadByRequest.current = new Map(unreadByRequest);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(Array.from(unreadByRequest.entries()))]);
+  }, [role, JSON.stringify(Array.from(unreadByRequest.entries()))]);
 
   // Auto-dismiss toast after 5s
   useEffect(() => {
@@ -135,20 +206,87 @@ export default function RequestsTestPage() {
   }, [toast]);
 
   const handleLoadRequests = async () => {
-    if (!customerId) return;
-    await fetchRequests({
-      variables: {
-        customerId,
-        status: filterStatus === '' ? null : filterStatus,
-      },
-    });
+    const status = filterStatus === '' ? null : filterStatus;
+    if (role === 'customer' && customerId) {
+      await fetchByCustomer({ variables: { customerId, status } });
+    } else if (role === 'supplier' && supplierId) {
+      if (supplierTab === 'open') {
+        await fetchOpenForSupplier({ variables: { supplierId, limit: 50 } });
+      } else {
+        await fetchBySupplier({ variables: { supplierId, status } });
+      }
+    }
   };
 
-  // Auto-load whenever the logged-in customer becomes available or the filter changes
+  // Auto-load whenever the logged-in user becomes available, the filter
+  // changes, or the supplier flips between Open leads / My quotes
   useEffect(() => {
-    if (customerId) handleLoadRequests();
+    if (role && (customerId || supplierId)) handleLoadRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId, filterStatus]);
+  }, [role, customerId, supplierId, filterStatus, supplierTab]);
+
+  // ── Live subscriptions ─────────────────────────────────────────────
+  // Each one just triggers a refetch of the relevant list/detail queries.
+
+  // Customer: request lifecycle changes (own list)
+  useRequestEventForCustomerSubscription({
+    variables: { customerId: customerId ?? 0 },
+    skip: role !== 'customer' || !customerId,
+    onData: () => {
+      handleLoadRequests();
+      if (selectedRequestId) {
+        fetchRequest({ variables: { where: { requestId: selectedRequestId } } });
+      }
+    },
+  });
+
+  // Customer: new quote arrives on one of their requests → refetch the
+  // currently open quote list AND the list (status pill updates).
+  useQuoteEventForCustomerSubscription({
+    variables: { customerId: customerId ?? 0 },
+    skip: role !== 'customer' || !customerId,
+    onData: () => {
+      handleLoadRequests();
+      if (selectedRequestId) {
+        fetchQuotes({ variables: { requestId: selectedRequestId, status: null } });
+        fetchRequest({ variables: { where: { requestId: selectedRequestId } } });
+      }
+    },
+  });
+
+  // Supplier: a new matching open lead arrives (their inbox refetches).
+  useOpenRequestEventForSupplierSubscription({
+    variables: { supplierId: supplierId ?? 0 },
+    skip: role !== 'supplier' || !supplierId,
+    onData: () => {
+      if (supplierTab === 'open') handleLoadRequests();
+    },
+  });
+
+  // Supplier: one of their quotes changed (e.g. customer accepted) → refresh
+  // both tabs so "Open leads → My quotes" transitions reflect immediately.
+  useQuoteEventForSupplierSubscription({
+    variables: { supplierId: supplierId ?? 0 },
+    skip: role !== 'supplier' || !supplierId,
+    onData: () => {
+      handleLoadRequests();
+      if (selectedRequestId) {
+        fetchQuotes({ variables: { requestId: selectedRequestId, status: null } });
+        fetchRequest({ variables: { where: { requestId: selectedRequestId } } });
+      }
+    },
+  });
+
+  // Deep-link: open a specific request when the URL has ?id=N (used by /messages "View request →")
+  useEffect(() => {
+    const idFromUrl = router.query.id;
+    if (!idFromUrl) return;
+    const idNum = Array.isArray(idFromUrl) ? Number(idFromUrl[0]) : Number(idFromUrl);
+    if (Number.isFinite(idNum) && idNum > 0 && idNum !== selectedRequestId) {
+      handleSelectRequest(idNum).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.id]);
 
   const handleSelectRequest = async (requestId: number) => {
     setSelectedRequestId(requestId);
@@ -168,9 +306,21 @@ export default function RequestsTestPage() {
     }
   };
 
-  const handleAcceptQuote = async (quoteId: number) => {
+  // Tracks which offered slot the customer has picked per quote (quoteId →
+  // slotIndex). Accept is blocked until a slot is picked, if the quote has
+  // any.
+  const [pickedSlot, setPickedSlot] = useState<Record<number, number>>({});
+
+  const handleAcceptQuote = async (quoteId: number, slotIndex?: number) => {
     try {
-      const { data } = await acceptQuote({ variables: { data: { quoteId } } });
+      const { data } = await acceptQuote({
+        variables: {
+          data: {
+            quoteId,
+            ...(slotIndex !== undefined && { slotIndex }),
+          } as any,
+        },
+      });
       setFeedback({ kind: 'ok', text: `Accepted quote #${quoteId} → booking #${data?.acceptQuote.bookingId}` });
       if (selectedRequestId) {
         await Promise.all([
@@ -250,17 +400,17 @@ export default function RequestsTestPage() {
     );
   }
 
-  if (!customerId) {
+  if (!role) {
     return (
       <Box minHeight="100vh" bg={solvoColors.bg}>
         <SolvoNavBar activePath="/requests" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
             <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
-              This page is for customers
+              No requests to show
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
-              Your account doesn't have a customer profile. Suppliers can manage quotes from <Link href="/quotes" style={{ color: solvoColors.indigo, fontWeight: 600 }}>/quotes</Link> instead.
+              Your account has neither a customer nor a supplier profile yet.
             </Text>
           </Box>
         </Flex>
@@ -277,11 +427,48 @@ export default function RequestsTestPage() {
           Hi, {user.name}
         </Text>
         <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text} marginBottom="6px">
-          My requests
+          {role === 'supplier'
+            ? supplierTab === 'open'
+              ? 'Open leads'
+              : 'Requests you quoted on'
+            : 'My requests'}
         </Text>
         <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
-          Requests are created from the AI chat on the home page — click "Select" on a provider card there. Manage and accept quotes here.
+          {role === 'supplier'
+            ? supplierTab === 'open'
+              ? "Customer requests matching your services that you haven't quoted on yet. Send a quote to get into the conversation."
+              : 'Every request where you sent a quote, with the full customer details and your quote status.'
+            : 'Requests are created from the AI chat on the home page — click "Select" on a provider card there. Manage and accept quotes here.'}
         </Text>
+
+        {/* Supplier-only tab toggle: Open leads vs My quotes */}
+        {role === 'supplier' && (
+          <Flex gap="8px" marginBottom="20px" wrap="wrap">
+            {([
+              { key: 'open' as const, label: 'Open leads' },
+              { key: 'mine' as const, label: 'My quotes' },
+            ]).map((t) => {
+              const active = supplierTab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setSupplierTab(t.key)}
+                  style={{
+                    ...buttonBaseStyle,
+                    padding: '8px 14px',
+                    fontSize: '13px',
+                    background: active ? solvoColors.text : solvoColors.surface,
+                    color: active ? solvoColors.surface : solvoColors.text,
+                    border: `1px solid ${active ? solvoColors.text : solvoColors.border}`,
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </Flex>
+        )}
 
         {/* Filter bar */}
         <Box style={sectionStyle} marginBottom="20px">
@@ -342,7 +529,11 @@ export default function RequestsTestPage() {
 
               {requests.length === 0 ? (
                 <Text fontSize="sm" color={solvoColors.textSubtle}>
-                  No requests yet. Start a new one from the AI chat on the home page.
+                  {role === 'supplier'
+                    ? supplierTab === 'open'
+                      ? 'No matching open leads right now. New customer requests in your city + categories will appear here automatically.'
+                      : "You haven't quoted on any requests yet. Switch to Open leads to find matching customer requests."
+                    : 'No requests yet. Start a new one from the AI chat on the home page.'}
                 </Text>
               ) : (
                 <Flex direction="column" gap="8px">
@@ -386,7 +577,13 @@ export default function RequestsTestPage() {
                           <Box minWidth="0" flex="1">
                             <Flex align="center" gap="6px" marginBottom="2px">
                               <Text fontSize="sm" fontWeight={600} color={solvoColors.text} truncate>
-                                #{r.requestId} — {r.rawQuery}
+                                {role === 'supplier'
+                                  ? (
+                                      (r as any).customer?.user?.name
+                                        ? `${(r as any).customer.user.name} — ${r.rawQuery}`
+                                        : r.rawQuery
+                                    )
+                                  : r.rawQuery}
                               </Text>
                               {unread > 0 && (
                                 <Box
@@ -407,16 +604,54 @@ export default function RequestsTestPage() {
                               {r.city ?? 'No city'} · {r.guestCount ?? '—'} guests · {formatDate(r.createdAt)}
                             </Text>
                           </Box>
-                          <Box
-                            padding="4px 10px"
-                            borderRadius="9999px"
-                            bg={tone.bg}
-                            color={tone.fg}
-                            fontSize="11px"
-                            fontWeight={600}
-                          >
-                            {r.status}
-                          </Box>
+                          <Flex align="center" gap="8px" flexShrink={0}>
+                            <Box
+                              padding="4px 10px"
+                              borderRadius="9999px"
+                              bg={tone.bg}
+                              color={tone.fg}
+                              fontSize="11px"
+                              fontWeight={600}
+                            >
+                              {r.status}
+                            </Box>
+                            {/* Quick "Send quote" CTA on Open leads rows — opens a popup */}
+                            {role === 'supplier' && supplierTab === 'open' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setQuoteModalFor({
+                                    requestId: r.requestId,
+                                    preview: r.rawQuery,
+                                    customerName: r.customer?.user?.name,
+                                    meta: [
+                                      r.city,
+                                      r.guestCount ? `${r.guestCount} guests` : null,
+                                      r.serviceDate
+                                        ? new Date(r.serviceDate).toLocaleDateString(undefined, {
+                                            weekday: 'short',
+                                            month: 'short',
+                                            day: 'numeric',
+                                          })
+                                        : null,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' · '),
+                                  });
+                                }}
+                                style={{
+                                  ...buttonBaseStyle,
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  background: solvoColors.text,
+                                  color: solvoColors.surface,
+                                }}
+                              >
+                                Send quote
+                              </button>
+                            )}
+                          </Flex>
                         </Flex>
                       </Box>
                     );
@@ -465,60 +700,109 @@ export default function RequestsTestPage() {
                   {detail.closedAt && <DetailRow label="Closed" value={formatDate(detail.closedAt)} />}
                   {detail.closedReason && <DetailRow label="Reason" value={detail.closedReason} />}
 
-                  <Box marginTop="16px">
-                    <label style={labelStyle}>Change status</label>
-                    <select
-                      value={detail.status}
-                      onChange={(e) => handleUpdateStatus(e.target.value as RequestStatus)}
-                      disabled={busy}
-                      style={inputBaseStyle}
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </Box>
+                  {/* Customer-only management actions */}
+                  {role === 'customer' && (
+                    <>
+                      <Box marginTop="16px">
+                        <label style={labelStyle}>Change status</label>
+                        <select
+                          value={detail.status}
+                          onChange={(e) => handleUpdateStatus(e.target.value as RequestStatus)}
+                          disabled={busy}
+                          style={inputBaseStyle}
+                        >
+                          {STATUS_OPTIONS.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </Box>
 
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    disabled={busy || detail.status === RequestStatus.Closed}
-                    style={{
-                      ...buttonBaseStyle,
-                      width: '100%',
-                      marginTop: '12px',
-                      background: solvoColors.surface,
-                      color: solvoColors.text,
-                      border: `1px solid ${solvoColors.border}`,
-                      opacity: busy || detail.status === RequestStatus.Closed ? 0.5 : 1,
-                    }}
-                  >
-                    Close request
-                  </button>
+                      <button
+                        type="button"
+                        onClick={handleClose}
+                        disabled={busy || detail.status === RequestStatus.Closed}
+                        style={{
+                          ...buttonBaseStyle,
+                          width: '100%',
+                          marginTop: '12px',
+                          background: solvoColors.surface,
+                          color: solvoColors.text,
+                          border: `1px solid ${solvoColors.border}`,
+                          opacity: busy || detail.status === RequestStatus.Closed ? 0.5 : 1,
+                        }}
+                      >
+                        Close request
+                      </button>
+                    </>
+                  )}
+
+                  {/* Supplier-only message action */}
+                  {role === 'supplier' && supplierId && (
+                    <button
+                      type="button"
+                      onClick={() => handleMessageSupplier(supplierId, detail.requestId)}
+                      disabled={busy || createConvState.loading}
+                      style={{
+                        ...buttonBaseStyle,
+                        width: '100%',
+                        marginTop: '16px',
+                        background: solvoColors.indigo,
+                        color: solvoColors.surface,
+                        opacity: busy || createConvState.loading ? 0.5 : 1,
+                      }}
+                    >
+                      Message customer
+                    </button>
+                  )}
                 </>
               )}
             </Box>
 
-            {/* Quotes received */}
+            {/* Quotes section — customers see all, suppliers see their own only */}
             {detail && (
               <Box style={sectionStyle} marginTop="20px">
                 <Flex justify="space-between" align="center" marginBottom="12px">
                   <Text fontFamily={solvoFonts.serif} fontSize="20px">
-                    Quotes received
+                    {role === 'supplier' ? 'Your quote' : 'Quotes received'}
                   </Text>
                   <Text fontSize="xs" color={solvoColors.textSubtle}>
-                    {quotes.length}
+                    {role === 'supplier' ? (mySupplierQuote ? 1 : 0) : quotes.length}
                   </Text>
                 </Flex>
 
-                {quotes.length === 0 ? (
-                  <Text fontSize="sm" color={solvoColors.textSubtle}>
-                    No quotes yet for this request.
-                  </Text>
+                {(role === 'supplier' ? (mySupplierQuote ? [mySupplierQuote] : []) : quotes).length === 0 ? (
+                  <Box>
+                    <Text fontSize="sm" color={solvoColors.textSubtle} marginBottom={role === 'supplier' ? '10px' : '0'}>
+                      {role === 'supplier'
+                        ? 'No quote from you yet on this request.'
+                        : 'No quotes yet for this request.'}
+                    </Text>
+                    {role === 'supplier' && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push({
+                            pathname: '/quotes',
+                            query: { requestId: detail.requestId },
+                          })
+                        }
+                        style={{
+                          ...buttonBaseStyle,
+                          padding: '8px 14px',
+                          fontSize: '13px',
+                          background: solvoColors.indigo,
+                          color: solvoColors.surface,
+                        }}
+                      >
+                        Send a quote →
+                      </button>
+                    )}
+                  </Box>
                 ) : (
                   <Flex direction="column" gap="8px">
-                    {quotes.map((q) => {
+                    {(role === 'supplier' ? [mySupplierQuote!] : quotes).map((q: any) => {
                       const canAccept =
+                        role === 'customer' &&
                         (q.status === QuoteStatus.Sent || q.status === QuoteStatus.Viewed) &&
                         detail.status !== RequestStatus.Booked &&
                         detail.status !== RequestStatus.Closed;
@@ -531,7 +815,9 @@ export default function RequestsTestPage() {
                         >
                           <Flex justify="space-between" align="center" marginBottom="6px">
                             <Text fontSize="sm" fontWeight={600}>
-                              Quote #{q.quoteId} · Supplier #{q.supplierId}
+                              {role === 'customer'
+                                ? ((q as any).supplier?.companyName ?? `Supplier #${q.supplierId}`)
+                                : `Your quote #${q.quoteId}`}
                             </Text>
                             <Box
                               padding="2px 8px"
@@ -552,23 +838,95 @@ export default function RequestsTestPage() {
                               "{q.message}"
                             </Text>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => handleAcceptQuote(q.quoteId)}
-                            disabled={busy || !canAccept}
-                            style={{
-                              ...buttonBaseStyle,
-                              width: '100%',
-                              marginTop: '6px',
-                              padding: '8px 12px',
-                              fontSize: '13px',
-                              background: solvoColors.indigo,
-                              color: solvoColors.surface,
-                              opacity: busy || !canAccept ? 0.5 : 1,
-                            }}
-                          >
-                            Accept quote
-                          </button>
+                          {/* Offered time slots — customer picks one before accepting */}
+                          {role === 'customer' && Array.isArray((q as any).offeredSlots) && (q as any).offeredSlots.length > 0 && canAccept && (
+                            <Box marginTop="8px" marginBottom="8px">
+                              <Text fontSize="11px" fontWeight={600} color={solvoColors.textMuted} marginBottom="4px">
+                                Pick a time slot:
+                              </Text>
+                              <Flex direction="column" gap="4px">
+                                {(q as any).offeredSlots.map((s: { startsAt: string; endsAt: string }, sIdx: number) => {
+                                  const picked = pickedSlot[q.quoteId] === sIdx;
+                                  const start = new Date(s.startsAt);
+                                  const end = new Date(s.endsAt);
+                                  return (
+                                    <button
+                                      key={sIdx}
+                                      type="button"
+                                      onClick={() => setPickedSlot((p) => ({ ...p, [q.quoteId]: sIdx }))}
+                                      style={{
+                                        ...buttonBaseStyle,
+                                        padding: '8px 10px',
+                                        fontSize: '12px',
+                                        textAlign: 'left',
+                                        background: picked ? solvoColors.indigoLight : solvoColors.surface,
+                                        color: picked ? solvoColors.indigo : solvoColors.text,
+                                        border: `1px solid ${picked ? solvoColors.indigoBorder : solvoColors.border}`,
+                                        fontWeight: picked ? 600 : 400,
+                                      }}
+                                    >
+                                      {start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                      {' · '}
+                                      {start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                      {' – '}
+                                      {end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                    </button>
+                                  );
+                                })}
+                              </Flex>
+                            </Box>
+                          )}
+                          {role === 'customer' && (
+                          <Flex gap="6px" marginTop="6px">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const slots = (q as any).offeredSlots as Array<unknown> | undefined;
+                                const hasSlots = Array.isArray(slots) && slots.length > 0;
+                                const slotIdx = hasSlots ? pickedSlot[q.quoteId] : undefined;
+                                if (hasSlots && slotIdx === undefined) {
+                                  setFeedback({ kind: 'err', text: 'Pick a time slot before accepting' });
+                                  return;
+                                }
+                                handleAcceptQuote(q.quoteId, slotIdx);
+                              }}
+                              disabled={busy || !canAccept}
+                              style={{
+                                ...buttonBaseStyle,
+                                flex: 1,
+                                padding: '8px 12px',
+                                fontSize: '13px',
+                                background: solvoColors.indigo,
+                                color: solvoColors.surface,
+                                opacity: busy || !canAccept ? 0.5 : 1,
+                              }}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleMessageSupplier(q.supplierId, selectedRequestId!)
+                              }
+                              disabled={busy || createConvState.loading}
+                              style={{
+                                ...buttonBaseStyle,
+                                padding: '8px 12px',
+                                fontSize: '13px',
+                                background: solvoColors.surface,
+                                color: solvoColors.text,
+                                border: `1px solid ${solvoColors.border}`,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                opacity: busy || createConvState.loading ? 0.5 : 1,
+                              }}
+                            >
+                              <MessageSquare size={13} />
+                              Message
+                            </button>
+                          </Flex>
+                          )}
                         </Box>
                       );
                     })}
@@ -632,6 +990,24 @@ export default function RequestsTestPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Quote create popup — opened by the "Send quote" CTA on Open leads rows */}
+      {quoteModalFor && supplierId && (
+        <QuoteCreateModal
+          requestId={quoteModalFor.requestId}
+          supplierId={supplierId}
+          requestPreview={quoteModalFor.preview}
+          requestMeta={quoteModalFor.meta}
+          customerName={quoteModalFor.customerName}
+          onClose={() => setQuoteModalFor(null)}
+          onCreated={(quoteId) => {
+            setFeedback({ kind: 'ok', text: `Quote #${quoteId} sent.` });
+            setTimeout(() => setFeedback(null), 4000);
+            // Refresh both tabs — the request will move from Open leads to My quotes
+            handleLoadRequests();
+          }}
+        />
+      )}
     </Box>
   );
 }

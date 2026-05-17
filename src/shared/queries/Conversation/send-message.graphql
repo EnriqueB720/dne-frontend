@@ -1,0 +1,13 @@
+mutation sendMessage($data: MessageSendInput!) {
+  sendMessage(data: $data) {
+    messageId
+    conversationId
+    senderType
+    senderUserId
+    content
+    messageType
+    filtered
+    filteredReason
+    createdAt
+  }
+}
