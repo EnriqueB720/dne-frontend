@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, MoreVertical, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { MessageSquare, MoreVertical, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import type { ConversationSummary } from '@/shared/services/conversation.service';
@@ -13,6 +13,12 @@ export interface ChatSidebarProps {
   onDelete: (id: string) => void;
   /** Navigate back to the full landing / hero page */
   onGoHome: () => void;
+  /**
+   * Drawer state for screens below `lg`. On `lg` and up the sidebar is always
+   * visible inline and these are ignored.
+   */
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 function formatTime(iso: string): string {
@@ -34,6 +40,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onNew,
   onDelete,
   onGoHome,
+  isOpen = false,
+  onClose,
 }) => {
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
@@ -96,9 +104,52 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     closeMenu();
   };
 
+  // Auto-close the drawer when the user picks something. On lg+ `onClose`
+  // isn't wired so this is a no-op.
+  const handleSelect = (id: string) => {
+    onSelect(id);
+    onClose?.();
+  };
+  const handleNew = () => {
+    onNew();
+    onClose?.();
+  };
+  const handleGoHome = () => {
+    onGoHome();
+    onClose?.();
+  };
+
+  // Close drawer on Escape (only matters below lg, where `isOpen` is meaningful)
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
   return (
+    <>
+      {/* Backdrop — only rendered below lg, only visible when drawer is open */}
+      <Box
+        display={{ base: isOpen ? 'block' : 'none', lg: 'none' }}
+        position="fixed"
+        top={0}
+        right={0}
+        bottom={0}
+        left={0}
+        bg="rgba(28, 25, 23, 0.45)"
+        zIndex={1050}
+        onClick={onClose}
+        style={{
+          transition: 'opacity 0.2s ease',
+          opacity: isOpen ? 1 : 0,
+        }}
+      />
+
     <Box
-      width="260px"
+      width={{ base: '290px', lg: '260px' }}
       flexShrink={0}
       height="100vh"
       display="flex"
@@ -107,7 +158,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       borderColor={solvoColors.border}
       bg="white"
       overflow="hidden"
-      position="relative"
+      position={{ base: 'fixed', lg: 'relative' }}
+      top={{ base: 0, lg: 'auto' }}
+      left={{ base: 0, lg: 'auto' }}
+      zIndex={{ base: 1100, lg: 'auto' }}
+      transform={{ base: isOpen ? 'translateX(0)' : 'translateX(-100%)', lg: 'none' }}
+      boxShadow={{ base: isOpen ? solvoShadows.floatingPanel : 'none', lg: 'none' }}
+      style={{ transition: 'transform 0.25s ease-out, box-shadow 0.25s ease-out' }}
     >
       {/* Header */}
       <Flex
@@ -119,7 +176,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         flexShrink={0}
       >
         <button
-          onClick={onGoHome}
+          onClick={handleGoHome}
           title="Back to home"
           style={{
             display: 'flex',
@@ -154,22 +211,43 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
           </Text>
         </button>
 
-        <Box
-          as="button"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          width="28px"
-          height="28px"
-          borderRadius="8px"
-          cursor="pointer"
-          color={solvoColors.textMuted}
-          style={{ border: 'none', background: 'transparent', padding: 0 }}
-          onClick={onNew}
-          title="New conversation"
-        >
-          <Plus size={16} />
-        </Box>
+        <Flex align="center" gap="4px">
+          <Box
+            as="button"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            width="28px"
+            height="28px"
+            borderRadius="8px"
+            cursor="pointer"
+            color={solvoColors.textMuted}
+            style={{ border: 'none', background: 'transparent', padding: 0 }}
+            onClick={handleNew}
+            title="New conversation"
+          >
+            <Plus size={16} />
+          </Box>
+
+          {/* Close button — only shown when in drawer mode (below lg) */}
+          <Box
+            display={{ base: 'flex', lg: 'none' }}
+            as="button"
+            alignItems="center"
+            justifyContent="center"
+            width="28px"
+            height="28px"
+            borderRadius="8px"
+            cursor="pointer"
+            color={solvoColors.textMuted}
+            style={{ border: 'none', background: 'transparent', padding: 0 }}
+            onClick={onClose}
+            title="Close menu"
+            aria-label="Close menu"
+          >
+            <X size={16} />
+          </Box>
+        </Flex>
       </Flex>
 
       {/* Conversation list */}
@@ -213,7 +291,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     cursor="pointer"
                     marginBottom="2px"
                     bg={isActive ? solvoColors.indigoLight : isHovered ? solvoColors.bg : 'transparent'}
-                    onClick={() => onSelect(conv.conversationId)}
+                    onClick={() => handleSelect(conv.conversationId)}
                     onContextMenu={(e) => openMenuAtMouse(e, conv.conversationId)}
                     onMouseEnter={() => setHoveredId(conv.conversationId)}
                     onMouseLeave={() => setHoveredId(null)}
@@ -402,6 +480,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         )}
       </AnimatePresence>
     </Box>
+    </>
   );
 };
 

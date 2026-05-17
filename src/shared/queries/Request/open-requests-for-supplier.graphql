@@ -1,0 +1,22 @@
+query openRequestsForSupplier($supplierId: Int!, $limit: Int) {
+  openRequestsForSupplier(supplierId: $supplierId, limit: $limit) {
+    requestId
+    customerId
+    rawQuery
+    categoryId
+    city
+    serviceDate
+    guestCount
+    budgetMin
+    budgetMax
+    status
+    createdAt
+    customer {
+      customerId
+      user {
+        userId
+        name
+      }
+    }
+  }
+}

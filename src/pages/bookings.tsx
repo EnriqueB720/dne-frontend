@@ -10,6 +10,8 @@ import {
   useBookingsBySupplierLazyQuery,
   useCancelBookingMutation,
   useCompleteBookingMutation,
+  useBookingEventForCustomerSubscription,
+  useBookingEventForSupplierSubscription,
 } from '@generated';
 
 type Mode = 'customer' | 'supplier';
@@ -128,6 +130,28 @@ export default function BookingsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actorId, mode, filterStatus]);
+
+  // Live updates — any booking the customer/supplier is on changes, refetch.
+  useBookingEventForCustomerSubscription({
+    variables: { customerId: customerId ?? 0 },
+    skip: mode !== 'customer' || !customerId,
+    onData: () => {
+      handleLoad();
+      if (selectedBookingId) {
+        fetchDetail({ variables: { where: { bookingId: selectedBookingId } } });
+      }
+    },
+  });
+  useBookingEventForSupplierSubscription({
+    variables: { supplierId: supplierId ?? 0 },
+    skip: mode !== 'supplier' || !supplierId,
+    onData: () => {
+      handleLoad();
+      if (selectedBookingId) {
+        fetchDetail({ variables: { where: { bookingId: selectedBookingId } } });
+      }
+    },
+  });
 
   const handleSelect = async (bookingId: number) => {
     setSelectedBookingId(bookingId);
@@ -389,15 +413,37 @@ export default function BookingsPage() {
 
                   <DetailRow label="Status" value={detail.status} />
                   <DetailRow label="Payment" value={detail.paymentStatus} />
-                  <DetailRow label="Request" value={`#${detail.requestId}`} />
-                  <DetailRow label="Quote" value={`#${detail.quoteId}`} />
+                  <DetailRow
+                    label="Request"
+                    value={
+                      (detail as any).request?.rawQuery
+                        ? `#${detail.requestId} — ${(detail as any).request.rawQuery}`
+                        : `#${detail.requestId}`
+                    }
+                  />
+                  <DetailRow
+                    label="Quote"
+                    value={
+                      (detail as any).quote
+                        ? `#${detail.quoteId} · ${(detail as any).quote.currency ?? detail.currency} ${(detail as any).quote.totalPrice ?? detail.totalPrice}`
+                        : `#${detail.quoteId}`
+                    }
+                  />
                   <DetailRow
                     label="Customer"
-                    value={(detail as any).customer?.user?.name ?? `#${detail.customerId}`}
+                    value={
+                      (detail as any).customer?.user?.name
+                        ? `${(detail as any).customer.user.name} · #${detail.customerId}`
+                        : `#${detail.customerId}`
+                    }
                   />
                   <DetailRow
                     label="Supplier"
-                    value={(detail as any).supplier?.companyName ?? `#${detail.supplierId}`}
+                    value={
+                      (detail as any).supplier?.companyName
+                        ? `${(detail as any).supplier.companyName} · #${detail.supplierId}`
+                        : `#${detail.supplierId}`
+                    }
                   />
                   <DetailRow label="Service date" value={formatDate(detail.serviceDate)} />
                   {detail.serviceEndDate && <DetailRow label="End date" value={formatDate(detail.serviceEndDate)} />}

@@ -15,6 +15,7 @@ import {
   useMarkMessagesAsReadMutation,
   useArchiveConversationMutation,
   useRestoreConversationMutation,
+  useMessageEventForConversationSubscription,
 } from '@generated';
 
 type ChatRole = 'customer' | 'supplier';
@@ -195,6 +196,31 @@ export default function MessagesPage() {
     if (!selectedId) return;
     fetchMessages({ variables: { conversationId: selectedId, limit: 200 } });
   }, [selectedId, fetchMessages]);
+
+  // Live message arrivals on the open thread — refetch the message list AND
+  // the inbox (so the row bumps to top with the new lastMessageAt).
+  useMessageEventForConversationSubscription({
+    variables: { conversationId: selectedId ?? 0 },
+    skip: !selectedId,
+    onData: ({ data }) => {
+      const ev = data.data?.messageEventForConversation;
+      if (!ev || !selectedId) return;
+      // Skip the echo for messages we sent ourselves (the send mutation
+      // already refetched on its own).
+      if (ev.senderUserId === viewerUserId) return;
+      fetchMessages({ variables: { conversationId: selectedId, limit: 200 } });
+      // Also refresh the inbox so order + previews update for the recipient.
+      if (actorId && role === 'customer') {
+        fetchByCustomer({
+          variables: { customerId: actorId, viewerUserId: viewerUserId!, status: filterStatus },
+        });
+      } else if (actorId && role === 'supplier') {
+        fetchBySupplier({
+          variables: { supplierId: actorId, viewerUserId: viewerUserId!, status: filterStatus },
+        });
+      }
+    },
+  });
 
   // Mark messages read on open + every poll where new ones arrive
   useEffect(() => {

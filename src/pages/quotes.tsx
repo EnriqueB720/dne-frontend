@@ -1,17 +1,20 @@
 import { useContext, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { MessageSquare } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MessageSquare, X } from 'lucide-react';
 import { Box, Flex, Text, SolvoNavBar } from '@components';
-import { solvoColors, solvoFonts } from '@constants';
+import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
   QuoteStatus,
   useCreateQuoteMutation,
   useQuoteLazyQuery,
   useQuotesBySupplierLazyQuery,
+  useRequestLazyQuery,
   useWithdrawQuoteMutation,
   useCreateConversationMutation,
+  useQuoteEventForSupplierSubscription,
 } from '@generated';
 
 const STATUS_OPTIONS: QuoteStatus[] = [
@@ -95,15 +98,44 @@ export default function QuotesPage() {
   const [currency, setCurrency] = useState('CRC');
   const [message, setMessage] = useState('');
   const [validUntil, setValidUntil] = useState('');
+  // Modal toggle for the create-quote form. Defaults closed; auto-opens when
+  // the URL has `?requestId=` (deep-link from the Open leads "Send quote" CTA).
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [items, setItems] = useState<ItemDraft[]>([]);
+  // Available time windows the supplier is offering for this quote. The
+  // customer picks one when accepting, and that slot becomes the booking
+  // date + a calendar event on the supplier's calendar.
+  const [slots, setSlots] = useState<Array<{ startsAt: string; endsAt: string }>>([]);
   const [filterStatus, setFilterStatus] = useState<QuoteStatus | ''>('');
 
   const [createQuote, createState] = useCreateQuoteMutation();
   const [fetchList, listState] = useQuotesBySupplierLazyQuery({ fetchPolicy: 'network-only' });
   const [fetchDetail, detailState] = useQuoteLazyQuery({ fetchPolicy: 'network-only' });
+  const [fetchRequestForQuote, requestForQuoteState] = useRequestLazyQuery({
+    fetchPolicy: 'network-only',
+  });
   const [withdrawQuote, withdrawState] = useWithdrawQuoteMutation();
   const [createConversation, createConvState] = useCreateConversationMutation();
   const router = useRouter();
+
+  // True when the requestId was supplied externally (URL param) — the input
+  // becomes read-only so the supplier can't accidentally retarget the quote.
+  const requestIdLocked = Boolean(router.query.requestId);
+
+  // Customer name pulled from the request being quoted, displayed in the modal
+  // header so the supplier knows who they're quoting.
+  const customerName: string | undefined =
+    (requestForQuoteState.data?.request as any)?.customer?.user?.name ?? undefined;
+
+  // Prefill the create form when the supplier lands here via /quotes?requestId=N
+  // (e.g. clicking "Send a quote →" from the Open leads inbox on /requests).
+  useEffect(() => {
+    const rId = router.query.requestId;
+    if (!rId) return;
+    const idStr = Array.isArray(rId) ? rId[0] : rId;
+    if (idStr && idStr !== requestId) setRequestId(idStr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.requestId]);
 
   const handleMessageCustomer = async (requestId: number) => {
     if (!supplierId) return;
@@ -139,6 +171,52 @@ export default function QuotesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierId, filterStatus]);
 
+  // Live updates — any change to one of this supplier's quotes (accept,
+  // withdraw, expire) refetches the list + detail. Replaces the 15s poll.
+  useQuoteEventForSupplierSubscription({
+    variables: { supplierId: supplierId ?? 0 },
+    skip: !supplierId,
+    onData: () => {
+      if (supplierId) handleLoad();
+      if (selectedQuoteId) {
+        fetchDetail({ variables: { where: { quoteId: selectedQuoteId } } });
+      }
+    },
+  });
+
+  // Prefill the create form AND auto-open the modal when arriving from a
+  // "Send quote" link (e.g. /quotes?requestId=42) on the Open leads tab.
+  useEffect(() => {
+    const rid = router.query.requestId;
+    if (!rid) return;
+    const value = Array.isArray(rid) ? rid[0] : rid;
+    if (value) {
+      if (value !== requestId) setRequestId(value);
+      setShowCreateModal(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.requestId]);
+
+  // Fetch the request details (customer name, etc.) whenever requestId
+  // changes to a valid number, so the modal can display who the supplier
+  // is quoting.
+  useEffect(() => {
+    const idNum = Number(requestId);
+    if (!Number.isFinite(idNum) || idNum <= 0) return;
+    fetchRequestForQuote({ variables: { where: { requestId: idNum } } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestId]);
+
+  // Close the modal on Escape
+  useEffect(() => {
+    if (!showCreateModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !createState.loading) setShowCreateModal(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showCreateModal, createState.loading]);
+
   const handleCreate = async () => {
     if (!supplierId) return setFeedback({ kind: 'err', text: 'You must be a supplier to create quotes' });
     if (!requestId || !totalPrice || !validUntil) {
@@ -154,6 +232,13 @@ export default function QuotesPage() {
         total: Number(it.total || 0),
       }));
 
+    const slotsPayload = slots
+      .filter((s) => s.startsAt && s.endsAt)
+      .map((s) => ({
+        startsAt: new Date(s.startsAt).toISOString(),
+        endsAt: new Date(s.endsAt).toISOString(),
+      }));
+
     try {
       const { data } = await createQuote({
         variables: {
@@ -165,7 +250,8 @@ export default function QuotesPage() {
             message: message || undefined,
             validUntil,
             items: itemsPayload.length > 0 ? itemsPayload : undefined,
-          },
+            offeredSlots: slotsPayload.length > 0 ? slotsPayload : undefined,
+          } as any,
         },
       });
       setFeedback({ kind: 'ok', text: `Created quote #${data?.createQuote.quoteId}` });
@@ -174,6 +260,8 @@ export default function QuotesPage() {
       setMessage('');
       setValidUntil('');
       setItems([]);
+      setSlots([]);
+      setShowCreateModal(false);
       await handleLoad();
     } catch (err: any) {
       setFeedback({ kind: 'err', text: err?.message ?? 'Create failed' });
@@ -261,15 +349,31 @@ export default function QuotesPage() {
       <SolvoNavBar activePath="/quotes" />
 
       <Box maxWidth="1200px" margin="0 auto" padding="32px 24px">
-        <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.1em" textTransform="uppercase" marginBottom="8px">
-          Hi, {user.name}
-        </Text>
-        <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text} marginBottom="6px">
-          Quotes
-        </Text>
-        <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
-          Create quotes against requests and manage your sent quotes.
-        </Text>
+        <Flex justify="space-between" align="flex-start" gap="16px" wrap="wrap" marginBottom="24px">
+          <Box>
+            <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.1em" textTransform="uppercase" marginBottom="8px">
+              Hi, {user.name}
+            </Text>
+            <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text} marginBottom="6px">
+              Quotes
+            </Text>
+            <Text fontSize="sm" color={solvoColors.textMuted}>
+              Create quotes against requests and manage your sent quotes.
+            </Text>
+          </Box>
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              ...buttonBaseStyle,
+              background: solvoColors.text,
+              color: solvoColors.surface,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            + New quote
+          </button>
+        </Flex>
 
         <Box style={sectionStyle} marginBottom="20px">
           <Flex gap="10px" align="center" wrap="wrap">
@@ -315,15 +419,114 @@ export default function QuotesPage() {
 
         <Flex gap="20px" direction={{ base: 'column', md: 'row' }} align="flex-start">
           <Box flex="1" minWidth="0" width="100%">
-            <Box style={sectionStyle} marginBottom="20px">
-              <Text fontFamily={solvoFonts.serif} fontSize="20px" marginBottom="14px">
-                New quote
-              </Text>
+            {/* Create-quote modal — pattern matches the "Select provider" dialog on / */}
+            <AnimatePresence>
+              {showCreateModal && (
+                <motion.div
+                  key="create-quote-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(28, 25, 23, 0.5)',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 200,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '24px',
+                  }}
+                  onClick={() => !createState.loading && setShowCreateModal(false)}
+                >
+                  <motion.div
+                    key="create-quote-panel"
+                    initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                    transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      width: '100%',
+                      maxWidth: '560px',
+                      maxHeight: '90vh',
+                      overflowY: 'auto',
+                      background: solvoColors.surface,
+                      borderRadius: '20px',
+                      boxShadow: solvoShadows.heroInput,
+                    }}
+                  >
+                    <Flex
+                      align="center"
+                      justify="space-between"
+                      padding="18px 22px"
+                      borderBottom={`1px solid ${solvoColors.border}`}
+                    >
+                      <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+                        New quote
+                      </Text>
+                      <Box
+                        as="button"
+                        onClick={() => !createState.loading && setShowCreateModal(false)}
+                        width="30px"
+                        height="30px"
+                        borderRadius="9px"
+                        bg="transparent"
+                        border={`1px solid ${solvoColors.border}`}
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        cursor="pointer"
+                        color={solvoColors.text}
+                        style={{ padding: 0 }}
+                      >
+                        <X size={16} />
+                      </Box>
+                    </Flex>
+
+                    <Box padding="20px 22px">
+
+              {/* Customer + request context — surfaced once we've fetched the
+                  request behind the requestId. Mirrors the layout used in the
+                  shared QuoteCreateModal molecule. */}
+              {(customerName || (requestForQuoteState.data?.request as any)?.rawQuery) && (
+                <Box
+                  padding="12px 14px"
+                  borderRadius="12px"
+                  bg={solvoColors.bg}
+                  border={`1px solid ${solvoColors.border}`}
+                  marginBottom="14px"
+                >
+                  {customerName && (
+                    <Text fontSize="11px" fontWeight={600} color={solvoColors.textMuted} textTransform="uppercase" letterSpacing="0.04em" marginBottom="4px">
+                      Customer · {customerName}
+                    </Text>
+                  )}
+                  {(requestForQuoteState.data?.request as any)?.rawQuery && (
+                    <Text fontSize="13px" color={solvoColors.text}>
+                      "{(requestForQuoteState.data!.request as any).rawQuery}"
+                    </Text>
+                  )}
+                </Box>
+              )}
 
               <Flex gap="12px" wrap="wrap" marginBottom="12px">
                 <Box flex="1" minWidth="120px">
                   <label style={labelStyle}>Request ID *</label>
-                  <input type="number" value={requestId} onChange={(e) => setRequestId(e.target.value)} style={inputBaseStyle} />
+                  <input
+                    type="number"
+                    value={requestId}
+                    onChange={(e) => setRequestId(e.target.value)}
+                    readOnly={requestIdLocked}
+                    style={{
+                      ...inputBaseStyle,
+                      background: requestIdLocked ? solvoColors.bg : solvoColors.surface,
+                      color: requestIdLocked ? solvoColors.textMuted : solvoColors.text,
+                      cursor: requestIdLocked ? 'not-allowed' : 'text',
+                    }}
+                  />
                 </Box>
                 <Box flex="1" minWidth="120px">
                   <label style={labelStyle}>Total price *</label>
@@ -429,6 +632,85 @@ export default function QuotesPage() {
                 </Flex>
               ))}
 
+              {/* Available time slots — supplier offers, customer picks one when accepting */}
+              <Flex justify="space-between" align="center" marginTop="16px" marginBottom="8px">
+                <Box>
+                  <Text fontSize="sm" fontWeight={600} color={solvoColors.textMuted}>
+                    Available time slots
+                  </Text>
+                  <Text fontSize="xs" color={solvoColors.textSubtle}>
+                    The customer picks one when accepting your quote.
+                  </Text>
+                </Box>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSlots((prev) => [...prev, { startsAt: '', endsAt: '' }])
+                  }
+                  style={{
+                    ...buttonBaseStyle,
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    background: solvoColors.surface,
+                    color: solvoColors.text,
+                    border: `1px solid ${solvoColors.border}`,
+                  }}
+                >
+                  + Add slot
+                </button>
+              </Flex>
+
+              {slots.map((s, idx) => (
+                <Flex gap="6px" wrap="wrap" marginBottom="6px" key={idx} align="flex-end">
+                  <Box flex="1" minWidth="180px">
+                    <label style={{ ...labelStyle, fontSize: '11px' }}>Starts</label>
+                    <input
+                      type="datetime-local"
+                      value={s.startsAt}
+                      onChange={(e) =>
+                        setSlots((prev) =>
+                          prev.map((sl, i) =>
+                            i === idx ? { ...sl, startsAt: e.target.value } : sl,
+                          ),
+                        )
+                      }
+                      style={{ ...inputBaseStyle, fontSize: '13px' }}
+                    />
+                  </Box>
+                  <Box flex="1" minWidth="180px">
+                    <label style={{ ...labelStyle, fontSize: '11px' }}>Ends</label>
+                    <input
+                      type="datetime-local"
+                      value={s.endsAt}
+                      onChange={(e) =>
+                        setSlots((prev) =>
+                          prev.map((sl, i) =>
+                            i === idx ? { ...sl, endsAt: e.target.value } : sl,
+                          ),
+                        )
+                      }
+                      style={{ ...inputBaseStyle, fontSize: '13px' }}
+                    />
+                  </Box>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSlots((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                    style={{
+                      ...buttonBaseStyle,
+                      padding: '8px 10px',
+                      fontSize: '12px',
+                      background: solvoColors.surface,
+                      color: solvoColors.roseText,
+                      border: `1px solid ${solvoColors.border}`,
+                    }}
+                  >
+                    ×
+                  </button>
+                </Flex>
+              ))}
+
               <Flex justify="flex-end" marginTop="16px">
                 <button
                   type="button"
@@ -444,7 +726,11 @@ export default function QuotesPage() {
                   {createState.loading ? 'Creating…' : 'Create quote'}
                 </button>
               </Flex>
-            </Box>
+                    </Box>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <Box style={sectionStyle}>
               <Flex justify="space-between" align="center" marginBottom="14px">
@@ -458,7 +744,7 @@ export default function QuotesPage() {
 
               {list.length === 0 ? (
                 <Text fontSize="sm" color={solvoColors.textSubtle}>
-                  No quotes yet. Use the form above to send your first quote.
+                  No quotes yet. Tap "+ New quote" to send your first one — or head to "Open leads" on /requests to quote a specific customer request.
                 </Text>
               ) : (
                 <Flex direction="column" gap="8px">

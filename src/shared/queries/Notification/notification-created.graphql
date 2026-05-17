@@ -1,0 +1,15 @@
+subscription notificationCreated($userId: Int!) {
+  notificationCreated(userId: $userId) {
+    notificationId
+    userId
+    channel
+    template
+    subject
+    body
+    entityType
+    entityId
+    status
+    readAt
+    createdAt
+  }
+}

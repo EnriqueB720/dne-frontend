@@ -1,0 +1,6 @@
+subscription requestEventForCustomer($customerId: Int!) {
+  requestEventForCustomer(customerId: $customerId) {
+    eventType
+    requestId
+  }
+}

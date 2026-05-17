@@ -1,0 +1,15 @@
+query notificationsByUser($userId: Int!, $unreadOnly: Boolean, $limit: Int) {
+  notificationsByUser(userId: $userId, unreadOnly: $unreadOnly, limit: $limit) {
+    notificationId
+    userId
+    channel
+    template
+    subject
+    body
+    entityType
+    entityId
+    status
+    readAt
+    createdAt
+  }
+}

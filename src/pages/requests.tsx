@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, MessageSquare } from 'lucide-react';
-import { Box, Flex, Text, Pill, SolvoNavBar } from '@components';
+import { Box, Flex, Text, Pill, SolvoNavBar, QuoteCreateModal } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -12,12 +12,17 @@ import {
   useRequestLazyQuery,
   useRequestsByCustomerLazyQuery,
   useRequestsBySupplierLazyQuery,
+  useOpenRequestsForSupplierLazyQuery,
   useUpdateRequestStatusMutation,
   useCloseRequestMutation,
   useQuotesByRequestLazyQuery,
   useAcceptQuoteMutation,
   useMarkQuotesViewedMutation,
   useCreateConversationMutation,
+  useRequestEventForCustomerSubscription,
+  useOpenRequestEventForSupplierSubscription,
+  useQuoteEventForCustomerSubscription,
+  useQuoteEventForSupplierSubscription,
 } from '@generated';
 
 const STATUS_OPTIONS: RequestStatus[] = [
@@ -95,16 +100,30 @@ export default function RequestsTestPage() {
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [filterStatus, setFilterStatus] = useState<RequestStatus | ''>('');
   const [toast, setToast] = useState<{ count: number; ts: number } | null>(null);
+  // Supplier-only: 'open' = leads they haven't quoted yet, 'mine' = quotes
+  // they already sent. Default to 'open' so new suppliers see something.
+  const [supplierTab, setSupplierTab] = useState<'open' | 'mine'>('open');
+  // When set, opens the QuoteCreateModal pre-filled for this request.
+  const [quoteModalFor, setQuoteModalFor] = useState<{
+    requestId: number;
+    preview?: string;
+    meta?: string;
+    customerName?: string;
+  } | null>(null);
   const previousUnreadByRequest = useRef<Map<number, number>>(new Map());
 
+  // The lazy queries no longer poll — live updates come over GraphQL
+  // subscriptions wired below.
   const [fetchByCustomer, customerListState] = useRequestsByCustomerLazyQuery({
     fetchPolicy: 'network-only',
-    pollInterval: 15_000,
     notifyOnNetworkStatusChange: true,
   });
   const [fetchBySupplier, supplierListState] = useRequestsBySupplierLazyQuery({
     fetchPolicy: 'network-only',
-    pollInterval: 15_000,
+    notifyOnNetworkStatusChange: true,
+  });
+  const [fetchOpenForSupplier, openListState] = useOpenRequestsForSupplierLazyQuery({
+    fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
   const [fetchRequest, detailState] = useRequestLazyQuery({ fetchPolicy: 'network-only' });
@@ -115,7 +134,12 @@ export default function RequestsTestPage() {
   const [markQuotesViewed] = useMarkQuotesViewedMutation();
   const [createConversation, createConvState] = useCreateConversationMutation();
   const router = useRouter();
-  const listState = role === 'supplier' ? supplierListState : customerListState;
+  const listState =
+    role === 'supplier'
+      ? supplierTab === 'open'
+        ? openListState
+        : supplierListState
+      : customerListState;
 
   const handleMessageSupplier = async (sId: number, rId: number) => {
     try {
@@ -133,7 +157,9 @@ export default function RequestsTestPage() {
 
   const requests: any[] =
     role === 'supplier'
-      ? (supplierListState.data?.requestsBySupplier ?? [])
+      ? supplierTab === 'open'
+        ? (openListState.data?.openRequestsForSupplier ?? [])
+        : (supplierListState.data?.requestsBySupplier ?? [])
       : (customerListState.data?.requestsByCustomer ?? []);
   const detail = detailState.data?.request;
   const quotes = quotesState.data?.quotesByRequest ?? [];
@@ -184,15 +210,72 @@ export default function RequestsTestPage() {
     if (role === 'customer' && customerId) {
       await fetchByCustomer({ variables: { customerId, status } });
     } else if (role === 'supplier' && supplierId) {
-      await fetchBySupplier({ variables: { supplierId, status } });
+      if (supplierTab === 'open') {
+        await fetchOpenForSupplier({ variables: { supplierId, limit: 50 } });
+      } else {
+        await fetchBySupplier({ variables: { supplierId, status } });
+      }
     }
   };
 
-  // Auto-load whenever the logged-in user becomes available or the filter changes
+  // Auto-load whenever the logged-in user becomes available, the filter
+  // changes, or the supplier flips between Open leads / My quotes
   useEffect(() => {
     if (role && (customerId || supplierId)) handleLoadRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, customerId, supplierId, filterStatus]);
+  }, [role, customerId, supplierId, filterStatus, supplierTab]);
+
+  // ── Live subscriptions ─────────────────────────────────────────────
+  // Each one just triggers a refetch of the relevant list/detail queries.
+
+  // Customer: request lifecycle changes (own list)
+  useRequestEventForCustomerSubscription({
+    variables: { customerId: customerId ?? 0 },
+    skip: role !== 'customer' || !customerId,
+    onData: () => {
+      handleLoadRequests();
+      if (selectedRequestId) {
+        fetchRequest({ variables: { where: { requestId: selectedRequestId } } });
+      }
+    },
+  });
+
+  // Customer: new quote arrives on one of their requests → refetch the
+  // currently open quote list AND the list (status pill updates).
+  useQuoteEventForCustomerSubscription({
+    variables: { customerId: customerId ?? 0 },
+    skip: role !== 'customer' || !customerId,
+    onData: () => {
+      handleLoadRequests();
+      if (selectedRequestId) {
+        fetchQuotes({ variables: { requestId: selectedRequestId, status: null } });
+        fetchRequest({ variables: { where: { requestId: selectedRequestId } } });
+      }
+    },
+  });
+
+  // Supplier: a new matching open lead arrives (their inbox refetches).
+  useOpenRequestEventForSupplierSubscription({
+    variables: { supplierId: supplierId ?? 0 },
+    skip: role !== 'supplier' || !supplierId,
+    onData: () => {
+      if (supplierTab === 'open') handleLoadRequests();
+    },
+  });
+
+  // Supplier: one of their quotes changed (e.g. customer accepted) → refresh
+  // both tabs so "Open leads → My quotes" transitions reflect immediately.
+  useQuoteEventForSupplierSubscription({
+    variables: { supplierId: supplierId ?? 0 },
+    skip: role !== 'supplier' || !supplierId,
+    onData: () => {
+      handleLoadRequests();
+      if (selectedRequestId) {
+        fetchQuotes({ variables: { requestId: selectedRequestId, status: null } });
+        fetchRequest({ variables: { where: { requestId: selectedRequestId } } });
+      }
+    },
+  });
 
   // Deep-link: open a specific request when the URL has ?id=N (used by /messages "View request →")
   useEffect(() => {
@@ -223,9 +306,21 @@ export default function RequestsTestPage() {
     }
   };
 
-  const handleAcceptQuote = async (quoteId: number) => {
+  // Tracks which offered slot the customer has picked per quote (quoteId →
+  // slotIndex). Accept is blocked until a slot is picked, if the quote has
+  // any.
+  const [pickedSlot, setPickedSlot] = useState<Record<number, number>>({});
+
+  const handleAcceptQuote = async (quoteId: number, slotIndex?: number) => {
     try {
-      const { data } = await acceptQuote({ variables: { data: { quoteId } } });
+      const { data } = await acceptQuote({
+        variables: {
+          data: {
+            quoteId,
+            ...(slotIndex !== undefined && { slotIndex }),
+          } as any,
+        },
+      });
       setFeedback({ kind: 'ok', text: `Accepted quote #${quoteId} → booking #${data?.acceptQuote.bookingId}` });
       if (selectedRequestId) {
         await Promise.all([
@@ -332,13 +427,48 @@ export default function RequestsTestPage() {
           Hi, {user.name}
         </Text>
         <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text} marginBottom="6px">
-          {role === 'supplier' ? 'Requests you quoted on' : 'My requests'}
+          {role === 'supplier'
+            ? supplierTab === 'open'
+              ? 'Open leads'
+              : 'Requests you quoted on'
+            : 'My requests'}
         </Text>
         <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
           {role === 'supplier'
-            ? 'Every request where you sent a quote, with the full customer details and your quote status.'
+            ? supplierTab === 'open'
+              ? "Customer requests matching your services that you haven't quoted on yet. Send a quote to get into the conversation."
+              : 'Every request where you sent a quote, with the full customer details and your quote status.'
             : 'Requests are created from the AI chat on the home page — click "Select" on a provider card there. Manage and accept quotes here.'}
         </Text>
+
+        {/* Supplier-only tab toggle: Open leads vs My quotes */}
+        {role === 'supplier' && (
+          <Flex gap="8px" marginBottom="20px" wrap="wrap">
+            {([
+              { key: 'open' as const, label: 'Open leads' },
+              { key: 'mine' as const, label: 'My quotes' },
+            ]).map((t) => {
+              const active = supplierTab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setSupplierTab(t.key)}
+                  style={{
+                    ...buttonBaseStyle,
+                    padding: '8px 14px',
+                    fontSize: '13px',
+                    background: active ? solvoColors.text : solvoColors.surface,
+                    color: active ? solvoColors.surface : solvoColors.text,
+                    border: `1px solid ${active ? solvoColors.text : solvoColors.border}`,
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </Flex>
+        )}
 
         {/* Filter bar */}
         <Box style={sectionStyle} marginBottom="20px">
@@ -400,7 +530,9 @@ export default function RequestsTestPage() {
               {requests.length === 0 ? (
                 <Text fontSize="sm" color={solvoColors.textSubtle}>
                   {role === 'supplier'
-                    ? "No requests yet. They appear here once you've quoted on a customer's request."
+                    ? supplierTab === 'open'
+                      ? 'No matching open leads right now. New customer requests in your city + categories will appear here automatically.'
+                      : "You haven't quoted on any requests yet. Switch to Open leads to find matching customer requests."
                     : 'No requests yet. Start a new one from the AI chat on the home page.'}
                 </Text>
               ) : (
@@ -472,16 +604,54 @@ export default function RequestsTestPage() {
                               {r.city ?? 'No city'} · {r.guestCount ?? '—'} guests · {formatDate(r.createdAt)}
                             </Text>
                           </Box>
-                          <Box
-                            padding="4px 10px"
-                            borderRadius="9999px"
-                            bg={tone.bg}
-                            color={tone.fg}
-                            fontSize="11px"
-                            fontWeight={600}
-                          >
-                            {r.status}
-                          </Box>
+                          <Flex align="center" gap="8px" flexShrink={0}>
+                            <Box
+                              padding="4px 10px"
+                              borderRadius="9999px"
+                              bg={tone.bg}
+                              color={tone.fg}
+                              fontSize="11px"
+                              fontWeight={600}
+                            >
+                              {r.status}
+                            </Box>
+                            {/* Quick "Send quote" CTA on Open leads rows — opens a popup */}
+                            {role === 'supplier' && supplierTab === 'open' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setQuoteModalFor({
+                                    requestId: r.requestId,
+                                    preview: r.rawQuery,
+                                    customerName: r.customer?.user?.name,
+                                    meta: [
+                                      r.city,
+                                      r.guestCount ? `${r.guestCount} guests` : null,
+                                      r.serviceDate
+                                        ? new Date(r.serviceDate).toLocaleDateString(undefined, {
+                                            weekday: 'short',
+                                            month: 'short',
+                                            day: 'numeric',
+                                          })
+                                        : null,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' · '),
+                                  });
+                                }}
+                                style={{
+                                  ...buttonBaseStyle,
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  background: solvoColors.text,
+                                  color: solvoColors.surface,
+                                }}
+                              >
+                                Send quote
+                              </button>
+                            )}
+                          </Flex>
                         </Flex>
                       </Box>
                     );
@@ -601,11 +771,33 @@ export default function RequestsTestPage() {
                 </Flex>
 
                 {(role === 'supplier' ? (mySupplierQuote ? [mySupplierQuote] : []) : quotes).length === 0 ? (
-                  <Text fontSize="sm" color={solvoColors.textSubtle}>
-                    {role === 'supplier'
-                      ? 'No quote from you yet on this request.'
-                      : 'No quotes yet for this request.'}
-                  </Text>
+                  <Box>
+                    <Text fontSize="sm" color={solvoColors.textSubtle} marginBottom={role === 'supplier' ? '10px' : '0'}>
+                      {role === 'supplier'
+                        ? 'No quote from you yet on this request.'
+                        : 'No quotes yet for this request.'}
+                    </Text>
+                    {role === 'supplier' && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push({
+                            pathname: '/quotes',
+                            query: { requestId: detail.requestId },
+                          })
+                        }
+                        style={{
+                          ...buttonBaseStyle,
+                          padding: '8px 14px',
+                          fontSize: '13px',
+                          background: solvoColors.indigo,
+                          color: solvoColors.surface,
+                        }}
+                      >
+                        Send a quote →
+                      </button>
+                    )}
+                  </Box>
                 ) : (
                   <Flex direction="column" gap="8px">
                     {(role === 'supplier' ? [mySupplierQuote!] : quotes).map((q: any) => {
@@ -646,11 +838,58 @@ export default function RequestsTestPage() {
                               "{q.message}"
                             </Text>
                           )}
+                          {/* Offered time slots — customer picks one before accepting */}
+                          {role === 'customer' && Array.isArray((q as any).offeredSlots) && (q as any).offeredSlots.length > 0 && canAccept && (
+                            <Box marginTop="8px" marginBottom="8px">
+                              <Text fontSize="11px" fontWeight={600} color={solvoColors.textMuted} marginBottom="4px">
+                                Pick a time slot:
+                              </Text>
+                              <Flex direction="column" gap="4px">
+                                {(q as any).offeredSlots.map((s: { startsAt: string; endsAt: string }, sIdx: number) => {
+                                  const picked = pickedSlot[q.quoteId] === sIdx;
+                                  const start = new Date(s.startsAt);
+                                  const end = new Date(s.endsAt);
+                                  return (
+                                    <button
+                                      key={sIdx}
+                                      type="button"
+                                      onClick={() => setPickedSlot((p) => ({ ...p, [q.quoteId]: sIdx }))}
+                                      style={{
+                                        ...buttonBaseStyle,
+                                        padding: '8px 10px',
+                                        fontSize: '12px',
+                                        textAlign: 'left',
+                                        background: picked ? solvoColors.indigoLight : solvoColors.surface,
+                                        color: picked ? solvoColors.indigo : solvoColors.text,
+                                        border: `1px solid ${picked ? solvoColors.indigoBorder : solvoColors.border}`,
+                                        fontWeight: picked ? 600 : 400,
+                                      }}
+                                    >
+                                      {start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                      {' · '}
+                                      {start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                      {' – '}
+                                      {end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                    </button>
+                                  );
+                                })}
+                              </Flex>
+                            </Box>
+                          )}
                           {role === 'customer' && (
                           <Flex gap="6px" marginTop="6px">
                             <button
                               type="button"
-                              onClick={() => handleAcceptQuote(q.quoteId)}
+                              onClick={() => {
+                                const slots = (q as any).offeredSlots as Array<unknown> | undefined;
+                                const hasSlots = Array.isArray(slots) && slots.length > 0;
+                                const slotIdx = hasSlots ? pickedSlot[q.quoteId] : undefined;
+                                if (hasSlots && slotIdx === undefined) {
+                                  setFeedback({ kind: 'err', text: 'Pick a time slot before accepting' });
+                                  return;
+                                }
+                                handleAcceptQuote(q.quoteId, slotIdx);
+                              }}
                               disabled={busy || !canAccept}
                               style={{
                                 ...buttonBaseStyle,
@@ -751,6 +990,24 @@ export default function RequestsTestPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Quote create popup — opened by the "Send quote" CTA on Open leads rows */}
+      {quoteModalFor && supplierId && (
+        <QuoteCreateModal
+          requestId={quoteModalFor.requestId}
+          supplierId={supplierId}
+          requestPreview={quoteModalFor.preview}
+          requestMeta={quoteModalFor.meta}
+          customerName={quoteModalFor.customerName}
+          onClose={() => setQuoteModalFor(null)}
+          onCreated={(quoteId) => {
+            setFeedback({ kind: 'ok', text: `Quote #${quoteId} sent.` });
+            setTimeout(() => setFeedback(null), 4000);
+            // Refresh both tabs — the request will move from Open leads to My quotes
+            handleLoadRequests();
+          }}
+        />
+      )}
     </Box>
   );
 }

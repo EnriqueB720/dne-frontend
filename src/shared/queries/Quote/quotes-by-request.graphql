@@ -8,6 +8,10 @@ query quotesByRequest($requestId: Int!, $status: QuoteStatus) {
     validUntil
     status
     createdAt
+    offeredSlots {
+      startsAt
+      endsAt
+    }
     supplier {
       supplierId
       companyName
