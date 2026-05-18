@@ -1,0 +1,14 @@
+query messagesByConversation($conversationId: Int!, $limit: Int) {
+  messagesByConversation(conversationId: $conversationId, limit: $limit) {
+    messageId
+    conversationId
+    senderType
+    senderUserId
+    content
+    messageType
+    filtered
+    filteredReason
+    readAt
+    createdAt
+  }
+}

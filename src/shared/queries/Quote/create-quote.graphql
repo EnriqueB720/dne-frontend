@@ -16,5 +16,9 @@ mutation createQuote($data: QuoteCreateInput!) {
       unitPrice
       total
     }
+    offeredSlots {
+      startsAt
+      endsAt
+    }
   }
 }

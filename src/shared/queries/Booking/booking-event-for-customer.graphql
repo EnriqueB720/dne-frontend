@@ -1,0 +1,6 @@
+subscription bookingEventForCustomer($customerId: Int!) {
+  bookingEventForCustomer(customerId: $customerId) {
+    eventType
+    bookingId
+  }
+}

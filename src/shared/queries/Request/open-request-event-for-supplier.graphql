@@ -1,0 +1,6 @@
+subscription openRequestEventForSupplier($supplierId: Int!) {
+  openRequestEventForSupplier(supplierId: $supplierId) {
+    eventType
+    requestId
+  }
+}
