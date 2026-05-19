@@ -16,7 +16,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 export default function App({ Component, pageProps }: AppProps) {
 
-  const HTTP_URI = 'http://localhost:5000/graphql';
+const HTTP_URI = 'http://localhost:5000/graphql';
 const WS_URI = 'ws://localhost:5000/graphql';
 
   // Memo'd so the client doesn't get re-created on every render. The WebSocket
@@ -52,6 +52,8 @@ const WS_URI = 'ws://localhost:5000/graphql';
 
     return new ApolloClient({ link, cache: new InMemoryCache() });
   }, []);
+
+  setApolloClient(client);
 
   return <ChakraProvider value={defaultSystem}>
       <Head>

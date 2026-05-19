@@ -359,8 +359,8 @@ export enum MessageType {
 export type Mutation = {
   __typename?: 'Mutation';
   acceptQuote: Booking;
-  archiveConversation: Conversation;
   aiComplete: AiCompletionResult;
+  archiveConversation: Conversation;
   cancelBooking: Booking;
   cancelCalendarEvent: CalendarEvent;
   closeRequest: Request;
@@ -378,16 +378,16 @@ export type Mutation = {
   createUser: User;
   deleteAiConversation: Scalars['Boolean']['output'];
   deletePost: Scalars['Boolean']['output'];
+  linkAiConversationToRequest: AiConversation;
   markAllNotificationsAsRead: Scalars['Int']['output'];
   markMessagesAsRead: Scalars['Float']['output'];
   markNotificationAsRead: Notification;
-  linkAiConversationToRequest: AiConversation;
   markQuotesViewed: Scalars['Float']['output'];
-  restoreConversation: Conversation;
-  sendMessage: Message;
   mergeGuestAiConversations: Scalars['Float']['output'];
+  restoreConversation: Conversation;
   rollbackLastAiTurn: Scalars['Float']['output'];
   sendAiMessage: SendAiMessageResult;
+  sendMessage: Message;
   signup: User;
   updateAiConversation: AiConversation;
   updateAiMessageProviders: AiMessage;
@@ -403,13 +403,13 @@ export type MutationAcceptQuoteArgs = {
 };
 
 
-export type MutationArchiveConversationArgs = {
-  data: ConversationArchiveInput;
+export type MutationAiCompleteArgs = {
+  data: AiCompletionInput;
 };
 
 
-export type MutationAiCompleteArgs = {
-  data: AiCompletionInput;
+export type MutationArchiveConversationArgs = {
+  data: ConversationArchiveInput;
 };
 
 
@@ -499,6 +499,12 @@ export type MutationDeletePostArgs = {
 };
 
 
+export type MutationLinkAiConversationToRequestArgs = {
+  data: AiConversationLinkInput;
+  deviceId?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type MutationMarkAllNotificationsAsReadArgs = {
   data: NotificationsMarkAllReadInput;
 };
@@ -514,29 +520,18 @@ export type MutationMarkNotificationAsReadArgs = {
 };
 
 
-export type MutationLinkAiConversationToRequestArgs = {
-  data: AiConversationLinkInput;
-  deviceId?: InputMaybe<Scalars['String']['input']>;
-};
-
-
 export type MutationMarkQuotesViewedArgs = {
   data: QuoteMarkViewedInput;
 };
 
 
-export type MutationRestoreConversationArgs = {
-  data: ConversationRestoreInput;
-};
-
-
-export type MutationSendMessageArgs = {
-  data: MessageSendInput;
-};
-
-
 export type MutationMergeGuestAiConversationsArgs = {
   deviceId: Scalars['String']['input'];
+};
+
+
+export type MutationRestoreConversationArgs = {
+  data: ConversationRestoreInput;
 };
 
 
@@ -549,6 +544,11 @@ export type MutationRollbackLastAiTurnArgs = {
 export type MutationSendAiMessageArgs = {
   data: AiMessageSendInput;
   deviceId?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationSendMessageArgs = {
+  data: MessageSendInput;
 };
 
 
@@ -1112,14 +1112,6 @@ export type Search = {
   post?: Maybe<Array<Post>>;
 };
 
-/** Who sent a message in a customer↔supplier conversation */
-export enum SenderType {
-  Ai = 'AI',
-  Customer = 'CUSTOMER',
-  Supplier = 'SUPPLIER',
-  System = 'SYSTEM'
-}
-
 export type SendAiMessageResult = {
   __typename?: 'SendAiMessageResult';
   content: Scalars['String']['output'];
@@ -1129,6 +1121,14 @@ export type SendAiMessageResult = {
   role: Scalars['String']['output'];
   usage?: Maybe<AiMessageUsage>;
 };
+
+/** Who sent a message in a customer↔supplier conversation */
+export enum SenderType {
+  Ai = 'AI',
+  Customer = 'CUSTOMER',
+  Supplier = 'SUPPLIER',
+  System = 'SYSTEM'
+}
 
 export type Service = {
   __typename?: 'Service';
