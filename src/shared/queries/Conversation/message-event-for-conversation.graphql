@@ -1,0 +1,8 @@
+subscription messageEventForConversation($conversationId: Int!) {
+  messageEventForConversation(conversationId: $conversationId) {
+    eventType
+    conversationId
+    messageId
+    senderUserId
+  }
+}

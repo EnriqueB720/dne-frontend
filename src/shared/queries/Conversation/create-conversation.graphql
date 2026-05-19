@@ -1,0 +1,10 @@
+mutation createConversation($data: ConversationCreateInput!) {
+  createConversation(data: $data) {
+    conversationId
+    requestId
+    customerId
+    supplierId
+    status
+    createdAt
+  }
+}

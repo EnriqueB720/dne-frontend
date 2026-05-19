@@ -1,46 +1,58 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
+import { useMemo } from 'react'
 import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
 import AuthProvider from '@/shared/contexts/auth.provider'
-import { ApolloClient, HttpLink, InMemoryCache, from } from '@apollo/client';
+import { ApolloClient, HttpLink, InMemoryCache, split, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { ApolloProvider } from "@apollo/client/react";
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
+import { getMainDefinition } from '@apollo/client/utilities';
+import { createClient } from 'graphql-ws';
 import { setApolloClient } from '@/shared/services/apollo.client';
 import 'react-international-phone/style.css';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 
-// Build the Apollo client once at module load (NOT inside the component body)
-// — otherwise the client is recreated on every render, blowing the cache and
-// re-initialising the in-memory chat service reference each time React paints.
-const httpLink = new HttpLink({ uri: "http://localhost:5000/graphql" });
-
-// Attach the JWT from localStorage to every GraphQL request. We read the
-// token inside `setContext` (rather than once at module load) so the link
-// always picks up the freshest token after login/refresh.
-const authLink = setContext((_, { headers }) => {
-  const token =
-    typeof window !== 'undefined' ? localStorage.getItem('@token') : null;
-  return {
-    headers: {
-      ...headers,
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-    },
-  };
-});
-
-const apolloClient = new ApolloClient({
-  link: from([authLink, httpLink]),
-  cache: new InMemoryCache(),
-});
-
-// Expose the client to the service layer (conversation.service, ai.service),
-// which uses raw client.query / client.mutate so it can be called from
-// non-React paths (jotai atoms, async effects, etc.).
-setApolloClient(apolloClient);
-
-
 export default function App({ Component, pageProps }: AppProps) {
+
+  const HTTP_URI = 'http://localhost:5000/graphql';
+const WS_URI = 'ws://localhost:5000/graphql';
+
+  // Memo'd so the client doesn't get re-created on every render. The WebSocket
+  // link is only built on the browser — SSR/Node can't open a WS connection.
+  const client = useMemo(() => {
+    const httpLink = new HttpLink({ uri: HTTP_URI });
+
+    if (typeof window === 'undefined') {
+      return new ApolloClient({ link: httpLink, cache: new InMemoryCache() });
+    }
+
+    const wsLink = new GraphQLWsLink(
+      createClient({
+        url: WS_URI,
+        // Auto-reconnect on transient disconnects (tab sleep, network blips).
+        retryAttempts: Infinity,
+        shouldRetry: () => true,
+      }),
+    );
+
+    // Subscriptions go over WS, queries and mutations stay on HTTP.
+    const link = split(
+      ({ query }) => {
+        const def = getMainDefinition(query);
+        return (
+          def.kind === 'OperationDefinition' &&
+          def.operation === 'subscription'
+        );
+      },
+      wsLink,
+      httpLink,
+    );
+
+    return new ApolloClient({ link, cache: new InMemoryCache() });
+  }, []);
+
   return <ChakraProvider value={defaultSystem}>
       <Head>
         <title>Solvo</title>
@@ -63,7 +75,7 @@ export default function App({ Component, pageProps }: AppProps) {
           }
         `}</style>
       </Head>
-      <ApolloProvider client={apolloClient}>
+      <ApolloProvider client={client}>
         <AuthProvider>
           <Component {...pageProps} />
         </AuthProvider>

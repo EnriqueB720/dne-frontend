@@ -1,0 +1,13 @@
+query conversation($where: ConversationWhereInput!) {
+  conversation(where: $where) {
+    conversationId
+    requestId
+    customerId
+    supplierId
+    status
+    lastMessageAt
+    contactShareWarnings
+    createdAt
+    updatedAt
+  }
+}

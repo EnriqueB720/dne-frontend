@@ -39,6 +39,8 @@ import {
   LoadingState,
   ProviderCard,
   PackageCard,
+  NotificationBell,
+  QuoteCreateModal,
 } from '@molecules';
 export type { ProviderData, PackageData } from '@molecules';
 
@@ -90,6 +92,8 @@ export {
   LoadingState,
   ProviderCard,
   PackageCard,
+  NotificationBell,
+  QuoteCreateModal,
   SolvoNavBar,
   ChatSidebar,
   ChatThread,

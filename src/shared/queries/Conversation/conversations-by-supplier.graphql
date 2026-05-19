@@ -1,0 +1,24 @@
+query conversationsBySupplier($supplierId: Int!, $viewerUserId: Int!, $status: ConversationStatus) {
+  conversationsBySupplier(supplierId: $supplierId, viewerUserId: $viewerUserId, status: $status) {
+    conversationId
+    requestId
+    customerId
+    supplierId
+    status
+    lastMessageAt
+    contactShareWarnings
+    createdAt
+    updatedAt
+    customer {
+      customerId
+      user {
+        userId
+        name
+      }
+    }
+    request {
+      requestId
+      rawQuery
+    }
+  }
+}

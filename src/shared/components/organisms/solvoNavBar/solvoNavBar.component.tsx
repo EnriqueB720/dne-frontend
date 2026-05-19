@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogOut, Menu, User as UserIcon, X } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
-import { Logo } from '@molecules';
+import { Logo, NotificationBell } from '@molecules';
 import { solvoColors, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 
@@ -24,6 +24,11 @@ export interface SolvoNavBarProps {
   onNewChat?: () => void;
   /** Hide the logo entirely — useful in chat mode where the sidebar already shows it */
   hideLogo?: boolean;
+  /**
+   * When provided, render a hamburger button on the left (below `lg`) that
+   * triggers this callback — used by pages that have a collapsible side panel.
+   */
+  onMenuClick?: () => void;
 }
 
 const navItems = [
@@ -32,6 +37,7 @@ const navItems = [
   { label: 'Requests', href: '/requests' },
   { label: 'Quotes', href: '/quotes' },
   { label: 'Bookings', href: '/bookings' },
+  { label: 'Messages', href: '/messages' },
   { label: 'Calendar', href: '/calendar' },
   { label: 'Dashboard', href: '/dashboard' },
 ];
@@ -56,6 +62,7 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
   onGoHome,
   onNewChat,
   hideLogo = false,
+  onMenuClick,
 }) => {
   const router = useRouter();
   const { isAuthenticated, user, logout } = React.useContext(AuthContext);
@@ -159,17 +166,43 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
         justify="space-between"
         padding="14px 24px"
       >
-        {hideLogo ? (
-          <Box />
-        ) : onGoHome ? (
-          <button onClick={onGoHome} style={navButtonStyle} title="Home">
-            <Logo size="md" />
-          </button>
-        ) : (
-          <Link href="/" style={{ textDecoration: 'none', cursor: 'pointer' }}>
-            <Logo size="md" />
-          </Link>
-        )}
+        <Flex align="center" gap="8px">
+          {/* Hamburger (below lg) for pages with a collapsible side panel */}
+          {onMenuClick && (
+            <Box
+              as="button"
+              display={{ base: 'flex', lg: 'none' }}
+              alignItems="center"
+              justifyContent="center"
+              width="36px"
+              height="36px"
+              borderRadius="10px"
+              cursor="pointer"
+              color={solvoColors.textMuted}
+              borderWidth="1px"
+              borderStyle="solid"
+              borderColor={solvoColors.border}
+              style={{ background: 'transparent', padding: 0 }}
+              onClick={onMenuClick}
+              title="Open menu"
+              aria-label="Open menu"
+            >
+              <Menu size={16} />
+            </Box>
+          )}
+
+          {hideLogo ? (
+            <Box />
+          ) : onGoHome ? (
+            <button onClick={onGoHome} style={navButtonStyle} title="Home">
+              <Logo size="md" />
+            </button>
+          ) : (
+            <Link href="/" style={{ textDecoration: 'none', cursor: 'pointer' }}>
+              <Logo size="md" />
+            </Link>
+          )}
+        </Flex>
 
         {/* Inline nav — visible on lg and up */}
         <Flex gap="28px" align="center" display={{ base: 'none', lg: 'flex' }}>
@@ -314,6 +347,9 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
               )}
             </AnimatePresence>
           </Box>
+
+          {/* Notification bell — only when signed in */}
+          {isAuthenticated && user && <NotificationBell userId={user.userId} />}
 
           {/* Auth controls — always visible */}
           {isAuthenticated && user ? (
