@@ -68,11 +68,14 @@ RULES — follow exactly:
       - If the count is 1 or more: the cards are ALREADY visible below your message. Acknowledge what you found in present tense ("Here are 4 Italian options near Santo Domingo") and invite them to look. Do NOT list or describe the specific businesses yourself.
       - If the count is 0: there are NO cards. Tell the user plainly that you couldn't find matches, and offer to broaden it. Do NOT pretend results exist.
    b) Network lookup — a "## Network lookup" block lists suppliers found in the Solvo network for an informational question ("do you have DJs in Heredia?", "are there suppliers in our network?"). NO cards are shown. Answer in plain text: summarise what the network has (counts, names, categories, locations) using ONLY the listed data. If the block says zero matches, say so honestly. Do NOT say "see the cards" — there are none.
-   c) Conversation — no context block, or a "## Known providers" block. General questions (how Solvo works, what's verified), greetings, thanks, comparisons of results ALREADY shown, or questions about a specific provider already shown. NO cards appear. Answer fully in plain text. Do NOT mention "the cards" or "the options below".
+   c) Conversation — a "## Known providers" block, a "## Conversation" block, or no context block at all. General questions (how Solvo works, what's verified), greetings, thanks, comparisons of results ALREADY shown, or questions about a specific provider already shown. NO cards appear. Answer fully in plain text. Do NOT mention "the cards" or "the options below".
+      - "## Known providers": use those fields to answer. Do not invent any detail.
+      - "## Conversation": no structured data — use the conversation history above to answer. Speak naturally, referencing what was said earlier in the chat.
+      - No context block at all: treat the same as "## Conversation" — rely on history.
 5. PROVIDER FACTS — NO HALLUCINATION:
-   - When the user asks about a specific named provider, or to compare providers, you may ONLY use the data in the "## Known providers" / "## Search result" / "## Network lookup" block below, when present.
-   - If the provider IS in that block, answer using its fields verbatim. Do not invent addresses, hours, or services that aren't there.
-   - If the provider is NOT in that block (or no block is present), say you don't have detailed info on it and offer to search. Never make up the answer.
+   - When the user asks about a specific named provider, look FIRST in the context blocks below (## Known providers / ## Search result / ## Network lookup), then in the conversation history above this system prompt.
+   - If found in either place, answer using that data. Do not invent addresses, hours, or services that are not in the data.
+   - If genuinely not found in the blocks OR the conversation history, say you don't have detailed info on it and offer to search. Never make up the answer.
    - NEVER guess what category a named provider belongs to. Use ONLY the data you have.
 6. QUESTIONS: Ask at most ONE clarifying question per turn.
 7. FORMAT: No bullet points, no markdown headers, no numbered lists.
@@ -1056,12 +1059,22 @@ export default function Home() {
       // Capture current messages before the state update
       const currentMessages = messages;
 
-      // For the parser, pass the full conversation context so it can
-      // accumulate info across multiple user turns.
-      const contextQuery = [
-        ...currentMessages.filter((m) => m.role === 'user').map((m) => m.content),
-        content,
-      ].join('. ');
+      // For the parser: only pass the last 2 user messages + the current one.
+      // Sending the full history causes the parser to pick up stale service/
+      // location fields from earlier turns (e.g. it extracts "catering" when
+      // the user is now asking about DJs they just saw on screen).
+      const recentUserMsgs = currentMessages
+        .filter((m) => m.role === 'user')
+        .slice(-2)
+        .map((m) => m.content);
+      const contextQuery = [...recentUserMsgs, content]
+        .filter(Boolean)
+        .join('. ');
+
+      // Grounding from the most recent assistant message that carried cards.
+      // Computed once and passed to every intent branch so the AI always knows
+      // what was on screen, regardless of whether new cards are produced.
+      const recentGrounding = buildProviderGrounding(currentMessages);
 
       // Optimistic user message
       const nowStr = new Date().toISOString();
@@ -1097,6 +1110,15 @@ export default function Home() {
             content.length > 60 ? `${content.slice(0, 57)}…` : content;
           const conv = await createConversation(title, currentModel);
           convId = conv.conversationId;
+
+          // If the user hit "stop" while createConversation was in flight,
+          // the signal is already aborted. The conversation now exists in the
+          // DB but we're about to bail — delete it so no orphan is left behind.
+          if (signal.aborted) {
+            apiDeleteConversation(convId).catch(() => {/* best-effort */});
+            return;
+          }
+
           // Tell the load-messages effect to skip this id's fetch — local
           // state already holds the optimistic user message for this turn,
           // and the AI reply is appended below. Without this, the effect
@@ -1129,16 +1151,20 @@ export default function Home() {
 
         if (parsed.intent === 'chat') {
           // ── Conversational turn ────────────────────────────────────────
-          // No cards. Ground the AI in whatever providers were shown
-          // earlier so it can answer "where is PikiTiki?" / "compare the
-          // first and last result" factually.
+          // No cards. Ground the AI in the most recently shown providers
+          // so it can answer follow-ups ("where is PikiTiki?", "which of
+          // those are in our network?") factually. When no structured
+          // grounding is available, tell the AI to use conversation history.
           // eslint-disable-next-line no-console
           console.log('[intent] chat — no provider generation');
+          const chatContext = recentGrounding
+            ? groundingContext(recentGrounding)
+            : '## Conversation\nAnswer using the full conversation history above. If the user references providers discussed earlier in this conversation, refer to what was said. Ask a clarifying question only if genuinely needed.';
           aiResult = await apiSendMessage(
             convId,
             content,
             currentModel,
-            groundingContext(buildProviderGrounding(currentMessages)),
+            chatContext,
             signal,
             SOLVO_CHAT_SYSTEM_PROMPT,
           );
@@ -1172,8 +1198,10 @@ export default function Home() {
             });
             dbSuppliers = res?.data?.searchSuppliers ?? [];
           } catch (dbErr) {
-            // eslint-disable-next-line no-console
-            console.error('[DB] network_inquiry search ERROR:', dbErr);
+            if (!signal.aborted) {
+              // eslint-disable-next-line no-console
+              console.error('[DB] network_inquiry search ERROR:', dbErr);
+            }
           }
 
           const dbProviders = dbSuppliers.map((s, i) =>
@@ -1184,11 +1212,18 @@ export default function Home() {
             `[intent] network_inquiry — ${dbProviders.length} suppliers found, no cards`,
           );
 
+          // Combine the network-lookup block with any providers already on
+          // screen so the AI can cross-reference ("yes, 3 of those 5 are
+          // in our network") without losing the thread.
+          const networkCtx = networkInquiryContext(dbProviders, parsed)
+            + (recentGrounding
+              ? `\n\n## Previously shown to the user (reference only — do NOT render cards for these):\n${recentGrounding}`
+              : '');
           aiResult = await apiSendMessage(
             convId,
             content,
             currentModel,
-            networkInquiryContext(dbProviders, parsed),
+            networkCtx,
             signal,
             SOLVO_CHAT_SYSTEM_PROMPT,
           );
@@ -1227,8 +1262,10 @@ export default function Home() {
             });
             dbSuppliers = res?.data?.searchSuppliers ?? [];
           } catch (dbErr) {
-            // eslint-disable-next-line no-console
-            console.error('[DB] searchSuppliers ERROR:', dbErr);
+            if (!signal.aborted) {
+              // eslint-disable-next-line no-console
+              console.error('[DB] searchSuppliers ERROR:', dbErr);
+            }
           }
 
           const dbProviders = dbSuppliers.map((s, i) =>
@@ -1258,8 +1295,12 @@ export default function Home() {
                 signal,
               );
             } catch (err) {
-              // eslint-disable-next-line no-console
-              console.error('[AI] generateProvidersWithAi ERROR:', err);
+              // Suppress noise for intentional user-stop — the outer catch
+              // handles the abort case cleanly. Only log genuine failures.
+              if (!signal.aborted) {
+                // eslint-disable-next-line no-console
+                console.error('[AI] generateProvidersWithAi ERROR:', err);
+              }
               fillRes = null;
             }
           }
@@ -1290,11 +1331,18 @@ export default function Home() {
           console.log(
             `[providers] final card count = ${merged.length}`,
           );
+          // Include the previous providers as secondary context so the AI
+          // can acknowledge continuity ("switching from the DJs you saw…")
+          // without contradicting the new results it's about to introduce.
+          const resultCtx = searchResultContext(merged, parsed)
+            + (recentGrounding
+              ? `\n\n## Previously shown in this conversation (for continuity — focus on the NEW results above):\n${recentGrounding}`
+              : '');
           aiResult = await apiSendMessage(
             convId,
             content,
             currentModel,
-            searchResultContext(merged, parsed),
+            resultCtx,
             signal,
             SOLVO_CHAT_SYSTEM_PROMPT,
           );
@@ -1376,7 +1424,9 @@ export default function Home() {
   // message, since `sendAiMessage` saves it before calling the model). The
   // result: stopping leaves no half-finished turn behind.
   const handleStop = React.useCallback(() => {
-    abortRef.current?.abort();
+    // Provide a named reason so the AbortError is identifiable in catch
+    // blocks and distinguishable from network failures in logs.
+    abortRef.current?.abort(new DOMException('User stopped the response', 'AbortError'));
     abortRef.current = null;
     setWaitingForAI(false);
 

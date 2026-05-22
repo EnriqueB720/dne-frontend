@@ -34,6 +34,14 @@ async function runCompletion(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   opts: { system?: string; cachedSystem?: string; signal?: AbortSignal } = {},
 ): Promise<AiCompleteResult> {
+  // Bail out before touching Apollo if the signal is already aborted.
+  // This prevents Apollo from wrapping the cancelled fetch in an ApolloError,
+  // which Next.js dev-mode incorrectly surfaces as an unhandled rejection even
+  // when our catch blocks handle it correctly.
+  if (opts.signal?.aborted) {
+    throw new DOMException('Request aborted by user', 'AbortError');
+  }
+
   const { data, errors } = await getApolloClient().mutate<{
     aiComplete: { content: string; model: ModelKey; usage?: ChatUsage };
   }>({
@@ -189,7 +197,14 @@ const QUESTION_PREFIX_RE =
 const SEARCH_VERB_RE =
   /\b(?:find|busco|necesito|need|show\s+me|muéstrame|muestrame|recomi[ée]ndame|recommend|encu[ée]ntrame|plan\s+(?:a|me)|i\s+want|quiero|book)\b/i;
 
-const CAPITALIZED_NAME_RE = /\b([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,5})\b/;
+// Allow camelCase names like "PikiTiki" or "DJCarlos" — the first char must be
+// uppercase, then anything until a word boundary (no lowercase-only constraint).
+// Matches provider-style proper names only — excludes plain one-word brand names
+// like "Solvo" (the app itself). Requires either:
+//   1. Two or more capitalized words ("Mesa Fina", "Sabor Catering", "DJ Carlos Mora")
+//   2. A single camelCase word ("PikiTiki" — uppercase letter appears mid-word)
+const CAPITALIZED_NAME_RE =
+  /\b(?:[A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ]+){0,4}|[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*[A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ]*)\b/;
 
 /**
  * Country-agnostic extraction of an explicitly-stated location from free
@@ -275,8 +290,11 @@ function looksLikeQuestionAboutNamedEntity(message: string): boolean {
  * want analysis of existing results, not a fresh search. Deterministic
  * override for when the LLM gets fooled by words like "comparison".
  */
+// Note: \b doesn't anchor on accented characters (ú, ó, etc.) in JS without
+// the `u` flag and Unicode property escapes. We use (?<!\w) / (?!\w) as a
+// portable alternative so Spanish ordinals like "última opción" match correctly.
 const ORDINAL_RESULT_REF_RE =
-  /\b(?:the\s+)?(?:first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th|primer[oa]?|segund[oa]|tercer[oa]?|cuart[oa]|quint[oa]|[úu]ltim[oa])\s+(?:result|one|option|provider|card|pick|resultado|opci[óo]n|proveedor|tarjeta)s?\b/i;
+  /(?<!\w)(?:the\s+)?(?:first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th|primer[oa]?|segund[oa]|tercer[oa]?|cuart[oa]|quint[oa]|[úu]ltim[oa])\s+(?:result|one|option|provider|card|pick|resultado|opci[óo]n|proveedor|tarjeta)s?(?!\w)/i;
 
 function referencesShownResults(message: string): boolean {
   return ORDINAL_RESULT_REF_RE.test(message.trim());
@@ -292,10 +310,37 @@ function referencesShownResults(message: string): boolean {
  * "do you have ..." questions.
  */
 const NETWORK_INQUIRY_RE =
-  /\b(?:(?:in|en)\s+(?:our|your|su|la|nuestra)\s+(?:network|red)|are there (?:any )?(?:suppliers?|providers?|proveedor(?:es)?)|hay (?:alg[úu]n[oa]?s?\s+)?(?:proveedor(?:es)?|suppliers?|negocios?)|who(?:'s| is)?\s+(?:in|on)\s+(?:our|your)\s+network|what\s+(?:suppliers?|providers?|services?|categories|categor[íi]as)\s+(?:do you have|are (?:there|available)|tienen|hay)|qu[ée]\s+(?:proveedor(?:es)?|servicios?|categor[íi]as)\s+(?:tienen|hay|ofrecen)|tienen\s+(?:proveedor(?:es)?|suppliers?))\b/i;
+  /\b(?:(?:in|en)\s+(?:our|your|su|la|nuestra)\s+(?:network|red)|are\s+there\s+(?:any\s+)?(?:suppliers?|providers?|proveedor(?:es)?)|hay\s+(?:alg[úu]n[oa]?s?\s+)?(?:proveedor(?:es)?|suppliers?|negocios?)|who(?:'s|\s+is)?\s+(?:in|on)\s+(?:our|your)\s+network|what\s+(?:suppliers?|providers?|services?|categories|categor[íi]as)\s+(?:do\s+you\s+have|are\s+(?:there|available)|tienen|hay)|qu[ée]\s+(?:proveedor(?:es)?|servicios?|categor[íi]as)\s+(?:tienen|hay|ofrecen)|tienen\s+(?:proveedor(?:es)?|suppliers?)|do\s+you\s+(?:have|carry|offer)\s+(?:any\s+)?(?:suppliers?|providers?|proveedor(?:es)?|[A-Za-z\s]{2,20})\s+in|is\s+there\s+(?:a(?:nyone?|nybody)?|someone|alguien)\s+(?:who|that|que)\s+(?:does?|can|provide?s?|hace?|ofrece?)|do\s+you\s+have\s+(?:any\s+)?(?:[A-Z][a-z]+s?|dj|djs|ac|[a-z]{3,15})\s+(?:in|near|around|en|cerca))\b/i;
 
-function looksLikeNetworkInquiry(message: string): boolean {
+/** @internal exported for unit tests */
+export function looksLikeNetworkInquiry(message: string): boolean {
   return NETWORK_INQUIRY_RE.test(message.trim());
+}
+
+/**
+ * "Which one of THOSE are in our network?" / "are THESE on the network?" —
+ * referential pronouns ("those", "these", "them") combined with network
+ * vocabulary means the user is asking about providers ALREADY SHOWN on
+ * screen, not asking whether the network carries a category in general.
+ * This must override `looksLikeNetworkInquiry` so the turn stays in `chat`
+ * mode where the grounding block answers the question from known data.
+ */
+const REFERENTIAL_NETWORK_RE =
+  /\b(?:those|these|them|that\s+one|this\s+one)\b.{0,80}\b(?:(?:in|on|from)\s+(?:our|your|su|nuestra)\s+(?:network|red)|en\s+(?:nuestra|la)\s+red)\b/is;
+
+/** @internal exported for unit tests */
+export function referencesShownResultsAboutNetwork(message: string): boolean {
+  return REFERENTIAL_NETWORK_RE.test(message.trim());
+}
+
+/** @internal exported for unit tests */
+export function _referencesShownResults(message: string): boolean {
+  return referencesShownResults(message);
+}
+
+/** @internal exported for unit tests */
+export function _looksLikeQuestionAboutNamedEntity(message: string): boolean {
+  return looksLikeQuestionAboutNamedEntity(message);
 }
 
 function stripJsonFences(text: string): string {
@@ -371,12 +416,15 @@ export async function parseQueryWithAi(
     const lastTurn = trimmed.split(/\.\s+/).pop() ?? trimmed;
     if (
       looksLikeQuestionAboutNamedEntity(lastTurn) ||
-      // "compare the first and last result" — about cards already on screen,
-      // never a new search.
-      referencesShownResults(lastTurn)
+      // "compare the first and last result" — about cards already on screen.
+      referencesShownResults(lastTurn) ||
+      // "which one of THOSE are in our network?" — "those/these/them" always
+      // refers to providers already shown; route to chat so grounding answers.
+      referencesShownResultsAboutNetwork(lastTurn)
     ) {
-      // Highest priority — a question about a specific named provider or
-      // about results already shown is always conversational.
+      // Highest priority — a question about a specific named provider,
+      // about results already shown, or a referential follow-up about shown
+      // results and network membership, is always conversational.
       intent = 'chat';
     } else if (
       // "are there suppliers in our network?" — asking ABOUT the network.

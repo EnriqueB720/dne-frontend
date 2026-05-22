@@ -24,7 +24,22 @@ const WS_URI = 'ws://localhost:5000/graphql';
   const client = useMemo(() => {
     const httpLink = new HttpLink({ uri: HTTP_URI });
 
+    // Attach the JWT from localStorage to every HTTP request.
+    // Read inside setContext so we always pick up the freshest token
+    // after login / refresh — not the one at module load time.
+    const authLink = setContext((_, { headers }) => {
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('@token') : null;
+      return {
+        headers: {
+          ...headers,
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+      };
+    });
+
     if (typeof window === 'undefined') {
+      // SSR: no WebSocket, no auth token — just HTTP.
       return new ApolloClient({ link: httpLink, cache: new InMemoryCache() });
     }
 
@@ -37,7 +52,7 @@ const WS_URI = 'ws://localhost:5000/graphql';
       }),
     );
 
-    // Subscriptions go over WS, queries and mutations stay on HTTP.
+    // Subscriptions go over WS; queries/mutations go through authLink → HTTP.
     const link = split(
       ({ query }) => {
         const def = getMainDefinition(query);
@@ -47,7 +62,7 @@ const WS_URI = 'ws://localhost:5000/graphql';
         );
       },
       wsLink,
-      httpLink,
+      from([authLink, httpLink]),
     );
 
     return new ApolloClient({ link, cache: new InMemoryCache() });
