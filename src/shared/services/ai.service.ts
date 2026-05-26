@@ -197,6 +197,21 @@ const QUESTION_PREFIX_RE =
 const SEARCH_VERB_RE =
   /\b(?:find|busco|necesito|need|show\s+me|muéstrame|muestrame|recomi[ée]ndame|recommend|encu[ée]ntrame|plan\s+(?:a|me)|i\s+want|quiero|book)\b/i;
 
+/**
+ * Detects when the user is explicitly asking for provider results or options
+ * to be shown — in both English and Spanish. Used as an exception to the rule
+ * that keeps intent = 'chat' when providers have already been shown on screen.
+ * Without this, "show me more options" after a conversation would stay in chat
+ * mode and never trigger a new search.
+ */
+const EXPLICIT_RESULTS_RE =
+  /\b(?:show\s+(?:me\s+)?(?:more\s+)?(?:results?|options?|providers?|suppliers?)|find\s+(?:me\s+)?(?:more\s+|other\s+|different\s+)?(?:options?|providers?|suppliers?)|search\s+(?:for\s+)?(?:more\s+)?(?:options?|providers?)|more\s+(?:options?|results?|providers?)|different\s+(?:options?|providers?)|other\s+(?:options?|providers?|alternatives?)|muéstrame|muestrame|muéstr[áa]me|b[uú]sca(?:me)?|ver\s+(?:m[áa]s\s+)?(?:opciones?|resultados?|proveedores?)|m[áa]s\s+(?:opciones?|resultados?|proveedores?)|otras?\s+(?:opciones?|proveedores?)|diferentes?\s+(?:opciones?|proveedores?)|dame\s+(?:m[áa]s\s+)?(?:opciones?|resultados?|proveedores?))\b/i;
+
+/** True when the user is explicitly requesting results/options to be shown. */
+export function wantsMoreResults(message: string): boolean {
+  return EXPLICIT_RESULTS_RE.test(message.trim());
+}
+
 // Allow camelCase names like "PikiTiki" or "DJCarlos" — the first char must be
 // uppercase, then anything until a word boundary (no lowercase-only constraint).
 // Matches provider-style proper names only — excludes plain one-word brand names
@@ -326,7 +341,7 @@ export function looksLikeNetworkInquiry(message: string): boolean {
  * mode where the grounding block answers the question from known data.
  */
 const REFERENTIAL_NETWORK_RE =
-  /\b(?:those|these|them|that\s+one|this\s+one)\b.{0,80}\b(?:(?:in|on|from)\s+(?:our|your|su|nuestra)\s+(?:network|red)|en\s+(?:nuestra|la)\s+red)\b/is;
+  /\b(?:those|these|them|that\s+one|this\s+one)\b.{0,80}\b(?:(?:in|on|from)\s+(?:our|your|su|nuestra)\s+(?:network|red)|en\s+(?:nuestra|la)\s+red)\b/i;
 
 /** @internal exported for unit tests */
 export function referencesShownResultsAboutNetwork(message: string): boolean {

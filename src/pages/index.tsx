@@ -34,6 +34,7 @@ import { packageAtom, packageKey } from '@/shared/jotai/package.atom';
 import {
   parseQueryWithAi,
   generateProvidersWithAi,
+  wantsMoreResults,
   type ParsedQuery,
 } from '@/shared/services/ai.service';
 import {
@@ -796,6 +797,10 @@ export default function Home() {
   // The conversation id of the in-flight turn — handleStop needs it to roll
   // the aborted turn back server-side (closure-safe; refs don't go stale).
   const activeTurnConvIdRef = React.useRef<string | null>(null);
+  // Tracks whether the current turn CREATED a new conversation (as opposed to
+  // continuing an existing one). handleStop uses this to decide whether to
+  // delete the whole conversation vs. just rolling back the user message.
+  const wasNewConvThisTurnRef = React.useRef<string | null>(null);
 
   // ── Request creation (from "Select" on a provider card) ────────────────
   const { user, isAuthenticated } = React.useContext(AuthContext);
@@ -1126,6 +1131,9 @@ export default function Home() {
           skipNextMessageLoadRef.current = convId;
           setCurrentConvId(convId);
           setConversations((prev) => [conv, ...prev]);
+          // Mark this as a fresh conversation so handleStop knows to delete the
+          // whole thing (not just rollback one message) if the user cancels.
+          wasNewConvThisTurnRef.current = convId;
         }
         // Record the turn's conversation id so handleStop can roll it back.
         activeTurnConvIdRef.current = convId;
@@ -1144,6 +1152,23 @@ export default function Home() {
           signal,
         );
         const parsed = parseResult.parsed;
+
+        // ── Post-parse override: keep chat mode when providers already shown ──
+        // Once cards are on screen, follow-up messages are almost always
+        // conversational ("where is the first one?", "which is cheapest?").
+        // We only break out of chat mode when the user EXPLICITLY asks for
+        // a new search ("show me more options", "busca otras opciones", etc.).
+        if (
+          recentGrounding &&
+          parsed.intent === 'service_request' &&
+          !wantsMoreResults(content)
+        ) {
+          parsed.intent = 'chat';
+          // eslint-disable-next-line no-console
+          console.log(
+            '[intent] overridden → chat (providers shown + no explicit re-search request)',
+          );
+        }
 
         let aiResult: Awaited<ReturnType<typeof apiSendMessage>>;
         let provData: { parsed: ParsedQuery; providers: ProviderData[] } | null =
@@ -1437,13 +1462,41 @@ export default function Home() {
         : prev,
     );
 
-    // And undo it server-side (best-effort — fire and forget).
     const convId = activeTurnConvIdRef.current;
+    activeTurnConvIdRef.current = null;
+
+    if (wasNewConvThisTurnRef.current === convId && convId) {
+      // The user cancelled on the VERY FIRST message of a brand-new conversation.
+      // The conversation exists in the DB with a title but no messages —
+      // delete it entirely so it doesn't linger as a ghost in the sidebar.
+      wasNewConvThisTurnRef.current = null;
+      apiDeleteConversation(convId).catch(() => {/* best-effort */});
+      setConversations((prev) => prev.filter((c) => c.conversationId !== convId));
+      setCurrentConvId(null);
+      return;
+    }
+    wasNewConvThisTurnRef.current = null;
+
+    // Existing conversation — just roll back the user message server-side.
     if (convId) {
       rollbackLastTurn(convId).catch(() => {/* non-critical */});
     }
-    activeTurnConvIdRef.current = null;
   }, []);
+
+  // ── "See options" suggestion chip ─────────────────────────────────────
+  // After 2+ assistant replies with no cards, offer a shortcut so the user
+  // doesn't have to type "show me options" manually.
+  const shouldOfferOptions = React.useMemo(() => {
+    if (waitingForAI) return false;
+    const assistantMsgs = messages.filter((m) => m.role === 'assistant');
+    if (assistantMsgs.length < 2) return false;
+    const lastMsg = assistantMsgs[assistantMsgs.length - 1];
+    return !lastMsg.providers || lastMsg.providers.length === 0;
+  }, [messages, waitingForAI]);
+
+  const handleShowOptions = React.useCallback(() => {
+    handleSend('show me available options');
+  }, [handleSend]);
 
   // ── Go back to hero landing ────────────────────────────────────────────
   const handleGoHome = React.useCallback(() => {
@@ -1932,6 +1985,7 @@ export default function Home() {
           disabled={waitingForAI}
           model={currentModel}
           onModelChange={setCurrentModel}
+          onShowOptions={shouldOfferOptions ? handleShowOptions : undefined}
         />
       </Flex>
 
