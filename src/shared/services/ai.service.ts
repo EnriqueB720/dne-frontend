@@ -204,8 +204,37 @@ const SEARCH_VERB_RE =
  * Without this, "show me more options" after a conversation would stay in chat
  * mode and never trigger a new search.
  */
-const EXPLICIT_RESULTS_RE =
-  /\b(?:show\s+(?:me\s+)?(?:more\s+)?(?:results?|options?|providers?|suppliers?)|find\s+(?:me\s+)?(?:more\s+|other\s+|different\s+)?(?:options?|providers?|suppliers?)|search\s+(?:for\s+)?(?:more\s+)?(?:options?|providers?)|more\s+(?:options?|results?|providers?)|different\s+(?:options?|providers?)|other\s+(?:options?|providers?|alternatives?)|muéstrame|muestrame|muéstr[áa]me|b[uú]sca(?:me)?|ver\s+(?:m[áa]s\s+)?(?:opciones?|resultados?|proveedores?)|m[áa]s\s+(?:opciones?|resultados?|proveedores?)|otras?\s+(?:opciones?|proveedores?)|diferentes?\s+(?:opciones?|proveedores?)|dame\s+(?:m[áa]s\s+)?(?:opciones?|resultados?|proveedores?))\b/i;
+// Optional adjectives that can appear between "me" / "nos" and the result noun:
+// "show me available options", "show me more affordable providers", etc.
+const _ADJ = '(?:(?:more|available|other|different|new|cheap|affordable|better|other|additional|alternative|nearby|local)\\s+)*';
+
+const EXPLICIT_RESULTS_RE = new RegExp(
+  '\\b(?:' +
+  // English — "show me (adj*) results/options/providers"
+  `show\\s+(?:me\\s+)?${_ADJ}(?:results?|options?|providers?|suppliers?)|` +
+  // English — "find me (adj*) options"
+  `find\\s+(?:me\\s+)?${_ADJ}(?:options?|providers?|suppliers?)|` +
+  // English — "search for (adj*) options"
+  `search\\s+(?:for\\s+)?${_ADJ}(?:options?|providers?|results?)|` +
+  // English — bare adjectives: "more options", "different providers"
+  `(?:more|different|other)\\s+(?:options?|results?|providers?)|` +
+  // English — "can you show me …" / "could you find me …" (polite conversational)
+  `(?:can|could|please)\\s+(?:you\\s+)?(?:show|find|search|give)\\s+(?:me\\s+)?${_ADJ}(?:results?|options?|providers?|suppliers?)|` +
+  // Spanish — imperative show verbs
+  'mu[eé]str[aá]me|muestrame|mu[eé]str[aá]nos|' +
+  // Spanish — "busca(me) / buscar opciones"
+  'b[uú]sca(?:me|nos)?|buscar\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "ver (más) opciones / resultados"
+  'ver\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "más opciones / resultados"
+  'm[aá]s\\s+(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "otras / diferentes opciones"
+  'otras?\\s+(?:opciones?|proveedores?)|diferentes?\\s+(?:opciones?|proveedores?)|' +
+  // Spanish — "dame (más) opciones"
+  'dame\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)' +
+  ')\\b',
+  'i',
+);
 
 /** True when the user is explicitly requesting results/options to be shown. */
 export function wantsMoreResults(message: string): boolean {
@@ -449,6 +478,12 @@ export async function parseQueryWithAi(
       !SEARCH_VERB_RE.test(lastTurn)
     ) {
       intent = 'network_inquiry';
+    } else if (wantsMoreResults(lastTurn)) {
+      // "show me more options / can you find me other providers / muéstrame…"
+      // The LLM often classifies these as `chat` when phrased politely or when
+      // they follow a conversational exchange. We deterministically force
+      // service_request so the search pipeline always runs.
+      intent = 'service_request';
     }
 
     // Deterministic location override: if the user explicitly typed a place

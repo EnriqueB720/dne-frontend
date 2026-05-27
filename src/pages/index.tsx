@@ -1153,16 +1153,20 @@ export default function Home() {
         );
         const parsed = parseResult.parsed;
 
-        // ── Post-parse override: keep chat mode when providers already shown ──
+        // ── Post-parse override: chat ↔ service_request when providers shown ──
         // Once cards are on screen, follow-up messages are almost always
-        // conversational ("where is the first one?", "which is cheapest?").
-        // We only break out of chat mode when the user EXPLICITLY asks for
-        // a new search ("show me more options", "busca otras opciones", etc.).
-        if (
-          recentGrounding &&
-          parsed.intent === 'service_request' &&
-          !wantsMoreResults(content)
-        ) {
+        // conversational. We stay in chat UNLESS the user explicitly asks for
+        // more ("show me more options", "busca otras opciones", etc.).
+        // wantsMoreResults also acts as a safety net: parseQueryWithAi already
+        // applies this override deterministically, but if for any reason the LLM
+        // result made it through as chat, we correct it here too.
+        if (wantsMoreResults(content)) {
+          if (parsed.intent === 'chat') {
+            parsed.intent = 'service_request';
+            // eslint-disable-next-line no-console
+            console.log('[intent] overridden → service_request (explicit results request)');
+          }
+        } else if (recentGrounding && parsed.intent === 'service_request') {
           parsed.intent = 'chat';
           // eslint-disable-next-line no-console
           console.log(
@@ -1495,7 +1499,9 @@ export default function Home() {
   }, [messages, waitingForAI]);
 
   const handleShowOptions = React.useCallback(() => {
-    handleSend('show me available options');
+    // Send a phrase that wantsMoreResults() unambiguously matches, so the
+    // post-parse override correctly routes this to service_request.
+    handleSend('show me options');
   }, [handleSend]);
 
   // ── Go back to hero landing ────────────────────────────────────────────
