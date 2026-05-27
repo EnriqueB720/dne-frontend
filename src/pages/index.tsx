@@ -35,6 +35,7 @@ import {
   parseQueryWithAi,
   generateProvidersWithAi,
   wantsMoreResults,
+  wantsOutsideNetwork,
   type ParsedQuery,
 } from '@/shared/services/ai.service';
 import {
@@ -1258,7 +1259,11 @@ export default function Home() {
           );
           // provData stays null — informational answer, no cards rendered.
         } else {
-          // ── Service request: DB-first, AI fills only the gap ───────────
+          // ── Service request ────────────────────────────────────────────
+          // Detect "outside network" early — when set we skip the DB entirely
+          // and fill all slots with AI-suggested general-market providers.
+          const outsideNetwork = wantsOutsideNetwork(content);
+
           const rawLocation = (parsed.location || '').trim();
           const normalizedCity = rawLocation
             .split(',')[0]
@@ -1267,51 +1272,55 @@ export default function Home() {
           const guests = parsed.people
             ? parseInt(parsed.people.replace(/\D/g, ''), 10)
             : NaN;
-          const searchVars = {
-            serviceQuery: parsed.service?.trim() || null,
-            city: normalizedCity || null,
-            guestCount:
-              Number.isFinite(guests) && guests > 0 ? guests : null,
-            limit: TOTAL_CARDS,
-          };
-          // eslint-disable-next-line no-console
-          console.log('[DB] searchSuppliers input:', searchVars);
 
-          // Step 2: DB search (awaited up front — it's fast, and the chat
-          // AI needs the results to answer without contradicting the cards).
-          // The backend handles location matching: accent-insensitive,
-          // city-matches ranked first, and it degrades gracefully to
-          // "service matches elsewhere" rather than returning nothing — so
-          // no client-side retry is needed.
-          let dbSuppliers: any[] = [];
-          try {
-            const res = await searchSuppliers({
-              variables: { data: searchVars as any },
-              context: { fetchOptions: { signal } },
-            });
-            dbSuppliers = res?.data?.searchSuppliers ?? [];
-          } catch (dbErr) {
-            if (!signal.aborted) {
-              // eslint-disable-next-line no-console
-              console.error('[DB] searchSuppliers ERROR:', dbErr);
+          // Step 2: DB search — skipped when user explicitly wants results
+          // outside the Solvo network.
+          let dbProviders: ProviderData[] = [];
+          if (!outsideNetwork) {
+            const searchVars = {
+              serviceQuery: parsed.service?.trim() || null,
+              city: normalizedCity || null,
+              guestCount:
+                Number.isFinite(guests) && guests > 0 ? guests : null,
+              limit: TOTAL_CARDS,
+            };
+            // eslint-disable-next-line no-console
+            console.log('[DB] searchSuppliers input:', searchVars);
+
+            // The backend handles location matching: accent-insensitive,
+            // city-matches ranked first, degrades gracefully to service
+            // matches elsewhere — no client-side retry needed.
+            let dbSuppliers: any[] = [];
+            try {
+              const res = await searchSuppliers({
+                variables: { data: searchVars as any },
+                context: { fetchOptions: { signal } },
+              });
+              dbSuppliers = res?.data?.searchSuppliers ?? [];
+            } catch (dbErr) {
+              if (!signal.aborted) {
+                // eslint-disable-next-line no-console
+                console.error('[DB] searchSuppliers ERROR:', dbErr);
+              }
             }
+            dbProviders = dbSuppliers.map((s, i) =>
+              dbSupplierToProviderData(s, i),
+            );
+          } else {
+            // eslint-disable-next-line no-console
+            console.log('[intent] outside-network request — skipping DB search');
           }
 
-          const dbProviders = dbSuppliers.map((s, i) =>
-            dbSupplierToProviderData(s, i),
-          );
-          // Strict: DB results are authoritative. AI only fills the gap up
-          // to TOTAL_CARDS — and not at all when the DB already covers it.
-          const needFromAi = Math.max(0, TOTAL_CARDS - dbProviders.length);
+          // Step 3: AI top-up. For outside-network requests, fill ALL slots.
+          // For normal requests, fill only the gap the DB left.
+          const needFromAi = outsideNetwork
+            ? TOTAL_CARDS
+            : Math.max(0, TOTAL_CARDS - dbProviders.length);
           // eslint-disable-next-line no-console
           console.log(
-            `[providers] db=${dbProviders.length} needFromAi=${needFromAi}`,
+            `[providers] db=${dbProviders.length} needFromAi=${needFromAi} outsideNetwork=${outsideNetwork}`,
           );
 
-          // Step 3: AI top-up sized to exactly the gap. Awaited BEFORE the
-          // chat reply so the chat AI knows the final card count — otherwise
-          // it hedges with "hold on a moment..." and the user waits for
-          // results that already (didn't) arrive.
           let fillRes: Awaited<ReturnType<typeof generateProvidersWithAi>> | null =
             null;
           if (needFromAi > 0) {
@@ -1322,6 +1331,7 @@ export default function Home() {
                 locationForThisTurn,
                 needFromAi,
                 signal,
+                outsideNetwork,
               );
             } catch (err) {
               // Suppress noise for intentional user-stop — the outer catch
@@ -1495,7 +1505,13 @@ export default function Home() {
     const assistantMsgs = messages.filter((m) => m.role === 'assistant');
     if (assistantMsgs.length < 2) return false;
     const lastMsg = assistantMsgs[assistantMsgs.length - 1];
-    return !lastMsg.providers || lastMsg.providers.length === 0;
+    if (lastMsg.providers && lastMsg.providers.length > 0) return false;
+    // Suppress when the user's last message was already an explicit results
+    // request — the AI just responded to it (even if no cards appeared); showing
+    // the chip again would create a confusing "ask → nothing → chip → ask" loop.
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg && wantsMoreResults(lastUserMsg.content)) return false;
+    return true;
   }, [messages, waitingForAI]);
 
   const handleShowOptions = React.useCallback(() => {
