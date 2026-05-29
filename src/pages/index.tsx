@@ -98,9 +98,11 @@ RULES — follow exactly:
    - If found in either place, answer using that data. Do not invent addresses, hours, or services that are not in the data.
    - If genuinely not found in the blocks OR the conversation history, say you don't have detailed info on it and offer to search. Never make up the answer.
    - NEVER guess what category a named provider belongs to. Use ONLY the data you have.
-   - NETWORK STATUS (CRITICAL — do NOT lie about this): Every provider in the context blocks carries a "network:" field.
-     • "network: VERIFIED — in Solvo network" → real, verified Solvo supplier. You may say it is in our network.
-     • "network: AI SUGGESTION — NOT in Solvo network" → an AI-generated illustrative example, NOT a real Solvo partner. If the user asks whether these providers are in our network, you MUST say honestly they are NOT — they are AI-generated suggestions, not verified suppliers. Never claim an AI suggestion is a Solvo network partner.
+   - NETWORK STATUS (CRITICAL — two separate rules, both non-negotiable):
+     RULE A — Per-provider honesty: Every provider in the context blocks has a "network:" field.
+       • "network: VERIFIED — in Solvo network" → real verified supplier. You may confirm it is in our network.
+       • "network: AI SUGGESTION — NOT in Solvo network" → AI-generated example, not a real Solvo partner. Never claim it IS in the network.
+     RULE B — Never extrapolate emptiness: Seeing AI SUGGESTION cards does NOT mean the Solvo network lacks that service. The DB may simply not have been searched (e.g. the user requested outside-network options), or results may be in nearby areas. You are ONLY allowed to say "we have no [service] in our network" when a ## Network lookup block EXPLICITLY states 0 DB results for that service. Without that block, say "I'd need to search our network to check" — never assume absence.
 6. QUESTIONS: Ask at most ONE clarifying question per turn.
 7. FORMAT: No bullet points, no markdown headers, no numbered lists.
 
@@ -265,7 +267,13 @@ function buildProviderGrounding(messages: UiMessage[]): string {
  */
 function groundingContext(grounding: string): string {
   if (!grounding) return '';
-  return `## Known providers (answer questions about these specific businesses using ONLY this data — do not invent details):\n${grounding}`;
+  return (
+    `## Known providers (answer questions about these specific businesses using ONLY this data — do not invent details):\n${grounding}\n\n` +
+    `REMINDER: Any "network: AI SUGGESTION" labels above mean those SPECIFIC CARDS were AI-generated examples — ` +
+    `they do NOT mean the Solvo network is empty of that service. ` +
+    `If the user asks whether Solvo has [service] providers, say you'd need to run a search to confirm — ` +
+    `never assert the network lacks a category just because the shown cards are AI suggestions.`
+  );
 }
 
 /**
@@ -277,6 +285,7 @@ function groundingContext(grounding: string): string {
 function searchResultContext(
   providers: ProviderData[],
   parsed: ParsedQuery,
+  outsideNetwork = false,
 ): string {
   const count = providers.length;
   const requestLine = [
@@ -316,11 +325,19 @@ function searchResultContext(
   // can frame them correctly ("we found X in our network plus Y suggestions").
   const verifiedCount = providers.filter((p) => p.isRealSupplier).length;
   const aiCount = count - verifiedCount;
+
+  // When the user explicitly requested outside-network results, the DB was
+  // intentionally skipped — the AI MUST NOT interpret "all AI suggestions"
+  // as "the Solvo network has no providers for this service."
+  const outsideNetworkWarning = outsideNetwork
+    ? ` OUTSIDE-NETWORK SEARCH: The Solvo supplier database was intentionally skipped this turn because the user asked for non-network options. There may well be verified Solvo partners for this service — the DB simply was not queried. Do NOT tell the user the Solvo network lacks providers for this service.`
+    : '';
+
   const networkSummary =
     verifiedCount === count
       ? `All ${count} are verified Solvo suppliers.`
       : aiCount === count
-        ? `All ${count} are AI-generated suggestions (NOT in the Solvo network).`
+        ? `All ${count} are AI-generated suggestions (NOT in the Solvo network).${outsideNetworkWarning}`
         : `${verifiedCount} verified Solvo supplier${verifiedCount === 1 ? '' : 's'} + ${aiCount} AI-generated suggestion${aiCount === 1 ? '' : 's'} (not in network).`;
 
   return (
@@ -1426,7 +1443,7 @@ export default function Home() {
           // Include the previous providers as secondary context so the AI
           // can acknowledge continuity ("switching from the DJs you saw…")
           // without contradicting the new results it's about to introduce.
-          const resultCtx = searchResultContext(merged, parsed)
+          const resultCtx = searchResultContext(merged, parsed, outsideNetwork)
             + (recentGrounding
               ? `\n\n## Previously shown in this conversation (for continuity — focus on the NEW results above):\n${recentGrounding}`
               : '');
