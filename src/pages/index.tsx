@@ -1577,10 +1577,12 @@ export default function Home() {
     const lastMsg = assistantMsgs[assistantMsgs.length - 1];
     if (lastMsg.providers && lastMsg.providers.length > 0) return false;
     // Suppress when the user's last message was already an explicit results
-    // request — the AI just responded to it (even if no cards appeared); showing
-    // the chip again would create a confusing "ask → nothing → chip → ask" loop.
+    // request or an outside-network search — showing the chip again would
+    // create a confusing "ask → nothing → chip → ask" loop.
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-    if (lastUserMsg && wantsMoreResults(lastUserMsg.content)) return false;
+    if (!lastUserMsg) return true;
+    if (wantsMoreResults(lastUserMsg.content)) return false;
+    if (wantsOutsideNetwork(lastUserMsg.content)) return false;
     return true;
   }, [messages, waitingForAI]);
 

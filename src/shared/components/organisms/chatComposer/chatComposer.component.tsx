@@ -35,12 +35,20 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
   const recognitionRef = React.useRef<any>(null);
   const [isListening, setIsListening] = React.useState(false);
   const [micSupported, setMicSupported] = React.useState(false);
+  // Default to Spanish (Costa Rica) since the app is bilingual but CR-first.
+  // Users can toggle to English with the ES/EN pill in the toolbar.
+  const [micLang, setMicLang] = React.useState<'es-CR' | 'en-US'>('es-CR');
 
   React.useEffect(() => {
     const SR =
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
     setMicSupported(!!SR);
+    // Respect the browser's language if it's English — the user likely expects
+    // English recognition by default on an EN browser.
+    if (typeof navigator !== 'undefined' && navigator.language && !navigator.language.startsWith('es')) {
+      setMicLang('en-US');
+    }
   }, []);
 
   // Stop listening automatically if the AI starts responding.
@@ -82,9 +90,8 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
     const recognition = new SR();
     recognition.continuous = false;
     recognition.interimResults = true;
-    // Use the browser's preferred language (works for both English and Spanish
-    // users) — falls back to Spanish (Costa Rica) if none is set.
-    recognition.lang = navigator.language || 'es-CR';
+    // Use the language the user selected via the ES/EN toggle.
+    recognition.lang = micLang;
 
     recognition.onresult = (event: any) => {
       let finalTranscript = '';
@@ -245,7 +252,11 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
               onClick={toggleListening}
               disabled={disabled}
               aria-label={isListening ? 'Stop recording' : 'Start voice input'}
-              title={isListening ? 'Stop recording' : 'Speak your message'}
+              title={
+                isListening
+                  ? 'Stop recording'
+                  : `Speak your message (${micLang === 'es-CR' ? 'Spanish / ES' : 'English / EN'})`
+              }
               style={{
                 width: '32px',
                 height: '32px',
@@ -317,7 +328,7 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
           )}
         </Box>
 
-        {/* Model picker row */}
+        {/* Model picker + voice language row */}
         <Flex align="center" gap="8px" wrap="wrap">
           <Text fontSize="11px" color={solvoColors.textSubtle}>
             Model:
@@ -349,6 +360,45 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
           <Text fontSize="11px" color={solvoColors.textSubtle} marginLeft="4px">
             · {MODEL_META[model].fullName}
           </Text>
+
+          {/* Voice language toggle — only shown when the browser supports the mic */}
+          {micSupported && (
+            <>
+              <Text fontSize="11px" color={solvoColors.textSubtle} marginLeft="8px">
+                · 🎤
+              </Text>
+              {(['es-CR', 'en-US'] as const).map((lang) => {
+                const selected = micLang === lang;
+                const label = lang === 'es-CR' ? 'ES' : 'EN';
+                return (
+                  <button
+                    key={lang}
+                    onClick={() => !isListening && !disabled && setMicLang(lang)}
+                    disabled={disabled || isListening}
+                    title={
+                      lang === 'es-CR'
+                        ? 'Voice input in Spanish'
+                        : 'Voice input in English'
+                    }
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '999px',
+                      fontSize: '11px',
+                      fontWeight: 500,
+                      cursor: disabled || isListening ? 'not-allowed' : 'pointer',
+                      border: `1px solid ${selected ? solvoColors.indigo : solvoColors.border}`,
+                      background: selected ? solvoColors.indigo : 'transparent',
+                      color: selected ? 'white' : solvoColors.textMuted,
+                      opacity: disabled || isListening ? 0.5 : 1,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </Flex>
       </Box>
     </Box>
