@@ -205,7 +205,7 @@ const SEARCH_VERB_RE =
  * labelled as non-verified general-market options).
  */
 const OUTSIDE_NETWORK_RE =
-  /\b(?:outside\s+(?:your|the|our|su)\s+(?:network|red)|beyond\s+(?:your|the|our)\s+(?:network|red)|not\s+(?:from|in)\s+(?:your|the|our|su)\s+(?:network|red)|from\s+(?:the\s+)?(?:internet|web|google|el\s+mercado|outside)|fuera\s+de\s+(?:tu|su|nuestra|la)\s+red|no\s+en\s+(?:tu|su|nuestra|la)\s+red|en\s+(?:internet|la\s+web|el\s+mercado)|del\s+mercado\s+(?:general|en\s+general)|general\s+market)\b/i;
+  /\b(?:outside\s+(?:of\s+)?(?:your|the|our|su)\s+(?:network|red)|beyond\s+(?:of\s+)?(?:your|the|our)\s+(?:network|red)|not\s+(?:from|in)\s+(?:your|the|our|su)\s+(?:network|red)|from\s+(?:the\s+)?(?:internet|web|google|el\s+mercado|outside)|fuera\s+de\s+(?:tu|su|nuestra|la)\s+red|no\s+en\s+(?:tu|su|nuestra|la)\s+red|en\s+(?:internet|la\s+web|el\s+mercado)|del\s+mercado\s+(?:general|en\s+general)|general\s+market)\b/i;
 
 /** True when the user is asking to search beyond the Solvo supplier network. */
 export function wantsOutsideNetwork(message: string): boolean {

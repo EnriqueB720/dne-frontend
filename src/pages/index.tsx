@@ -58,6 +58,15 @@ import Link from 'next/link';
 import AuthContext from '@/shared/contexts/auth.context';
 import { useUserLocation } from '@hooks';
 
+// ── Helpers for post-parse intent override ─────────────────────────────────
+//
+// When the user's message contains an explicit search/action verb ("look",
+// "find", "show", "need", etc.) it's almost certainly a NEW search request —
+// even if providers are already on screen. We must NOT downgrade it to `chat`
+// just because recentGrounding exists. This regex guards that case.
+const SEARCH_ACTION_RE =
+  /\b(?:look(?:\s+(?:for|inside|at|around))?|search(?:\s+for)?|find(?:\s+me)?|show(?:\s+me)?|get(?:\s+me)?|give(?:\s+me)?|need|want|looking(?:\s+for)?|b[uú]sca(?:me|nos|r)?|necesito|quiero|dame|mu[eé]str[aá](?:me|nos)?)\b/i;
+
 // ── System prompt for chat AI ──────────────────────────────────────────────
 const SOLVO_CHAT_SYSTEM_PROMPT = `You are Solvo, an AI concierge for a service marketplace in Costa Rica.
 
@@ -1155,24 +1164,31 @@ export default function Home() {
         const parsed = parseResult.parsed;
 
         // ── Post-parse override: chat ↔ service_request when providers shown ──
-        // Once cards are on screen, follow-up messages are almost always
-        // conversational. We stay in chat UNLESS the user explicitly asks for
-        // more ("show me more options", "busca otras opciones", etc.).
-        // wantsMoreResults also acts as a safety net: parseQueryWithAi already
-        // applies this override deterministically, but if for any reason the LLM
-        // result made it through as chat, we correct it here too.
-        if (wantsMoreResults(content)) {
-          if (parsed.intent === 'chat') {
+        // Layer 1 (upgrade): if the user explicitly asks for results or to
+        // search outside the network, force service_request regardless of what
+        // the LLM said. parseQueryWithAi already does this deterministically,
+        // but this is a second safety net for any that slipped through.
+        if (wantsMoreResults(content) || wantsOutsideNetwork(content)) {
+          if (parsed.intent !== 'service_request') {
             parsed.intent = 'service_request';
             // eslint-disable-next-line no-console
-            console.log('[intent] overridden → service_request (explicit results request)');
+            console.log('[intent] overridden → service_request (explicit results/outside-network request)');
           }
         } else if (recentGrounding && parsed.intent === 'service_request') {
-          parsed.intent = 'chat';
-          // eslint-disable-next-line no-console
-          console.log(
-            '[intent] overridden → chat (providers shown + no explicit re-search request)',
-          );
+          // Layer 2 (downgrade): once providers are on screen, most follow-ups
+          // are conversational. BUT only downgrade when the message contains NO
+          // action verb — "look inside Costa Rica", "find me options", "show me
+          // DJs" are new searches and must stay as service_request. Purely
+          // conversational phrasing ("which is cheapest?", "tell me more about
+          // it") contains no such verb and is safe to downgrade.
+          if (!SEARCH_ACTION_RE.test(content)) {
+            parsed.intent = 'chat';
+            // eslint-disable-next-line no-console
+            console.log('[intent] overridden → chat (conversational follow-up — no action verb)');
+          } else {
+            // eslint-disable-next-line no-console
+            console.log('[intent] kept service_request (action verb present despite recentGrounding)');
+          }
         }
 
         let aiResult: Awaited<ReturnType<typeof apiSendMessage>>;

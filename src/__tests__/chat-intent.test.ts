@@ -20,6 +20,8 @@ import {
   _referencesShownResults,
   _looksLikeQuestionAboutNamedEntity,
   detectExplicitLocation,
+  wantsOutsideNetwork,
+  wantsMoreResults,
 } from '../shared/services/ai.service';
 
 // ─── A. referencesShownResultsAboutNetwork ────────────────────────────────────
@@ -296,6 +298,100 @@ describe('buildProviderGrounding', () => {
 
   test('returns empty string when messages array is empty', () => {
     expect(buildProviderGrounding([])).toBe('');
+  });
+});
+
+// ─── H. wantsOutsideNetwork ──────────────────────────────────────────────────
+
+describe('wantsOutsideNetwork', () => {
+  const YES = [
+    // English — "outside of" with "of" between "outside" and possessive
+    'please show me DJs outside of our network',
+    'show me options outside of your network',
+    'find providers outside of the network',
+    // English — without "of"
+    'show me DJs outside our network',
+    'options outside your network',
+    'search outside the network',
+    // English — other phrasings
+    'not in your network',
+    'not from our network',
+    'from the internet',
+    'from the web',
+    'from google',
+    'general market',
+    // Spanish
+    'fuera de tu red',
+    'fuera de la red',
+    'fuera de nuestra red',
+    'en internet',
+    'en la web',
+  ];
+
+  const NO = [
+    // Asking about our network (should be network_inquiry)
+    'are there DJs in our network?',
+    'do you have suppliers in your network?',
+    // Normal service requests
+    'I need catering in Santa Ana',
+    'find me a DJ',
+    'show me more options',
+    // Referential follow-up
+    'which of those are in our network?',
+  ];
+
+  test.each(YES)('"%s" → true', (input) => {
+    expect(wantsOutsideNetwork(input)).toBe(true);
+  });
+
+  test.each(NO)('"%s" → false', (input) => {
+    expect(wantsOutsideNetwork(input)).toBe(false);
+  });
+});
+
+// ─── I. wantsMoreResults ──────────────────────────────────────────────────────
+
+describe('wantsMoreResults', () => {
+  const YES = [
+    'show me options',
+    'show me more options',
+    'show me available options',
+    'show me other providers',
+    'find me options',
+    'search for options',
+    'more options',
+    'different providers',
+    'can you show me more options',
+    'could you find me results',
+    'muéstrame',
+    'muestrame',
+    'búscame opciones',
+    'ver opciones',
+    'más opciones',
+    'otras opciones',
+    'dame más opciones',
+  ];
+
+  const NO = [
+    // Conversational follow-ups
+    'which is cheapest?',
+    'where is PikiTiki?',
+    'tell me more about the first one',
+    'compare the first and last',
+    // Normal new searches without explicit results vocabulary
+    'I need catering for 20 people',
+    'find me a DJ in Heredia',
+    'look inside Costa Rica',
+    // Outside-network (handled separately)
+    'show me DJs outside of our network',
+  ];
+
+  test.each(YES)('"%s" → true', (input) => {
+    expect(wantsMoreResults(input)).toBe(true);
+  });
+
+  test.each(NO)('"%s" → false', (input) => {
+    expect(wantsMoreResults(input)).toBe(false);
   });
 });
 
