@@ -353,16 +353,38 @@ describe('wantsOutsideNetwork', () => {
 
 describe('wantsMoreResults', () => {
   const YES = [
+    // Core English patterns
     'show me options',
     'show me more options',
     'show me available options',
     'show me other providers',
+    'show more',
     'find me options',
+    'find me more providers',
     'search for options',
     'more options',
     'different providers',
     'can you show me more options',
     'could you find me results',
+    // "any more / any others"
+    'any more options?',
+    'any others?',
+    'any options?',
+    'are there any more providers?',
+    'are there more results?',
+    // "can I see more"
+    'can I see more options?',
+    'can I see more?',
+    // "what else / anything else"
+    'what else do you have?',
+    'what else is available?',
+    'what else can you find?',
+    'anything else available?',
+    'anything else?',
+    // "got any more"
+    'got any more options?',
+    'got other providers?',
+    // Spanish core
     'muéstrame',
     'muestrame',
     'búscame opciones',
@@ -370,20 +392,40 @@ describe('wantsMoreResults', () => {
     'más opciones',
     'otras opciones',
     'dame más opciones',
+    // Spanish "hay más / algo más / qué más"
+    'hay más opciones?',
+    'hay opciones?',
+    'algo más?',
+    'qué más tienes?',
+    'qué más hay?',
+    'tienes más opciones?',
+    'tienes opciones?',
+    // Polite Spanish
+    'dame otras opciones',
+    'ver más opciones',
   ];
 
   const NO = [
-    // Conversational follow-ups
+    // Conversational follow-ups — must NOT trigger a new search
     'which is cheapest?',
     'where is PikiTiki?',
     'tell me more about the first one',
     'compare the first and last',
+    'how much does Sabor Catering charge?',
+    'is the first one verified?',
     // Normal new searches without explicit results vocabulary
     'I need catering for 20 people',
     'find me a DJ in Heredia',
     'look inside Costa Rica',
-    // Outside-network (handled separately)
+    'I need AC repair',
+    // Outside-network: "show me DJs outside of our network" — "DJs" is not a
+    // results noun so wantsMoreResults returns false; wantsOutsideNetwork handles it.
+    // "show me options outside of your network" DOES match (contains "show me options")
+    // and that's intentional — both flags fire and the override picks service_request.
     'show me DJs outside of our network',
+    // General questions
+    'how does Solvo work?',
+    'what is included?',
   ];
 
   test.each(YES)('"%s" → true', (input) => {

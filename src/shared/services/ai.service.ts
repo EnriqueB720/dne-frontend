@@ -223,18 +223,35 @@ export function wantsOutsideNetwork(message: string): boolean {
 // "show me available options", "show me more affordable providers", etc.
 const _ADJ = '(?:(?:more|available|other|different|new|cheap|affordable|better|other|additional|alternative|nearby|local)\\s+)*';
 
+// Nouns that refer to a list of results/providers.
+const _NOUN = '(?:options?|results?|providers?|suppliers?|choices?|alternatives?)';
+
 const EXPLICIT_RESULTS_RE = new RegExp(
   '\\b(?:' +
   // English — "show me (adj*) results/options/providers"
-  `show\\s+(?:me\\s+)?${_ADJ}(?:results?|options?|providers?|suppliers?)|` +
+  `show\\s+(?:me\\s+)?${_ADJ}${_NOUN}|` +
+  // English — "show more" (bare)
+  'show\\s+more|' +
   // English — "find me (adj*) options"
-  `find\\s+(?:me\\s+)?${_ADJ}(?:options?|providers?|suppliers?)|` +
+  `find\\s+(?:me\\s+)?${_ADJ}${_NOUN}|` +
   // English — "search for (adj*) options"
-  `search\\s+(?:for\\s+)?${_ADJ}(?:options?|providers?|results?)|` +
+  `search\\s+(?:for\\s+)?${_ADJ}${_NOUN}|` +
   // English — bare adjectives: "more options", "different providers"
-  `(?:more|different|other)\\s+(?:options?|results?|providers?)|` +
+  `(?:more|different|other)\\s+${_NOUN}|` +
+  // English — "any (more) options?", "any others?"
+  `any\\s+(?:more\\s+)?${_NOUN}|any\\s+others?|` +
+  // English — "are there (any) more options?"
+  `are\\s+there\\s+(?:any\\s+)?(?:more\\s+)?${_NOUN}|` +
+  // English — "can/could I see more"
+  `can\\s+I\\s+see\\s+(?:more|${_NOUN}|more\\s+${_NOUN})|` +
+  // English — "what else do you have / is available"
+  'what\\s+else\\s+(?:do\\s+you\\s+have|is\\s+(?:there|available)|can\\s+you\\s+(?:find|show))|' +
+  // English — "anything else (available)?"
+  'anything\\s+else(?:\\s+(?:available|out\\s+there))?|' +
+  // English — "got any more options"
+  `got\\s+(?:any\\s+)?(?:more|other)\\s+${_NOUN}|` +
   // English — "can you show me …" / "could you find me …" (polite conversational)
-  `(?:can|could|please)\\s+(?:you\\s+)?(?:show|find|search|give)\\s+(?:me\\s+)?${_ADJ}(?:results?|options?|providers?|suppliers?)|` +
+  `(?:can|could|please)\\s+(?:you\\s+)?(?:show|find|search|give)\\s+(?:me\\s+)?${_ADJ}${_NOUN}|` +
   // Spanish — imperative show verbs
   'mu[eé]str[aá]me|muestrame|mu[eé]str[aá]nos|' +
   // Spanish — "busca(me) / buscar opciones"
@@ -243,6 +260,12 @@ const EXPLICIT_RESULTS_RE = new RegExp(
   'ver\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)|' +
   // Spanish — "más opciones / resultados"
   'm[aá]s\\s+(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "hay (más) opciones?"
+  'hay\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "algo más", "qué más tienes / hay"
+  'algo\\s+m[aá]s|qu[eé]\\s+m[aá]s\\s+(?:tienes?|hay|tienen)|' +
+  // Spanish — "tienes más opciones?"
+  'tienes?\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)|' +
   // Spanish — "otras / diferentes opciones"
   'otras?\\s+(?:opciones?|proveedores?)|diferentes?\\s+(?:opciones?|proveedores?)|' +
   // Spanish — "dame (más) opciones"

@@ -67,6 +67,16 @@ import { useUserLocation } from '@hooks';
 const SEARCH_ACTION_RE =
   /\b(?:look(?:\s+(?:for|inside|at|around))?|search(?:\s+for)?|find(?:\s+me)?|show(?:\s+me)?|get(?:\s+me)?|give(?:\s+me)?|need|want|looking(?:\s+for)?|b[uú]sca(?:me|nos|r)?|necesito|quiero|dame|mu[eé]str[aá](?:me|nos)?)\b/i;
 
+// ── Context-reset detection ─────────────────────────────────────────────────
+//
+// When the user says "never mind", "forget that", "scratch that", etc., they
+// are explicitly starting fresh. We clear the previous user messages from
+// contextQuery so the parser doesn't bleed old service/category mentions into
+// the new request. Example: "never mind can I also get AC repair" after a DJ
+// search should produce service="AC repair", not service="DJ, catering, AC repair".
+const CONTEXT_CLEAR_RE =
+  /\b(?:never\s+mind|forget\s+(?:that|it|the|those|everything|all)?|scratch\s+that|start\s+over|disregard\s+(?:that|it)|olvida(?:te|lo|los|la|las)?(?:\s+(?:eso|lo\s+anterior|todo))?|deja\s+(?:eso|eso\s+de\s+lado)|al\s+final|better\s+yet|actually\s+no|wait\s+no)\b/i;
+
 // ── System prompt for chat AI ──────────────────────────────────────────────
 const SOLVO_CHAT_SYSTEM_PROMPT = `You are Solvo, an AI concierge for a service marketplace in Costa Rica.
 
@@ -88,6 +98,9 @@ RULES — follow exactly:
    - If found in either place, answer using that data. Do not invent addresses, hours, or services that are not in the data.
    - If genuinely not found in the blocks OR the conversation history, say you don't have detailed info on it and offer to search. Never make up the answer.
    - NEVER guess what category a named provider belongs to. Use ONLY the data you have.
+   - NETWORK STATUS (CRITICAL — do NOT lie about this): Every provider in the context blocks carries a "network:" field.
+     • "network: VERIFIED — in Solvo network" → real, verified Solvo supplier. You may say it is in our network.
+     • "network: AI SUGGESTION — NOT in Solvo network" → an AI-generated illustrative example, NOT a real Solvo partner. If the user asks whether these providers are in our network, you MUST say honestly they are NOT — they are AI-generated suggestions, not verified suppliers. Never claim an AI suggestion is a Solvo network partner.
 6. QUESTIONS: Ask at most ONE clarifying question per turn.
 7. FORMAT: No bullet points, no markdown headers, no numbered lists.
 
@@ -211,8 +224,13 @@ function formatProvidersForGrounding(providers: ProviderData[]): string {
       if (p.phone) parts.push(`phone: ${p.phone}`);
       if (p.email) parts.push(`email: ${p.email}`);
       if (p.website) parts.push(`website: ${p.website}`);
+      // This label is read by the AI to decide whether to claim a provider is
+      // in the Solvo network. Keep the wording consistent with rule 5 of
+      // SOLVO_CHAT_SYSTEM_PROMPT or the AI will not enforce it correctly.
       parts.push(
-        p.isRealSupplier ? 'source: in our network' : 'source: AI suggestion',
+        p.isRealSupplier
+          ? 'network: VERIFIED — in Solvo network'
+          : 'network: AI SUGGESTION — NOT in Solvo network',
       );
       return parts.join(' | ');
     })
@@ -294,9 +312,20 @@ function searchResultContext(
     }
   }
 
+  // Break down how many are real DB suppliers vs AI suggestions so the AI
+  // can frame them correctly ("we found X in our network plus Y suggestions").
+  const verifiedCount = providers.filter((p) => p.isRealSupplier).length;
+  const aiCount = count - verifiedCount;
+  const networkSummary =
+    verifiedCount === count
+      ? `All ${count} are verified Solvo suppliers.`
+      : aiCount === count
+        ? `All ${count} are AI-generated suggestions (NOT in the Solvo network).`
+        : `${verifiedCount} verified Solvo supplier${verifiedCount === 1 ? '' : 's'} + ${aiCount} AI-generated suggestion${aiCount === 1 ? '' : 's'} (not in network).`;
+
   return (
     `## Search result\n` +
-    `${count} provider card${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} shown to the user RIGHT NOW, below your message, for [${requestLine || 'this request'}].` +
+    `${count} provider card${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} shown to the user RIGHT NOW, below your message, for [${requestLine || 'this request'}]. ${networkSummary}` +
     locationNote +
     ` Acknowledge them in present tense. The cards:\n${formatProvidersForGrounding(providers)}`
   );
@@ -1078,10 +1107,18 @@ export default function Home() {
       // Sending the full history causes the parser to pick up stale service/
       // location fields from earlier turns (e.g. it extracts "catering" when
       // the user is now asking about DJs they just saw on screen).
-      const recentUserMsgs = currentMessages
-        .filter((m) => m.role === 'user')
-        .slice(-2)
-        .map((m) => m.content);
+      //
+      // EXCEPTION — context reset: "never mind", "forget that", etc. signal
+      // that the user is starting a completely fresh request. In that case we
+      // drop previous messages entirely so the parser doesn't blend the old
+      // service ("DJ") into the new one ("AC repair").
+      const isClearingContext = CONTEXT_CLEAR_RE.test(content);
+      const recentUserMsgs = isClearingContext
+        ? []
+        : currentMessages
+            .filter((m) => m.role === 'user')
+            .slice(-2)
+            .map((m) => m.content);
       const contextQuery = [...recentUserMsgs, content]
         .filter(Boolean)
         .join('. ');
