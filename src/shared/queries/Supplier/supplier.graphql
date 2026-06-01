@@ -1,0 +1,48 @@
+query supplier($where: SupplierWhereInput!) {
+  supplier(where: $where) {
+    supplierId
+    companyName
+    slug
+    tagline
+    description
+    businessPhone
+    businessEmail
+    whatsappNumber
+    websiteUrl
+    city
+    rating
+    reviewCount
+    responseTimeMinutes
+    minCapacity
+    maxCapacity
+    verified
+    premium
+    services {
+      serviceId
+      name
+      description
+      pricingModel
+      basePrice
+      currency
+    }
+    categories {
+      categoryId
+      isPrimary
+      category {
+        categoryId
+        categoryName
+      }
+    }
+    reviewsReceived {
+      reviewId
+      rating
+      text
+      ratingQuality
+      ratingCommunication
+      ratingValue
+      ratingPunctuality
+      supplierResponse
+      createdAt
+    }
+  }
+}

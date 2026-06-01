@@ -190,11 +190,24 @@ export type Customer = {
   __typename?: 'Customer';
   createdAt: Scalars['DateTime']['output'];
   customerId: Scalars['Float']['output'];
+  defaultAddress?: Maybe<Scalars['String']['output']>;
   defaultCity?: Maybe<Scalars['String']['output']>;
   marketingOptIn: Scalars['Boolean']['output'];
   updatedAt: Scalars['DateTime']['output'];
   user?: Maybe<User>;
   userId: Scalars['Float']['output'];
+};
+
+export type CustomerUpdateInput = {
+  customerId: Scalars['Int']['input'];
+  defaultAddress?: InputMaybe<Scalars['String']['input']>;
+  defaultCity?: InputMaybe<Scalars['String']['input']>;
+  marketingOptIn?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+export type CustomerWhereInput = {
+  customerId?: InputMaybe<Scalars['Int']['input']>;
+  userId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 /** Lifecycle status of a calendar event */
@@ -212,6 +225,30 @@ export enum EventType {
   Recurring = 'RECURRING',
   Tentative = 'TENTATIVE'
 }
+
+export type Favorite = {
+  __typename?: 'Favorite';
+  createdAt: Scalars['DateTime']['output'];
+  customerId: Scalars['Int']['output'];
+  favoriteId: Scalars['Int']['output'];
+  notes?: Maybe<Scalars['String']['output']>;
+  supplier?: Maybe<Supplier>;
+  supplierId: Scalars['Int']['output'];
+};
+
+export type FavoriteToggleInput = {
+  customerId: Scalars['Int']['input'];
+  notes?: InputMaybe<Scalars['String']['input']>;
+  supplierId: Scalars['Int']['input'];
+};
+
+export type FavoriteToggleResult = {
+  __typename?: 'FavoriteToggleResult';
+  customerId: Scalars['Int']['output'];
+  favoriteId?: Maybe<Scalars['Int']['output']>;
+  supplierId: Scalars['Int']['output'];
+  wasAdded: Scalars['Boolean']['output'];
+};
 
 /** Supported languages for users */
 export enum Language {
@@ -300,9 +337,13 @@ export type Mutation = {
   restoreConversation: Conversation;
   sendMessage: Message;
   signup: User;
+  toggleFavorite: FavoriteToggleResult;
   updateCalendarEvent: CalendarEvent;
+  updateCustomer: Customer;
   updatePost: Post;
   updateRequestStatus: Request;
+  updateSupplier: Supplier;
+  updateUser: User;
   withdrawQuote: Quote;
 };
 
@@ -427,8 +468,18 @@ export type MutationSignupArgs = {
 };
 
 
+export type MutationToggleFavoriteArgs = {
+  data: FavoriteToggleInput;
+};
+
+
 export type MutationUpdateCalendarEventArgs = {
   data: CalendarEventUpdateInput;
+};
+
+
+export type MutationUpdateCustomerArgs = {
+  data: CustomerUpdateInput;
 };
 
 
@@ -441,6 +492,16 @@ export type MutationUpdatePostArgs = {
 
 export type MutationUpdateRequestStatusArgs = {
   data: RequestUpdateStatusInput;
+};
+
+
+export type MutationUpdateSupplierArgs = {
+  data: SupplierUpdateInput;
+};
+
+
+export type MutationUpdateUserArgs = {
+  data: UserUpdateInput;
 };
 
 
@@ -588,6 +649,8 @@ export type Query = {
   conversation: Conversation;
   conversationsByCustomer: Array<Conversation>;
   conversationsBySupplier: Array<Conversation>;
+  customer: Customer;
+  favoritesByCustomer: Array<Favorite>;
   login: LoginOutput;
   messagesByConversation: Array<Message>;
   notificationsByUser: Array<Notification>;
@@ -606,6 +669,7 @@ export type Query = {
   searchSuppliers: Array<Supplier>;
   subscription: PlanSubscription;
   supplier: Supplier;
+  supplierDashboardStats: SupplierDashboardStats;
   suppliers: Array<Supplier>;
   unreadNotificationCount: Scalars['Int']['output'];
   user: User;
@@ -662,6 +726,16 @@ export type QueryConversationsBySupplierArgs = {
   status?: InputMaybe<ConversationStatus>;
   supplierId: Scalars['Int']['input'];
   viewerUserId: Scalars['Int']['input'];
+};
+
+
+export type QueryCustomerArgs = {
+  where: CustomerWhereInput;
+};
+
+
+export type QueryFavoritesByCustomerArgs = {
+  customerId: Scalars['Int']['input'];
 };
 
 
@@ -764,6 +838,11 @@ export type QuerySubscriptionArgs = {
 
 export type QuerySupplierArgs = {
   where: SupplierWhereInput;
+};
+
+
+export type QuerySupplierDashboardStatsArgs = {
+  supplierId: Scalars['Int']['input'];
 };
 
 
@@ -939,6 +1018,22 @@ export type RequestWhereInput = {
   requestId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type Review = {
+  __typename?: 'Review';
+  bookingId: Scalars['Int']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  customerId: Scalars['Int']['output'];
+  rating: Scalars['Int']['output'];
+  ratingCommunication?: Maybe<Scalars['Int']['output']>;
+  ratingPunctuality?: Maybe<Scalars['Int']['output']>;
+  ratingQuality?: Maybe<Scalars['Int']['output']>;
+  ratingValue?: Maybe<Scalars['Int']['output']>;
+  reviewId: Scalars['Int']['output'];
+  supplierId: Scalars['Int']['output'];
+  supplierResponse?: Maybe<Scalars['String']['output']>;
+  text?: Maybe<Scalars['String']['output']>;
+};
+
 /** Supported roles for users */
 export enum Role {
   Admin = 'ADMIN',
@@ -1062,6 +1157,7 @@ export type Supplier = {
   __typename?: 'Supplier';
   businessEmail?: Maybe<Scalars['String']['output']>;
   businessPhone?: Maybe<Scalars['String']['output']>;
+  categories?: Maybe<Array<SupplierCategory>>;
   city?: Maybe<Scalars['String']['output']>;
   companyName: Scalars['String']['output'];
   description?: Maybe<Scalars['String']['output']>;
@@ -1072,6 +1168,7 @@ export type Supplier = {
   rating?: Maybe<Scalars['String']['output']>;
   responseTimeMinutes?: Maybe<Scalars['Float']['output']>;
   reviewCount?: Maybe<Scalars['Float']['output']>;
+  reviewsReceived?: Maybe<Array<Review>>;
   services?: Maybe<Array<Service>>;
   slug?: Maybe<Scalars['String']['output']>;
   supplierId: Scalars['Float']['output'];
@@ -1082,9 +1179,29 @@ export type Supplier = {
   whatsappNumber?: Maybe<Scalars['String']['output']>;
 };
 
+export type SupplierCategory = {
+  __typename?: 'SupplierCategory';
+  category?: Maybe<Category>;
+  categoryId: Scalars['Int']['output'];
+  isPrimary: Scalars['Boolean']['output'];
+  supplierId: Scalars['Int']['output'];
+};
+
 export type SupplierCreateInput = {
   companyName: Scalars['String']['input'];
   userId?: InputMaybe<Scalars['Float']['input']>;
+};
+
+export type SupplierDashboardStats = {
+  __typename?: 'SupplierDashboardStats';
+  activeLeadsCount: Scalars['Int']['output'];
+  conversionRate: Scalars['Float']['output'];
+  currency: Scalars['String']['output'];
+  mtdEarnings: Scalars['String']['output'];
+  mtdGross: Scalars['String']['output'];
+  platformFeeRate: Scalars['Float']['output'];
+  responseRate: Scalars['Float']['output'];
+  weeklyLeadCounts: Array<Scalars['Int']['output']>;
 };
 
 export type SupplierSearchInput = {
@@ -1093,6 +1210,22 @@ export type SupplierSearchInput = {
   guestCount?: InputMaybe<Scalars['Int']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   serviceQuery?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SupplierUpdateInput = {
+  address?: InputMaybe<Scalars['String']['input']>;
+  businessEmail?: InputMaybe<Scalars['String']['input']>;
+  businessPhone?: InputMaybe<Scalars['String']['input']>;
+  city?: InputMaybe<Scalars['String']['input']>;
+  companyName?: InputMaybe<Scalars['String']['input']>;
+  description?: InputMaybe<Scalars['String']['input']>;
+  maxCapacity?: InputMaybe<Scalars['Int']['input']>;
+  minCapacity?: InputMaybe<Scalars['Int']['input']>;
+  slug?: InputMaybe<Scalars['String']['input']>;
+  supplierId: Scalars['Int']['input'];
+  tagline?: InputMaybe<Scalars['String']['input']>;
+  websiteUrl?: InputMaybe<Scalars['String']['input']>;
+  whatsappNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type SupplierWhereInput = {
@@ -1127,6 +1260,14 @@ export type UserCreateInput = {
   profilePicture?: InputMaybe<Scalars['String']['input']>;
   role: Role;
   subscription: SubscriptionCreateNestedInput;
+};
+
+export type UserUpdateInput = {
+  country?: InputMaybe<Scalars['String']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  phone?: InputMaybe<Scalars['String']['input']>;
+  profilePicture?: InputMaybe<Scalars['String']['input']>;
+  userId: Scalars['Int']['input'];
 };
 
 export type UserWhereInput = {
@@ -1304,6 +1445,34 @@ export type SendMessageMutationVariables = Exact<{
 
 export type SendMessageMutation = { __typename?: 'Mutation', sendMessage: { __typename?: 'Message', messageId: number, conversationId: number, senderType: SenderType, senderUserId?: number | null, content: string, messageType: MessageType, filtered: boolean, filteredReason?: string | null, createdAt: any } };
 
+export type CustomerQueryVariables = Exact<{
+  where: CustomerWhereInput;
+}>;
+
+
+export type CustomerQuery = { __typename?: 'Query', customer: { __typename?: 'Customer', customerId: number, userId: number, defaultCity?: string | null, defaultAddress?: string | null, marketingOptIn: boolean, user?: { __typename?: 'User', userId: number, email: string, name: string, phone: string, country: string } | null } };
+
+export type UpdateCustomerMutationVariables = Exact<{
+  data: CustomerUpdateInput;
+}>;
+
+
+export type UpdateCustomerMutation = { __typename?: 'Mutation', updateCustomer: { __typename?: 'Customer', customerId: number, defaultCity?: string | null, defaultAddress?: string | null, marketingOptIn: boolean } };
+
+export type FavoritesByCustomerQueryVariables = Exact<{
+  customerId: Scalars['Int']['input'];
+}>;
+
+
+export type FavoritesByCustomerQuery = { __typename?: 'Query', favoritesByCustomer: Array<{ __typename?: 'Favorite', favoriteId: number, customerId: number, supplierId: number, notes?: string | null, createdAt: any, supplier?: { __typename?: 'Supplier', supplierId: number, companyName: string, city?: string | null, rating?: string | null, reviewCount?: number | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null } | null }> };
+
+export type ToggleFavoriteMutationVariables = Exact<{
+  data: FavoriteToggleInput;
+}>;
+
+
+export type ToggleFavoriteMutation = { __typename?: 'Mutation', toggleFavorite: { __typename?: 'FavoriteToggleResult', favoriteId?: number | null, customerId: number, supplierId: number, wasAdded: boolean } };
+
 export type MarkAllNotificationsAsReadMutationVariables = Exact<{
   data: NotificationsMarkAllReadInput;
 }>;
@@ -1479,10 +1648,38 @@ export type SearchSuppliersQueryVariables = Exact<{
 
 export type SearchSuppliersQuery = { __typename?: 'Query', searchSuppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, businessPhone?: string | null, businessEmail?: string | null, whatsappNumber?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, basePrice: string, currency: string, pricingModel: PricingModel }> | null }> };
 
+export type SupplierDashboardStatsQueryVariables = Exact<{
+  supplierId: Scalars['Int']['input'];
+}>;
+
+
+export type SupplierDashboardStatsQuery = { __typename?: 'Query', supplierDashboardStats: { __typename?: 'SupplierDashboardStats', responseRate: number, conversionRate: number, activeLeadsCount: number, mtdEarnings: string, mtdGross: string, currency: string, platformFeeRate: number, weeklyLeadCounts: Array<number> } };
+
+export type SupplierQueryVariables = Exact<{
+  where: SupplierWhereInput;
+}>;
+
+
+export type SupplierQuery = { __typename?: 'Query', supplier: { __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, businessPhone?: string | null, businessEmail?: string | null, whatsappNumber?: string | null, websiteUrl?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, pricingModel: PricingModel, basePrice: string, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', categoryId: number, isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null, reviewsReceived?: Array<{ __typename?: 'Review', reviewId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, supplierResponse?: string | null, createdAt: any }> | null } };
+
 export type SuppliersQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SuppliersQuery = { __typename?: 'Query', suppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string }> };
+export type SuppliersQuery = { __typename?: 'Query', suppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, city?: string | null, rating?: string | null, reviewCount?: number | null, verified?: boolean | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null }> };
+
+export type UpdateSupplierMutationVariables = Exact<{
+  data: SupplierUpdateInput;
+}>;
+
+
+export type UpdateSupplierMutation = { __typename?: 'Mutation', updateSupplier: { __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, businessPhone?: string | null, businessEmail?: string | null, whatsappNumber?: string | null, websiteUrl?: string | null, city?: string | null, minCapacity?: number | null, maxCapacity?: number | null } };
+
+export type UpdateUserMutationVariables = Exact<{
+  data: UserUpdateInput;
+}>;
+
+
+export type UpdateUserMutation = { __typename?: 'Mutation', updateUser: { __typename?: 'User', userId: number, name: string, phone: string, country: string } };
 
 
 export const LoginDocument = gql`
@@ -2619,6 +2816,193 @@ export function useSendMessageMutation(baseOptions?: Apollo.MutationHookOptions<
 export type SendMessageMutationHookResult = ReturnType<typeof useSendMessageMutation>;
 export type SendMessageMutationResult = Apollo.MutationResult<SendMessageMutation>;
 export type SendMessageMutationOptions = Apollo.BaseMutationOptions<SendMessageMutation, SendMessageMutationVariables>;
+export const CustomerDocument = gql`
+    query customer($where: CustomerWhereInput!) {
+  customer(where: $where) {
+    customerId
+    userId
+    defaultCity
+    defaultAddress
+    marketingOptIn
+    user {
+      userId
+      email
+      name
+      phone
+      country
+    }
+  }
+}
+    `;
+
+/**
+ * __useCustomerQuery__
+ *
+ * To run a query within a React component, call `useCustomerQuery` and pass it any options that fit your needs.
+ * When your component renders, `useCustomerQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useCustomerQuery({
+ *   variables: {
+ *      where: // value for 'where'
+ *   },
+ * });
+ */
+export function useCustomerQuery(baseOptions: Apollo.QueryHookOptions<CustomerQuery, CustomerQueryVariables> & ({ variables: CustomerQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<CustomerQuery, CustomerQueryVariables>(CustomerDocument, options);
+      }
+export function useCustomerLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<CustomerQuery, CustomerQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<CustomerQuery, CustomerQueryVariables>(CustomerDocument, options);
+        }
+// @ts-ignore
+export function useCustomerSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<CustomerQuery, CustomerQueryVariables>): Apollo.UseSuspenseQueryResult<CustomerQuery, CustomerQueryVariables>;
+export function useCustomerSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<CustomerQuery, CustomerQueryVariables>): Apollo.UseSuspenseQueryResult<CustomerQuery | undefined, CustomerQueryVariables>;
+export function useCustomerSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<CustomerQuery, CustomerQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<CustomerQuery, CustomerQueryVariables>(CustomerDocument, options);
+        }
+export type CustomerQueryHookResult = ReturnType<typeof useCustomerQuery>;
+export type CustomerLazyQueryHookResult = ReturnType<typeof useCustomerLazyQuery>;
+export type CustomerSuspenseQueryHookResult = ReturnType<typeof useCustomerSuspenseQuery>;
+export type CustomerQueryResult = Apollo.QueryResult<CustomerQuery, CustomerQueryVariables>;
+export const UpdateCustomerDocument = gql`
+    mutation updateCustomer($data: CustomerUpdateInput!) {
+  updateCustomer(data: $data) {
+    customerId
+    defaultCity
+    defaultAddress
+    marketingOptIn
+  }
+}
+    `;
+export type UpdateCustomerMutationFn = Apollo.MutationFunction<UpdateCustomerMutation, UpdateCustomerMutationVariables>;
+
+/**
+ * __useUpdateCustomerMutation__
+ *
+ * To run a mutation, you first call `useUpdateCustomerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateCustomerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateCustomerMutation, { data, loading, error }] = useUpdateCustomerMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useUpdateCustomerMutation(baseOptions?: Apollo.MutationHookOptions<UpdateCustomerMutation, UpdateCustomerMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateCustomerMutation, UpdateCustomerMutationVariables>(UpdateCustomerDocument, options);
+      }
+export type UpdateCustomerMutationHookResult = ReturnType<typeof useUpdateCustomerMutation>;
+export type UpdateCustomerMutationResult = Apollo.MutationResult<UpdateCustomerMutation>;
+export type UpdateCustomerMutationOptions = Apollo.BaseMutationOptions<UpdateCustomerMutation, UpdateCustomerMutationVariables>;
+export const FavoritesByCustomerDocument = gql`
+    query favoritesByCustomer($customerId: Int!) {
+  favoritesByCustomer(customerId: $customerId) {
+    favoriteId
+    customerId
+    supplierId
+    notes
+    createdAt
+    supplier {
+      supplierId
+      companyName
+      city
+      rating
+      reviewCount
+      categories {
+        isPrimary
+        category {
+          categoryId
+          categoryName
+        }
+      }
+    }
+  }
+}
+    `;
+
+/**
+ * __useFavoritesByCustomerQuery__
+ *
+ * To run a query within a React component, call `useFavoritesByCustomerQuery` and pass it any options that fit your needs.
+ * When your component renders, `useFavoritesByCustomerQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useFavoritesByCustomerQuery({
+ *   variables: {
+ *      customerId: // value for 'customerId'
+ *   },
+ * });
+ */
+export function useFavoritesByCustomerQuery(baseOptions: Apollo.QueryHookOptions<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables> & ({ variables: FavoritesByCustomerQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables>(FavoritesByCustomerDocument, options);
+      }
+export function useFavoritesByCustomerLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables>(FavoritesByCustomerDocument, options);
+        }
+// @ts-ignore
+export function useFavoritesByCustomerSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables>): Apollo.UseSuspenseQueryResult<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables>;
+export function useFavoritesByCustomerSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables>): Apollo.UseSuspenseQueryResult<FavoritesByCustomerQuery | undefined, FavoritesByCustomerQueryVariables>;
+export function useFavoritesByCustomerSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables>(FavoritesByCustomerDocument, options);
+        }
+export type FavoritesByCustomerQueryHookResult = ReturnType<typeof useFavoritesByCustomerQuery>;
+export type FavoritesByCustomerLazyQueryHookResult = ReturnType<typeof useFavoritesByCustomerLazyQuery>;
+export type FavoritesByCustomerSuspenseQueryHookResult = ReturnType<typeof useFavoritesByCustomerSuspenseQuery>;
+export type FavoritesByCustomerQueryResult = Apollo.QueryResult<FavoritesByCustomerQuery, FavoritesByCustomerQueryVariables>;
+export const ToggleFavoriteDocument = gql`
+    mutation toggleFavorite($data: FavoriteToggleInput!) {
+  toggleFavorite(data: $data) {
+    favoriteId
+    customerId
+    supplierId
+    wasAdded
+  }
+}
+    `;
+export type ToggleFavoriteMutationFn = Apollo.MutationFunction<ToggleFavoriteMutation, ToggleFavoriteMutationVariables>;
+
+/**
+ * __useToggleFavoriteMutation__
+ *
+ * To run a mutation, you first call `useToggleFavoriteMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useToggleFavoriteMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [toggleFavoriteMutation, { data, loading, error }] = useToggleFavoriteMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useToggleFavoriteMutation(baseOptions?: Apollo.MutationHookOptions<ToggleFavoriteMutation, ToggleFavoriteMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ToggleFavoriteMutation, ToggleFavoriteMutationVariables>(ToggleFavoriteDocument, options);
+      }
+export type ToggleFavoriteMutationHookResult = ReturnType<typeof useToggleFavoriteMutation>;
+export type ToggleFavoriteMutationResult = Apollo.MutationResult<ToggleFavoriteMutation>;
+export type ToggleFavoriteMutationOptions = Apollo.BaseMutationOptions<ToggleFavoriteMutation, ToggleFavoriteMutationVariables>;
 export const MarkAllNotificationsAsReadDocument = gql`
     mutation markAllNotificationsAsRead($data: NotificationsMarkAllReadInput!) {
   markAllNotificationsAsRead(data: $data)
@@ -3727,11 +4111,158 @@ export type SearchSuppliersQueryHookResult = ReturnType<typeof useSearchSupplier
 export type SearchSuppliersLazyQueryHookResult = ReturnType<typeof useSearchSuppliersLazyQuery>;
 export type SearchSuppliersSuspenseQueryHookResult = ReturnType<typeof useSearchSuppliersSuspenseQuery>;
 export type SearchSuppliersQueryResult = Apollo.QueryResult<SearchSuppliersQuery, SearchSuppliersQueryVariables>;
+export const SupplierDashboardStatsDocument = gql`
+    query supplierDashboardStats($supplierId: Int!) {
+  supplierDashboardStats(supplierId: $supplierId) {
+    responseRate
+    conversionRate
+    activeLeadsCount
+    mtdEarnings
+    mtdGross
+    currency
+    platformFeeRate
+    weeklyLeadCounts
+  }
+}
+    `;
+
+/**
+ * __useSupplierDashboardStatsQuery__
+ *
+ * To run a query within a React component, call `useSupplierDashboardStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useSupplierDashboardStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useSupplierDashboardStatsQuery({
+ *   variables: {
+ *      supplierId: // value for 'supplierId'
+ *   },
+ * });
+ */
+export function useSupplierDashboardStatsQuery(baseOptions: Apollo.QueryHookOptions<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables> & ({ variables: SupplierDashboardStatsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables>(SupplierDashboardStatsDocument, options);
+      }
+export function useSupplierDashboardStatsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables>(SupplierDashboardStatsDocument, options);
+        }
+// @ts-ignore
+export function useSupplierDashboardStatsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables>): Apollo.UseSuspenseQueryResult<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables>;
+export function useSupplierDashboardStatsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables>): Apollo.UseSuspenseQueryResult<SupplierDashboardStatsQuery | undefined, SupplierDashboardStatsQueryVariables>;
+export function useSupplierDashboardStatsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables>(SupplierDashboardStatsDocument, options);
+        }
+export type SupplierDashboardStatsQueryHookResult = ReturnType<typeof useSupplierDashboardStatsQuery>;
+export type SupplierDashboardStatsLazyQueryHookResult = ReturnType<typeof useSupplierDashboardStatsLazyQuery>;
+export type SupplierDashboardStatsSuspenseQueryHookResult = ReturnType<typeof useSupplierDashboardStatsSuspenseQuery>;
+export type SupplierDashboardStatsQueryResult = Apollo.QueryResult<SupplierDashboardStatsQuery, SupplierDashboardStatsQueryVariables>;
+export const SupplierDocument = gql`
+    query supplier($where: SupplierWhereInput!) {
+  supplier(where: $where) {
+    supplierId
+    companyName
+    slug
+    tagline
+    description
+    businessPhone
+    businessEmail
+    whatsappNumber
+    websiteUrl
+    city
+    rating
+    reviewCount
+    responseTimeMinutes
+    minCapacity
+    maxCapacity
+    verified
+    premium
+    services {
+      serviceId
+      name
+      description
+      pricingModel
+      basePrice
+      currency
+    }
+    categories {
+      categoryId
+      isPrimary
+      category {
+        categoryId
+        categoryName
+      }
+    }
+    reviewsReceived {
+      reviewId
+      rating
+      text
+      ratingQuality
+      ratingCommunication
+      ratingValue
+      ratingPunctuality
+      supplierResponse
+      createdAt
+    }
+  }
+}
+    `;
+
+/**
+ * __useSupplierQuery__
+ *
+ * To run a query within a React component, call `useSupplierQuery` and pass it any options that fit your needs.
+ * When your component renders, `useSupplierQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useSupplierQuery({
+ *   variables: {
+ *      where: // value for 'where'
+ *   },
+ * });
+ */
+export function useSupplierQuery(baseOptions: Apollo.QueryHookOptions<SupplierQuery, SupplierQueryVariables> & ({ variables: SupplierQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<SupplierQuery, SupplierQueryVariables>(SupplierDocument, options);
+      }
+export function useSupplierLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<SupplierQuery, SupplierQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<SupplierQuery, SupplierQueryVariables>(SupplierDocument, options);
+        }
+// @ts-ignore
+export function useSupplierSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<SupplierQuery, SupplierQueryVariables>): Apollo.UseSuspenseQueryResult<SupplierQuery, SupplierQueryVariables>;
+export function useSupplierSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<SupplierQuery, SupplierQueryVariables>): Apollo.UseSuspenseQueryResult<SupplierQuery | undefined, SupplierQueryVariables>;
+export function useSupplierSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<SupplierQuery, SupplierQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<SupplierQuery, SupplierQueryVariables>(SupplierDocument, options);
+        }
+export type SupplierQueryHookResult = ReturnType<typeof useSupplierQuery>;
+export type SupplierLazyQueryHookResult = ReturnType<typeof useSupplierLazyQuery>;
+export type SupplierSuspenseQueryHookResult = ReturnType<typeof useSupplierSuspenseQuery>;
+export type SupplierQueryResult = Apollo.QueryResult<SupplierQuery, SupplierQueryVariables>;
 export const SuppliersDocument = gql`
     query suppliers {
   suppliers {
     supplierId
     companyName
+    city
+    rating
+    reviewCount
+    verified
+    categories {
+      isPrimary
+      category {
+        categoryId
+        categoryName
+      }
+    }
   }
 }
     `;
@@ -3770,3 +4301,83 @@ export type SuppliersQueryHookResult = ReturnType<typeof useSuppliersQuery>;
 export type SuppliersLazyQueryHookResult = ReturnType<typeof useSuppliersLazyQuery>;
 export type SuppliersSuspenseQueryHookResult = ReturnType<typeof useSuppliersSuspenseQuery>;
 export type SuppliersQueryResult = Apollo.QueryResult<SuppliersQuery, SuppliersQueryVariables>;
+export const UpdateSupplierDocument = gql`
+    mutation updateSupplier($data: SupplierUpdateInput!) {
+  updateSupplier(data: $data) {
+    supplierId
+    companyName
+    slug
+    tagline
+    description
+    businessPhone
+    businessEmail
+    whatsappNumber
+    websiteUrl
+    city
+    minCapacity
+    maxCapacity
+  }
+}
+    `;
+export type UpdateSupplierMutationFn = Apollo.MutationFunction<UpdateSupplierMutation, UpdateSupplierMutationVariables>;
+
+/**
+ * __useUpdateSupplierMutation__
+ *
+ * To run a mutation, you first call `useUpdateSupplierMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateSupplierMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateSupplierMutation, { data, loading, error }] = useUpdateSupplierMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useUpdateSupplierMutation(baseOptions?: Apollo.MutationHookOptions<UpdateSupplierMutation, UpdateSupplierMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateSupplierMutation, UpdateSupplierMutationVariables>(UpdateSupplierDocument, options);
+      }
+export type UpdateSupplierMutationHookResult = ReturnType<typeof useUpdateSupplierMutation>;
+export type UpdateSupplierMutationResult = Apollo.MutationResult<UpdateSupplierMutation>;
+export type UpdateSupplierMutationOptions = Apollo.BaseMutationOptions<UpdateSupplierMutation, UpdateSupplierMutationVariables>;
+export const UpdateUserDocument = gql`
+    mutation updateUser($data: UserUpdateInput!) {
+  updateUser(data: $data) {
+    userId
+    name
+    phone
+    country
+  }
+}
+    `;
+export type UpdateUserMutationFn = Apollo.MutationFunction<UpdateUserMutation, UpdateUserMutationVariables>;
+
+/**
+ * __useUpdateUserMutation__
+ *
+ * To run a mutation, you first call `useUpdateUserMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateUserMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateUserMutation, { data, loading, error }] = useUpdateUserMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useUpdateUserMutation(baseOptions?: Apollo.MutationHookOptions<UpdateUserMutation, UpdateUserMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateUserMutation, UpdateUserMutationVariables>(UpdateUserDocument, options);
+      }
+export type UpdateUserMutationHookResult = ReturnType<typeof useUpdateUserMutation>;
+export type UpdateUserMutationResult = Apollo.MutationResult<UpdateUserMutation>;
+export type UpdateUserMutationOptions = Apollo.BaseMutationOptions<UpdateUserMutation, UpdateUserMutationVariables>;

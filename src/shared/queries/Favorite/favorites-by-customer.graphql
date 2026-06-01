@@ -1,0 +1,23 @@
+query favoritesByCustomer($customerId: Int!) {
+  favoritesByCustomer(customerId: $customerId) {
+    favoriteId
+    customerId
+    supplierId
+    notes
+    createdAt
+    supplier {
+      supplierId
+      companyName
+      city
+      rating
+      reviewCount
+      categories {
+        isPrimary
+        category {
+          categoryId
+          categoryName
+        }
+      }
+    }
+  }
+}

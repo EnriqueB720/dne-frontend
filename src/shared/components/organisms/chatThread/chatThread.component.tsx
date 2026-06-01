@@ -32,6 +32,8 @@ export interface ChatThreadProps {
   onTogglePackage?: (provider: ProviderData) => void;
   /** Called when user clicks "Select" on a provider card — starts a Request. */
   onSelectProvider?: (provider: ProviderData, message: UiMessage) => void;
+  /** Called when user clicks "View profile" on a provider card. */
+  onViewProfile?: (provider: ProviderData) => void;
 }
 
 /** Render the "SOLVO UNDERSTOOD" interpretation block */
@@ -78,6 +80,7 @@ const ChatThread: React.FC<ChatThreadProps> = ({
   packageKeys = new Set(),
   onTogglePackage,
   onSelectProvider,
+  onViewProfile,
 }) => {
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
@@ -202,6 +205,7 @@ const ChatThread: React.FC<ChatThreadProps> = ({
                                     ? (prov) => onSelectProvider(prov, msg)
                                     : undefined
                                 }
+                                onViewProfile={onViewProfile}
                               />
                             );
                           })}
