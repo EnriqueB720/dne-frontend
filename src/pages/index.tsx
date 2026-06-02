@@ -34,6 +34,8 @@ import { packageAtom, packageKey } from '@/shared/jotai/package.atom';
 import {
   parseQueryWithAi,
   generateProvidersWithAi,
+  wantsMoreResults,
+  wantsOutsideNetwork,
   type ParsedQuery,
 } from '@/shared/services/ai.service';
 import {
@@ -56,6 +58,25 @@ import Link from 'next/link';
 import AuthContext from '@/shared/contexts/auth.context';
 import { useUserLocation } from '@hooks';
 
+// ── Helpers for post-parse intent override ─────────────────────────────────
+//
+// When the user's message contains an explicit search/action verb ("look",
+// "find", "show", "need", etc.) it's almost certainly a NEW search request —
+// even if providers are already on screen. We must NOT downgrade it to `chat`
+// just because recentGrounding exists. This regex guards that case.
+const SEARCH_ACTION_RE =
+  /\b(?:look(?:\s+(?:for|inside|at|around))?|search(?:\s+for)?|find(?:\s+me)?|show(?:\s+me)?|get(?:\s+me)?|give(?:\s+me)?|need|want|looking(?:\s+for)?|b[uú]sca(?:me|nos|r)?|necesito|quiero|dame|mu[eé]str[aá](?:me|nos)?)\b/i;
+
+// ── Context-reset detection ─────────────────────────────────────────────────
+//
+// When the user says "never mind", "forget that", "scratch that", etc., they
+// are explicitly starting fresh. We clear the previous user messages from
+// contextQuery so the parser doesn't bleed old service/category mentions into
+// the new request. Example: "never mind can I also get AC repair" after a DJ
+// search should produce service="AC repair", not service="DJ, catering, AC repair".
+const CONTEXT_CLEAR_RE =
+  /\b(?:never\s+mind|forget\s+(?:that|it|the|those|everything|all)?|scratch\s+that|start\s+over|disregard\s+(?:that|it)|olvida(?:te|lo|los|la|las)?(?:\s+(?:eso|lo\s+anterior|todo))?|deja\s+(?:eso|eso\s+de\s+lado)|al\s+final|better\s+yet|actually\s+no|wait\s+no)\b/i;
+
 // ── System prompt for chat AI ──────────────────────────────────────────────
 const SOLVO_CHAT_SYSTEM_PROMPT = `You are Solvo, an AI concierge for a service marketplace in Costa Rica.
 
@@ -77,6 +98,11 @@ RULES — follow exactly:
    - If found in either place, answer using that data. Do not invent addresses, hours, or services that are not in the data.
    - If genuinely not found in the blocks OR the conversation history, say you don't have detailed info on it and offer to search. Never make up the answer.
    - NEVER guess what category a named provider belongs to. Use ONLY the data you have.
+   - NETWORK STATUS (CRITICAL — two separate rules, both non-negotiable):
+     RULE A — Per-provider honesty: Every provider in the context blocks has a "network:" field.
+       • "network: VERIFIED — in Solvo network" → real verified supplier. You may confirm it is in our network.
+       • "network: AI SUGGESTION — NOT in Solvo network" → AI-generated example, not a real Solvo partner. Never claim it IS in the network.
+     RULE B — Never extrapolate emptiness: Seeing AI SUGGESTION cards does NOT mean the Solvo network lacks that service. The DB may simply not have been searched (e.g. the user requested outside-network options), or results may be in nearby areas. You are ONLY allowed to say "we have no [service] in our network" when a ## Network lookup block EXPLICITLY states 0 DB results for that service. Without that block, say "I'd need to search our network to check" — never assume absence.
 6. QUESTIONS: Ask at most ONE clarifying question per turn.
 7. FORMAT: No bullet points, no markdown headers, no numbered lists.
 
@@ -200,8 +226,13 @@ function formatProvidersForGrounding(providers: ProviderData[]): string {
       if (p.phone) parts.push(`phone: ${p.phone}`);
       if (p.email) parts.push(`email: ${p.email}`);
       if (p.website) parts.push(`website: ${p.website}`);
+      // This label is read by the AI to decide whether to claim a provider is
+      // in the Solvo network. Keep the wording consistent with rule 5 of
+      // SOLVO_CHAT_SYSTEM_PROMPT or the AI will not enforce it correctly.
       parts.push(
-        p.isRealSupplier ? 'source: in our network' : 'source: AI suggestion',
+        p.isRealSupplier
+          ? 'network: VERIFIED — in Solvo network'
+          : 'network: AI SUGGESTION — NOT in Solvo network',
       );
       return parts.join(' | ');
     })
@@ -236,7 +267,13 @@ function buildProviderGrounding(messages: UiMessage[]): string {
  */
 function groundingContext(grounding: string): string {
   if (!grounding) return '';
-  return `## Known providers (answer questions about these specific businesses using ONLY this data — do not invent details):\n${grounding}`;
+  return (
+    `## Known providers (answer questions about these specific businesses using ONLY this data — do not invent details):\n${grounding}\n\n` +
+    `REMINDER: Any "network: AI SUGGESTION" labels above mean those SPECIFIC CARDS were AI-generated examples — ` +
+    `they do NOT mean the Solvo network is empty of that service. ` +
+    `If the user asks whether Solvo has [service] providers, say you'd need to run a search to confirm — ` +
+    `never assert the network lacks a category just because the shown cards are AI suggestions.`
+  );
 }
 
 /**
@@ -248,6 +285,7 @@ function groundingContext(grounding: string): string {
 function searchResultContext(
   providers: ProviderData[],
   parsed: ParsedQuery,
+  outsideNetwork = false,
 ): string {
   const count = providers.length;
   const requestLine = [
@@ -283,9 +321,28 @@ function searchResultContext(
     }
   }
 
+  // Break down how many are real DB suppliers vs AI suggestions so the AI
+  // can frame them correctly ("we found X in our network plus Y suggestions").
+  const verifiedCount = providers.filter((p) => p.isRealSupplier).length;
+  const aiCount = count - verifiedCount;
+
+  // When the user explicitly requested outside-network results, the DB was
+  // intentionally skipped — the AI MUST NOT interpret "all AI suggestions"
+  // as "the Solvo network has no providers for this service."
+  const outsideNetworkWarning = outsideNetwork
+    ? ` OUTSIDE-NETWORK SEARCH: The Solvo supplier database was intentionally skipped this turn because the user asked for non-network options. There may well be verified Solvo partners for this service — the DB simply was not queried. Do NOT tell the user the Solvo network lacks providers for this service.`
+    : '';
+
+  const networkSummary =
+    verifiedCount === count
+      ? `All ${count} are verified Solvo suppliers.`
+      : aiCount === count
+        ? `All ${count} are AI-generated suggestions (NOT in the Solvo network).${outsideNetworkWarning}`
+        : `${verifiedCount} verified Solvo supplier${verifiedCount === 1 ? '' : 's'} + ${aiCount} AI-generated suggestion${aiCount === 1 ? '' : 's'} (not in network).`;
+
   return (
     `## Search result\n` +
-    `${count} provider card${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} shown to the user RIGHT NOW, below your message, for [${requestLine || 'this request'}].` +
+    `${count} provider card${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} shown to the user RIGHT NOW, below your message, for [${requestLine || 'this request'}]. ${networkSummary}` +
     locationNote +
     ` Acknowledge them in present tense. The cards:\n${formatProvidersForGrounding(providers)}`
   );
@@ -796,6 +853,10 @@ export default function Home() {
   // The conversation id of the in-flight turn — handleStop needs it to roll
   // the aborted turn back server-side (closure-safe; refs don't go stale).
   const activeTurnConvIdRef = React.useRef<string | null>(null);
+  // Tracks whether the current turn CREATED a new conversation (as opposed to
+  // continuing an existing one). handleStop uses this to decide whether to
+  // delete the whole conversation vs. just rolling back the user message.
+  const wasNewConvThisTurnRef = React.useRef<string | null>(null);
 
   // ── Request creation (from "Select" on a provider card) ────────────────
   const { user, isAuthenticated } = React.useContext(AuthContext);
@@ -1063,10 +1124,18 @@ export default function Home() {
       // Sending the full history causes the parser to pick up stale service/
       // location fields from earlier turns (e.g. it extracts "catering" when
       // the user is now asking about DJs they just saw on screen).
-      const recentUserMsgs = currentMessages
-        .filter((m) => m.role === 'user')
-        .slice(-2)
-        .map((m) => m.content);
+      //
+      // EXCEPTION — context reset: "never mind", "forget that", etc. signal
+      // that the user is starting a completely fresh request. In that case we
+      // drop previous messages entirely so the parser doesn't blend the old
+      // service ("DJ") into the new one ("AC repair").
+      const isClearingContext = CONTEXT_CLEAR_RE.test(content);
+      const recentUserMsgs = isClearingContext
+        ? []
+        : currentMessages
+            .filter((m) => m.role === 'user')
+            .slice(-2)
+            .map((m) => m.content);
       const contextQuery = [...recentUserMsgs, content]
         .filter(Boolean)
         .join('. ');
@@ -1126,6 +1195,9 @@ export default function Home() {
           skipNextMessageLoadRef.current = convId;
           setCurrentConvId(convId);
           setConversations((prev) => [conv, ...prev]);
+          // Mark this as a fresh conversation so handleStop knows to delete the
+          // whole thing (not just rollback one message) if the user cancels.
+          wasNewConvThisTurnRef.current = convId;
         }
         // Record the turn's conversation id so handleStop can roll it back.
         activeTurnConvIdRef.current = convId;
@@ -1144,6 +1216,34 @@ export default function Home() {
           signal,
         );
         const parsed = parseResult.parsed;
+
+        // ── Post-parse override: chat ↔ service_request when providers shown ──
+        // Layer 1 (upgrade): if the user explicitly asks for results or to
+        // search outside the network, force service_request regardless of what
+        // the LLM said. parseQueryWithAi already does this deterministically,
+        // but this is a second safety net for any that slipped through.
+        if (wantsMoreResults(content) || wantsOutsideNetwork(content)) {
+          if (parsed.intent !== 'service_request') {
+            parsed.intent = 'service_request';
+            // eslint-disable-next-line no-console
+            console.log('[intent] overridden → service_request (explicit results/outside-network request)');
+          }
+        } else if (recentGrounding && parsed.intent === 'service_request') {
+          // Layer 2 (downgrade): once providers are on screen, most follow-ups
+          // are conversational. BUT only downgrade when the message contains NO
+          // action verb — "look inside Costa Rica", "find me options", "show me
+          // DJs" are new searches and must stay as service_request. Purely
+          // conversational phrasing ("which is cheapest?", "tell me more about
+          // it") contains no such verb and is safe to downgrade.
+          if (!SEARCH_ACTION_RE.test(content)) {
+            parsed.intent = 'chat';
+            // eslint-disable-next-line no-console
+            console.log('[intent] overridden → chat (conversational follow-up — no action verb)');
+          } else {
+            // eslint-disable-next-line no-console
+            console.log('[intent] kept service_request (action verb present despite recentGrounding)');
+          }
+        }
 
         let aiResult: Awaited<ReturnType<typeof apiSendMessage>>;
         let provData: { parsed: ParsedQuery; providers: ProviderData[] } | null =
@@ -1229,7 +1329,11 @@ export default function Home() {
           );
           // provData stays null — informational answer, no cards rendered.
         } else {
-          // ── Service request: DB-first, AI fills only the gap ───────────
+          // ── Service request ────────────────────────────────────────────
+          // Detect "outside network" early — when set we skip the DB entirely
+          // and fill all slots with AI-suggested general-market providers.
+          const outsideNetwork = wantsOutsideNetwork(content);
+
           const rawLocation = (parsed.location || '').trim();
           const normalizedCity = rawLocation
             .split(',')[0]
@@ -1238,51 +1342,55 @@ export default function Home() {
           const guests = parsed.people
             ? parseInt(parsed.people.replace(/\D/g, ''), 10)
             : NaN;
-          const searchVars = {
-            serviceQuery: parsed.service?.trim() || null,
-            city: normalizedCity || null,
-            guestCount:
-              Number.isFinite(guests) && guests > 0 ? guests : null,
-            limit: TOTAL_CARDS,
-          };
-          // eslint-disable-next-line no-console
-          console.log('[DB] searchSuppliers input:', searchVars);
 
-          // Step 2: DB search (awaited up front — it's fast, and the chat
-          // AI needs the results to answer without contradicting the cards).
-          // The backend handles location matching: accent-insensitive,
-          // city-matches ranked first, and it degrades gracefully to
-          // "service matches elsewhere" rather than returning nothing — so
-          // no client-side retry is needed.
-          let dbSuppliers: any[] = [];
-          try {
-            const res = await searchSuppliers({
-              variables: { data: searchVars as any },
-              context: { fetchOptions: { signal } },
-            });
-            dbSuppliers = res?.data?.searchSuppliers ?? [];
-          } catch (dbErr) {
-            if (!signal.aborted) {
-              // eslint-disable-next-line no-console
-              console.error('[DB] searchSuppliers ERROR:', dbErr);
+          // Step 2: DB search — skipped when user explicitly wants results
+          // outside the Solvo network.
+          let dbProviders: ProviderData[] = [];
+          if (!outsideNetwork) {
+            const searchVars = {
+              serviceQuery: parsed.service?.trim() || null,
+              city: normalizedCity || null,
+              guestCount:
+                Number.isFinite(guests) && guests > 0 ? guests : null,
+              limit: TOTAL_CARDS,
+            };
+            // eslint-disable-next-line no-console
+            console.log('[DB] searchSuppliers input:', searchVars);
+
+            // The backend handles location matching: accent-insensitive,
+            // city-matches ranked first, degrades gracefully to service
+            // matches elsewhere — no client-side retry needed.
+            let dbSuppliers: any[] = [];
+            try {
+              const res = await searchSuppliers({
+                variables: { data: searchVars as any },
+                context: { fetchOptions: { signal } },
+              });
+              dbSuppliers = res?.data?.searchSuppliers ?? [];
+            } catch (dbErr) {
+              if (!signal.aborted) {
+                // eslint-disable-next-line no-console
+                console.error('[DB] searchSuppliers ERROR:', dbErr);
+              }
             }
+            dbProviders = dbSuppliers.map((s, i) =>
+              dbSupplierToProviderData(s, i),
+            );
+          } else {
+            // eslint-disable-next-line no-console
+            console.log('[intent] outside-network request — skipping DB search');
           }
 
-          const dbProviders = dbSuppliers.map((s, i) =>
-            dbSupplierToProviderData(s, i),
-          );
-          // Strict: DB results are authoritative. AI only fills the gap up
-          // to TOTAL_CARDS — and not at all when the DB already covers it.
-          const needFromAi = Math.max(0, TOTAL_CARDS - dbProviders.length);
+          // Step 3: AI top-up. For outside-network requests, fill ALL slots.
+          // For normal requests, fill only the gap the DB left.
+          const needFromAi = outsideNetwork
+            ? TOTAL_CARDS
+            : Math.max(0, TOTAL_CARDS - dbProviders.length);
           // eslint-disable-next-line no-console
           console.log(
-            `[providers] db=${dbProviders.length} needFromAi=${needFromAi}`,
+            `[providers] db=${dbProviders.length} needFromAi=${needFromAi} outsideNetwork=${outsideNetwork}`,
           );
 
-          // Step 3: AI top-up sized to exactly the gap. Awaited BEFORE the
-          // chat reply so the chat AI knows the final card count — otherwise
-          // it hedges with "hold on a moment..." and the user waits for
-          // results that already (didn't) arrive.
           let fillRes: Awaited<ReturnType<typeof generateProvidersWithAi>> | null =
             null;
           if (needFromAi > 0) {
@@ -1293,6 +1401,7 @@ export default function Home() {
                 locationForThisTurn,
                 needFromAi,
                 signal,
+                outsideNetwork,
               );
             } catch (err) {
               // Suppress noise for intentional user-stop — the outer catch
@@ -1334,7 +1443,7 @@ export default function Home() {
           // Include the previous providers as secondary context so the AI
           // can acknowledge continuity ("switching from the DJs you saw…")
           // without contradicting the new results it's about to introduce.
-          const resultCtx = searchResultContext(merged, parsed)
+          const resultCtx = searchResultContext(merged, parsed, outsideNetwork)
             + (recentGrounding
               ? `\n\n## Previously shown in this conversation (for continuity — focus on the NEW results above):\n${recentGrounding}`
               : '');
@@ -1437,13 +1546,51 @@ export default function Home() {
         : prev,
     );
 
-    // And undo it server-side (best-effort — fire and forget).
     const convId = activeTurnConvIdRef.current;
+    activeTurnConvIdRef.current = null;
+
+    if (wasNewConvThisTurnRef.current === convId && convId) {
+      // The user cancelled on the VERY FIRST message of a brand-new conversation.
+      // The conversation exists in the DB with a title but no messages —
+      // delete it entirely so it doesn't linger as a ghost in the sidebar.
+      wasNewConvThisTurnRef.current = null;
+      apiDeleteConversation(convId).catch(() => {/* best-effort */});
+      setConversations((prev) => prev.filter((c) => c.conversationId !== convId));
+      setCurrentConvId(null);
+      return;
+    }
+    wasNewConvThisTurnRef.current = null;
+
+    // Existing conversation — just roll back the user message server-side.
     if (convId) {
       rollbackLastTurn(convId).catch(() => {/* non-critical */});
     }
-    activeTurnConvIdRef.current = null;
   }, []);
+
+  // ── "See options" suggestion chip ─────────────────────────────────────
+  // After 2+ assistant replies with no cards, offer a shortcut so the user
+  // doesn't have to type "show me options" manually.
+  const shouldOfferOptions = React.useMemo(() => {
+    if (waitingForAI) return false;
+    const assistantMsgs = messages.filter((m) => m.role === 'assistant');
+    if (assistantMsgs.length < 2) return false;
+    const lastMsg = assistantMsgs[assistantMsgs.length - 1];
+    if (lastMsg.providers && lastMsg.providers.length > 0) return false;
+    // Suppress when the user's last message was already an explicit results
+    // request or an outside-network search — showing the chip again would
+    // create a confusing "ask → nothing → chip → ask" loop.
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    if (!lastUserMsg) return true;
+    if (wantsMoreResults(lastUserMsg.content)) return false;
+    if (wantsOutsideNetwork(lastUserMsg.content)) return false;
+    return true;
+  }, [messages, waitingForAI]);
+
+  const handleShowOptions = React.useCallback(() => {
+    // Send a phrase that wantsMoreResults() unambiguously matches, so the
+    // post-parse override correctly routes this to service_request.
+    handleSend('show me options');
+  }, [handleSend]);
 
   // ── Go back to hero landing ────────────────────────────────────────────
   const handleGoHome = React.useCallback(() => {
@@ -1932,6 +2079,7 @@ export default function Home() {
           disabled={waitingForAI}
           model={currentModel}
           onModelChange={setCurrentModel}
+          onShowOptions={shouldOfferOptions ? handleShowOptions : undefined}
         />
       </Flex>
 

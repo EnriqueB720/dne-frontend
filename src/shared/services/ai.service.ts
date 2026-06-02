@@ -197,6 +197,88 @@ const QUESTION_PREFIX_RE =
 const SEARCH_VERB_RE =
   /\b(?:find|busco|necesito|need|show\s+me|muéstrame|muestrame|recomi[ée]ndame|recommend|encu[ée]ntrame|plan\s+(?:a|me)|i\s+want|quiero|book)\b/i;
 
+/**
+ * Detects requests to search OUTSIDE the Solvo supplier network — e.g.
+ * "do you have anything outside your network?", "search the internet for…",
+ * "show me options not in your network". When detected, the search pipeline
+ * skips the DB and fills all slots with AI-suggested providers (clearly
+ * labelled as non-verified general-market options).
+ */
+const OUTSIDE_NETWORK_RE =
+  /\b(?:outside\s+(?:of\s+)?(?:your|the|our|su)\s+(?:network|red)|beyond\s+(?:of\s+)?(?:your|the|our)\s+(?:network|red)|not\s+(?:from|in)\s+(?:your|the|our|su)\s+(?:network|red)|from\s+(?:the\s+)?(?:internet|web|google|el\s+mercado|outside)|fuera\s+de\s+(?:tu|su|nuestra|la)\s+red|no\s+en\s+(?:tu|su|nuestra|la)\s+red|en\s+(?:internet|la\s+web|el\s+mercado)|del\s+mercado\s+(?:general|en\s+general)|general\s+market)\b/i;
+
+/** True when the user is asking to search beyond the Solvo supplier network. */
+export function wantsOutsideNetwork(message: string): boolean {
+  return OUTSIDE_NETWORK_RE.test(message.trim());
+}
+
+/**
+ * Detects when the user is explicitly asking for provider results or options
+ * to be shown — in both English and Spanish. Used as an exception to the rule
+ * that keeps intent = 'chat' when providers have already been shown on screen.
+ * Without this, "show me more options" after a conversation would stay in chat
+ * mode and never trigger a new search.
+ */
+// Optional adjectives that can appear between "me" / "nos" and the result noun:
+// "show me available options", "show me more affordable providers", etc.
+const _ADJ = '(?:(?:more|available|other|different|new|cheap|affordable|better|other|additional|alternative|nearby|local)\\s+)*';
+
+// Nouns that refer to a list of results/providers.
+const _NOUN = '(?:options?|results?|providers?|suppliers?|choices?|alternatives?)';
+
+const EXPLICIT_RESULTS_RE = new RegExp(
+  '\\b(?:' +
+  // English — "show me (adj*) results/options/providers"
+  `show\\s+(?:me\\s+)?${_ADJ}${_NOUN}|` +
+  // English — "show more" (bare)
+  'show\\s+more|' +
+  // English — "find me (adj*) options"
+  `find\\s+(?:me\\s+)?${_ADJ}${_NOUN}|` +
+  // English — "search for (adj*) options"
+  `search\\s+(?:for\\s+)?${_ADJ}${_NOUN}|` +
+  // English — bare adjectives: "more options", "different providers"
+  `(?:more|different|other)\\s+${_NOUN}|` +
+  // English — "any (more) options?", "any others?"
+  `any\\s+(?:more\\s+)?${_NOUN}|any\\s+others?|` +
+  // English — "are there (any) more options?"
+  `are\\s+there\\s+(?:any\\s+)?(?:more\\s+)?${_NOUN}|` +
+  // English — "can/could I see more"
+  `can\\s+I\\s+see\\s+(?:more|${_NOUN}|more\\s+${_NOUN})|` +
+  // English — "what else do you have / is available"
+  'what\\s+else\\s+(?:do\\s+you\\s+have|is\\s+(?:there|available)|can\\s+you\\s+(?:find|show))|' +
+  // English — "anything else (available)?"
+  'anything\\s+else(?:\\s+(?:available|out\\s+there))?|' +
+  // English — "got any more options"
+  `got\\s+(?:any\\s+)?(?:more|other)\\s+${_NOUN}|` +
+  // English — "can you show me …" / "could you find me …" (polite conversational)
+  `(?:can|could|please)\\s+(?:you\\s+)?(?:show|find|search|give)\\s+(?:me\\s+)?${_ADJ}${_NOUN}|` +
+  // Spanish — imperative show verbs
+  'mu[eé]str[aá]me|muestrame|mu[eé]str[aá]nos|' +
+  // Spanish — "busca(me) / buscar opciones"
+  'b[uú]sca(?:me|nos)?|buscar\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "ver (más) opciones / resultados"
+  'ver\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "más opciones / resultados"
+  'm[aá]s\\s+(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "hay (más) opciones?"
+  'hay\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "algo más", "qué más tienes / hay"
+  'algo\\s+m[aá]s|qu[eé]\\s+m[aá]s\\s+(?:tienes?|hay|tienen)|' +
+  // Spanish — "tienes más opciones?"
+  'tienes?\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)|' +
+  // Spanish — "otras / diferentes opciones"
+  'otras?\\s+(?:opciones?|proveedores?)|diferentes?\\s+(?:opciones?|proveedores?)|' +
+  // Spanish — "dame (más) opciones"
+  'dame\\s+(?:m[aá]s\\s+)?(?:opciones?|resultados?|proveedores?)' +
+  ')\\b',
+  'i',
+);
+
+/** True when the user is explicitly requesting results/options to be shown. */
+export function wantsMoreResults(message: string): boolean {
+  return EXPLICIT_RESULTS_RE.test(message.trim());
+}
+
 // Allow camelCase names like "PikiTiki" or "DJCarlos" — the first char must be
 // uppercase, then anything until a word boundary (no lowercase-only constraint).
 // Matches provider-style proper names only — excludes plain one-word brand names
@@ -326,7 +408,7 @@ export function looksLikeNetworkInquiry(message: string): boolean {
  * mode where the grounding block answers the question from known data.
  */
 const REFERENTIAL_NETWORK_RE =
-  /\b(?:those|these|them|that\s+one|this\s+one)\b.{0,80}\b(?:(?:in|on|from)\s+(?:our|your|su|nuestra)\s+(?:network|red)|en\s+(?:nuestra|la)\s+red)\b/is;
+  /\b(?:those|these|them|that\s+one|this\s+one)\b.{0,80}\b(?:(?:in|on|from)\s+(?:our|your|su|nuestra)\s+(?:network|red)|en\s+(?:nuestra|la)\s+red)\b/i;
 
 /** @internal exported for unit tests */
 export function referencesShownResultsAboutNetwork(message: string): boolean {
@@ -434,6 +516,12 @@ export async function parseQueryWithAi(
       !SEARCH_VERB_RE.test(lastTurn)
     ) {
       intent = 'network_inquiry';
+    } else if (wantsMoreResults(lastTurn) || wantsOutsideNetwork(lastTurn)) {
+      // "show me more options", "muéstrame…", "search outside your network"…
+      // The LLM often classifies these as `chat` when phrased politely or when
+      // they follow a conversational exchange. We deterministically force
+      // service_request so the search pipeline always runs.
+      intent = 'service_request';
     }
 
     // Deterministic location override: if the user explicitly typed a place
@@ -493,10 +581,16 @@ export interface GenerateProvidersResult {
  * potentially harmful. Real, contactable details only ever come from real DB
  * suppliers. The prompt below deliberately omits contact fields.
  */
-function buildProvidersSystemPrompt(count: number): string {
+function buildProvidersSystemPrompt(count: number, outsideNetwork = false): string {
+  const networkNote = outsideNetwork
+    ? `These providers are general-market suggestions (NOT in the Solvo verified network). The user explicitly asked to see options outside the Solvo network. Label them naturally — do not claim they are Solvo partners.`
+    : `These are SUPPLEMENTARY suggestions shown after real verified providers, so keep them realistic and modest.`;
+
   return `You are Solvo, a service marketplace assistant in Costa Rica. Given a user's parsed service request, suggest ${count} plausible local service provider${count === 1 ? '' : 's'} as illustrative options.
 
 Respond with ONLY a JSON array of ${count} object${count === 1 ? '' : 's'} — no prose, no markdown fences, no commentary.
+
+⚠️ SERVICE CATEGORY — NON-NEGOTIABLE: Every single provider you generate MUST offer the EXACT service category requested (e.g. if the request is for catering, ALL ${count} providers must be catering businesses — never AC repair, photography, cleaning, or any other category). Generating an off-category provider is an error. Check each item before outputting.
 
 CRITICAL: each field's VALUE must be the actual data, not a description of the format. Never copy schema-description text into a value.
 
@@ -522,16 +616,18 @@ Field rules:
 - "rating": decimal between 4.4 and 4.9
 - "reviews": integer between 80 and 600
 - "priceLabel": colones formatted with ₡ and commas (e.g. "₡165,000", "₡420,000"). Vary the values; anchor to the user's stated budget if any.
-- "includes": array of 3 to 4 short feature strings, each under 7 words, specific to the service.
+- "includes": array of 3 to 4 short feature strings, each under 7 words. MUST be specific to the requested service category — never copy features from unrelated categories.
 - "tags": array of 1 to 2 strings, picked ONLY from this set: ["AI Match", "Fast response", "Premium", "Best price", "Customizable", "Eco-friendly"].
 - "responseTime": exactly "Replies in ~N min" where N is an integer between 5 and 45
 - "location": "Neighborhood, X km away". IMPORTANT: when the user's request includes a location, EVERY provider's neighborhood MUST be that location or an immediately adjacent one — never a far-away city.
-- "avatar": single emoji that matches the service category
+- "avatar": single emoji that matches the service category (e.g. 🍽️ for catering, ❄️ for AC, 🎧 for DJ — pick the right one for this service)
 - "verified": always false — these are AI suggestions, not verified listings
 - DO NOT include "website", "email", or "phone" — never invent contact details. These are suggestions only; real contact info comes solely from verified providers.
 - "recommended": omit it — the caller decides which card is the recommended one
 
-Output exactly ${count} item${count === 1 ? '' : 's'}. These are SUPPLEMENTARY suggestions shown after real verified providers, so keep them realistic and modest.`;
+${networkNote}
+
+Output exactly ${count} item${count === 1 ? '' : 's'}.`;
 }
 
 const FALLBACK_PROVIDERS: ProviderData[] = [
@@ -623,6 +719,7 @@ export async function generateProvidersWithAi(
   deviceLocation?: DeviceLocation | null,
   count = 4,
   signal?: AbortSignal,
+  outsideNetwork = false,
 ): Promise<GenerateProvidersResult> {
   // Caller asks for exactly the number of cards the DB search came up short
   // by. Guard against nonsense values.
@@ -649,7 +746,7 @@ Generate ${wanted} matching provider${wanted === 1 ? '' : 's'} as a JSON array.`
   const data = await runCompletion(
     model,
     [{ role: 'user', content: userMessage }],
-    { cachedSystem: buildProvidersSystemPrompt(wanted), signal },
+    { cachedSystem: buildProvidersSystemPrompt(wanted, outsideNetwork), signal },
   );
 
   const cleaned = stripJsonFences(data.content);
