@@ -1,0 +1,9 @@
+mutation updateAiMessageProviders(
+  $data: AiMessageProvidersUpdateInput!
+  $deviceId: String
+) {
+  updateAiMessageProviders(data: $data, deviceId: $deviceId) {
+    messageId
+    providersJson
+  }
+}

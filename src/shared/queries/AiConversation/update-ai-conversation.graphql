@@ -1,0 +1,11 @@
+mutation updateAiConversation(
+  $data: AiConversationUpdateInput!
+  $deviceId: String
+) {
+  updateAiConversation(data: $data, deviceId: $deviceId) {
+    conversationId
+    title
+    model
+    updatedAt
+  }
+}

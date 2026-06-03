@@ -1,0 +1,3 @@
+mutation mergeGuestAiConversations($deviceId: String!) {
+  mergeGuestAiConversations(deviceId: $deviceId)
+}

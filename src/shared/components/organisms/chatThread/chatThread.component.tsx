@@ -83,9 +83,33 @@ const ChatThread: React.FC<ChatThreadProps> = ({
   onViewProfile,
 }) => {
   const bottomRef = React.useRef<HTMLDivElement>(null);
+  // Attached to the last AI message's text bubble — we scroll here when AI
+  // responds so the user sees the text first, not the bottom of the card list.
+  const latestAiMsgRef = React.useRef<HTMLDivElement>(null);
+  // Track previous waitingForAI to detect the transition waiting→done.
+  const prevWaitingRef = React.useRef(false);
 
-  // Auto-scroll to bottom whenever messages change or AI starts/stops
   React.useEffect(() => {
+    const wasWaiting = prevWaitingRef.current;
+    prevWaitingRef.current = waitingForAI;
+
+    if (waitingForAI) {
+      // AI started thinking — scroll to bottom so the spinner is visible.
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    if (wasWaiting && messages.length > 0) {
+      const last = messages[messages.length - 1];
+      if (last.role === 'assistant') {
+        // AI just finished — scroll to the top of the AI text bubble so the
+        // user reads the response first; cards are below and require a scroll.
+        latestAiMsgRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+    }
+
+    // Default (conversation load, user message): scroll to bottom.
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, waitingForAI]);
 
@@ -94,6 +118,13 @@ const ChatThread: React.FC<ChatThreadProps> = ({
   // their Select buttons can fire createRequest, but we don't re-render the card.
   const firstParsedIdx = messages.findIndex(
     (m) => m.role === 'assistant' && !!m.parsedQuery,
+  );
+
+  // Index of the last AI message — latestAiMsgRef is attached to it so we
+  // can scroll to its text bubble (not the bottom of its card list).
+  const lastAiIdx = messages.reduce(
+    (acc, m, i) => (m.role === 'assistant' ? i : acc),
+    -1,
   );
 
   return (
@@ -171,6 +202,7 @@ const ChatThread: React.FC<ChatThreadProps> = ({
                       {/* Text content */}
                       {msg.content && (
                         <Box
+                          ref={i === lastAiIdx ? latestAiMsgRef : undefined}
                           padding="12px 16px"
                           borderRadius="4px 18px 18px 18px"
                           bg="white"

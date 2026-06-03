@@ -1,0 +1,13 @@
+mutation sendAiMessage($data: AiMessageSendInput!, $deviceId: String) {
+  sendAiMessage(data: $data, deviceId: $deviceId) {
+    messageId
+    role
+    content
+    model
+    usage {
+      inputTokens
+      outputTokens
+    }
+    createdAt
+  }
+}

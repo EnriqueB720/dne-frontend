@@ -1,0 +1,22 @@
+query aiConversation($conversationId: String!, $deviceId: String) {
+  aiConversation(conversationId: $conversationId, deviceId: $deviceId) {
+    conversationId
+    title
+    model
+    deviceId
+    userId
+    createdAt
+    updatedAt
+    messages {
+      messageId
+      conversationId
+      role
+      content
+      model
+      inputTokens
+      outputTokens
+      providersJson
+      createdAt
+    }
+  }
+}

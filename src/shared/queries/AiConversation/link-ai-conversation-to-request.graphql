@@ -1,0 +1,9 @@
+mutation linkAiConversationToRequest(
+  $data: AiConversationLinkInput!
+  $deviceId: String
+) {
+  linkAiConversationToRequest(data: $data, deviceId: $deviceId) {
+    conversationId
+    requestId
+  }
+}
