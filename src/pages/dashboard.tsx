@@ -1,18 +1,11 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useAtom } from 'jotai';
 import AuthContext from '@/shared/contexts/auth.context';
 import { motion } from 'framer-motion';
-import { Inbox, Plus, RotateCcw, Sparkles } from 'lucide-react';
+import { Inbox, Plus, Sparkles } from 'lucide-react';
 import { Box, Flex, Text, SolvoNavBar, Pill } from '@components';
-import {
-  solvoColors,
-  solvoFonts,
-  MODEL_LIST,
-  estimateCostUsd,
-} from '@constants';
-import { aiUsageAtom, EMPTY_USAGE } from '@/shared/jotai';
+import { solvoColors, solvoFonts } from '@constants';
 import {
   BookingStatus,
   ConversationStatus,
@@ -23,21 +16,7 @@ import {
   useFavoritesByCustomerQuery,
 } from '@generated';
 
-type TabId = 'active' | 'conversations' | 'saved' | 'past' | 'usage';
-
-const formatNumber = (n: number) => n.toLocaleString('en-US');
-const formatCost = (n: number) =>
-  n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
-const formatDate = (iso?: string | null) => {
-  if (!iso) return 'Never';
-  const d = new Date(iso);
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-};
+type TabId = 'active' | 'conversations' | 'saved' | 'past';
 
 const timeAgo = (iso?: string | null): string => {
   if (!iso) return '';
@@ -110,7 +89,6 @@ export default function Dashboard() {
   }, [isAuthenticated, customerId, supplierId, router]);
 
   const [tab, setTab] = useState<TabId>('active');
-  const [usage, setUsage] = useAtom(aiUsageAtom);
 
   // ── Queries ─────────────────────────────────────────────────────────
   const requestsQuery = useRequestsByCustomerQuery({
@@ -171,22 +149,7 @@ export default function Dashboard() {
     { id: 'conversations', label: 'Conversations', count: conversations.length, showCount: true },
     { id: 'saved', label: 'Saved', count: favorites.length, showCount: true },
     { id: 'past', label: 'Past bookings', count: pastBookings.length, showCount: true },
-    { id: 'usage', label: 'AI usage', count: 0, showCount: false },
   ];
-
-  // AI usage totals (unchanged — stays local to the device)
-  const totals = MODEL_LIST.reduce(
-    (acc, m) => {
-      const u = usage[m.key];
-      const cost = estimateCostUsd(m.key, u.inputTokens, u.outputTokens);
-      acc.requests += u.requests;
-      acc.inputTokens += u.inputTokens;
-      acc.outputTokens += u.outputTokens;
-      acc.cost += cost;
-      return acc;
-    },
-    { requests: 0, inputTokens: 0, outputTokens: 0, cost: 0 },
-  );
 
   // ── Gates ───────────────────────────────────────────────────────────
   if (!isAuthenticated || !user) {
@@ -664,177 +627,6 @@ export default function Dashboard() {
               </Flex>
             )}
           </>
-        )}
-
-        {/* ── AI usage (unchanged — stays local to the device) ─────── */}
-        {tab === 'usage' && (
-          <Flex direction="column" gap="20px">
-            <Box
-              padding="24px"
-              borderRadius="20px"
-              borderWidth="1px"
-              borderColor={solvoColors.border}
-              bg="white"
-              style={{
-                background: `linear-gradient(135deg, ${solvoColors.indigoLight}, white)`,
-              }}
-            >
-              <Flex align="center" justify="space-between" marginBottom="16px">
-                <Flex align="center" gap="10px">
-                  <Flex
-                    width="32px"
-                    height="32px"
-                    borderRadius="10px"
-                    align="center"
-                    justify="center"
-                    style={{
-                      background: `linear-gradient(135deg, ${solvoColors.indigo}, #6366F1)`,
-                    }}
-                    color="white"
-                  >
-                    <Sparkles size={16} />
-                  </Flex>
-                  <Box>
-                    <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.06em" fontWeight="600">
-                      AI USAGE — THIS DEVICE
-                    </Text>
-                    <Text fontSize="sm" color={solvoColors.textMuted}>
-                      Stored locally. Resets when you clear browser data.
-                    </Text>
-                  </Box>
-                </Flex>
-                <Flex
-                  as="button"
-                  align="center"
-                  gap="6px"
-                  padding="8px 14px"
-                  borderRadius="10px"
-                  borderWidth="1px"
-                  borderColor={solvoColors.border}
-                  fontSize="xs"
-                  fontWeight="500"
-                  color={solvoColors.textMuted}
-                  bg="white"
-                  cursor="pointer"
-                  onClick={() => setUsage(EMPTY_USAGE)}
-                  _hover={{ borderColor: solvoColors.borderHover, color: solvoColors.text }}
-                >
-                  <RotateCcw size={12} />
-                  Reset
-                </Flex>
-              </Flex>
-
-              <Flex gap="32px" wrap="wrap">
-                <Box>
-                  <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.06em" fontWeight="600">
-                    REQUESTS
-                  </Text>
-                  <Text fontFamily={solvoFonts.serif} fontSize="32px" color={solvoColors.text}>
-                    {formatNumber(totals.requests)}
-                  </Text>
-                </Box>
-                <Box>
-                  <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.06em" fontWeight="600">
-                    INPUT TOKENS
-                  </Text>
-                  <Text fontFamily={solvoFonts.serif} fontSize="32px" color={solvoColors.text}>
-                    {formatNumber(totals.inputTokens)}
-                  </Text>
-                </Box>
-                <Box>
-                  <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.06em" fontWeight="600">
-                    OUTPUT TOKENS
-                  </Text>
-                  <Text fontFamily={solvoFonts.serif} fontSize="32px" color={solvoColors.text}>
-                    {formatNumber(totals.outputTokens)}
-                  </Text>
-                </Box>
-                <Box>
-                  <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.06em" fontWeight="600">
-                    EST. COST
-                  </Text>
-                  <Text fontFamily={solvoFonts.serif} fontSize="32px" color={solvoColors.indigo}>
-                    {formatCost(totals.cost)}
-                  </Text>
-                </Box>
-              </Flex>
-            </Box>
-
-            <Box display="grid" gridTemplateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap="14px">
-              {MODEL_LIST.map((m) => {
-                const u = usage[m.key];
-                const cost = estimateCostUsd(m.key, u.inputTokens, u.outputTokens);
-                const hasUsage = u.requests > 0;
-                return (
-                  <Flex
-                    key={m.key}
-                    direction="column"
-                    gap="14px"
-                    padding="20px"
-                    bg="white"
-                    borderWidth="1px"
-                    borderColor={solvoColors.border}
-                    borderRadius="16px"
-                  >
-                    <Flex align="center" justify="space-between">
-                      <Box>
-                        <Text fontWeight="600" color={solvoColors.text} fontSize="sm">
-                          {m.fullName}
-                        </Text>
-                        <Text fontSize="xs" color={solvoColors.textSubtle}>
-                          {m.apiId}
-                        </Text>
-                      </Box>
-                      {hasUsage ? (
-                        <Pill tone="indigo">{u.requests} reqs</Pill>
-                      ) : (
-                        <Pill tone="default">Unused</Pill>
-                      )}
-                    </Flex>
-
-                    <Flex direction="column" gap="6px">
-                      <Flex justify="space-between">
-                        <Text fontSize="xs" color={solvoColors.textSubtle}>Input tokens</Text>
-                        <Text fontSize="xs" fontWeight="500" color={solvoColors.text}>
-                          {formatNumber(u.inputTokens)}
-                        </Text>
-                      </Flex>
-                      <Flex justify="space-between">
-                        <Text fontSize="xs" color={solvoColors.textSubtle}>Output tokens</Text>
-                        <Text fontSize="xs" fontWeight="500" color={solvoColors.text}>
-                          {formatNumber(u.outputTokens)}
-                        </Text>
-                      </Flex>
-                      <Flex justify="space-between">
-                        <Text fontSize="xs" color={solvoColors.textSubtle}>Last used</Text>
-                        <Text fontSize="xs" fontWeight="500" color={solvoColors.text}>
-                          {formatDate(u.lastUsedAt)}
-                        </Text>
-                      </Flex>
-                    </Flex>
-
-                    <Box padding="10px 12px" bg={solvoColors.bg} borderRadius="10px">
-                      <Flex justify="space-between" align="center">
-                        <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.04em" fontWeight="600">
-                          EST. COST
-                        </Text>
-                        <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.indigo}>
-                          {formatCost(cost)}
-                        </Text>
-                      </Flex>
-                      <Text fontSize="10px" color={solvoColors.textSubtle} marginTop="2px">
-                        ${m.inputPricePerMillion.toFixed(2)}/M in · ${m.outputPricePerMillion.toFixed(2)}/M out
-                      </Text>
-                    </Box>
-                  </Flex>
-                );
-              })}
-            </Box>
-
-            <Text fontSize="11px" color={solvoColors.textSubtle}>
-              Cost is estimated client-side from token counts returned by each provider. For exact billing, check the provider dashboard.
-            </Text>
-          </Flex>
         )}
       </Box>
     </Box>
