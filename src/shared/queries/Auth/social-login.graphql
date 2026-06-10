@@ -1,0 +1,13 @@
+mutation socialLogin($data: SocialLoginInput!) {
+  socialLogin(data: $data) {
+    access_token
+    expiresAt
+    user {
+      userId
+      email
+      name
+      isCustomer
+      isSupplier
+    }
+  }
+}

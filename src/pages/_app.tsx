@@ -2,7 +2,9 @@ import type { AppProps } from 'next/app'
 import Head from 'next/head'
 import { useMemo } from 'react'
 import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
+import { SessionProvider } from 'next-auth/react'
 import AuthProvider from '@/shared/contexts/auth.provider'
+import NextAuthBridge from '@/shared/contexts/nextauth-bridge'
 import { ApolloClient, HttpLink, InMemoryCache, split, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { ApolloProvider } from "@apollo/client/react";
@@ -14,7 +16,7 @@ import 'react-international-phone/style.css';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 
-export default function App({ Component, pageProps }: AppProps) {
+export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
 
 const HTTP_URI = 'http://localhost:5000/graphql';
 const WS_URI = 'ws://localhost:5000/graphql';
@@ -92,11 +94,14 @@ const WS_URI = 'ws://localhost:5000/graphql';
           }
         `}</style>
       </Head>
-      <ApolloProvider client={client}>
-        <AuthProvider>
-          <Component {...pageProps} />
-        </AuthProvider>
-      </ApolloProvider>
+      <SessionProvider session={session}>
+        <ApolloProvider client={client}>
+          <AuthProvider>
+            <NextAuthBridge />
+            <Component {...pageProps} />
+          </AuthProvider>
+        </ApolloProvider>
+      </SessionProvider>
     </ChakraProvider>
 
 }

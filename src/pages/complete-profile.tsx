@@ -1,16 +1,28 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { gql, useMutation } from '@apollo/client';
 import { Sparkles, User as UserIcon, Briefcase } from 'lucide-react';
 import { PhoneInput } from 'react-international-phone';
 import { Box, Flex, Text } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
-import { useSignupMutation } from '@generated';
-import SocialAuthButtons from '@/shared/components/molecules/socialAuthButtons/social-auth-buttons.component';
 
 type Role = 'CUSTOMER' | 'SUPPLIER';
+
+// Inline gql (no codegen dependency) — mirrors the conversation.service pattern.
+const COMPLETE_ONBOARDING = gql`
+  mutation completeOnboarding($data: CompleteOnboardingInput!) {
+    completeOnboarding(data: $data) {
+      access_token
+      user {
+        userId
+        isCustomer
+        isSupplier
+      }
+    }
+  }
+`;
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -34,56 +46,55 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
 };
 
-export default function RegisterPage() {
+export default function CompleteProfilePage() {
   const router = useRouter();
-  const { login, isLoading } = useContext(AuthContext);
-  const [signup] = useSignupMutation();
+  const { user, isAuthenticated, refreshUserToken } = useContext(AuthContext);
+  const [completeOnboarding] = useMutation(COMPLETE_ONBOARDING);
 
   const [role, setRole] = useState<Role>('CUSTOMER');
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('+506');
   const [country, setCountry] = useState('CR');
   const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Already onboarded (or arrived here directly without a session) → leave.
+  useEffect(() => {
+    if (isAuthenticated && user && (user.isCustomer || user.isSupplier)) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, user, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSubmitting(true);
 
     if (role === 'SUPPLIER' && !companyName.trim()) {
       setError('Company name is required for supplier accounts');
-      setSubmitting(false);
       return;
     }
 
+    setSubmitting(true);
     try {
-      await signup({
+      await completeOnboarding({
         variables: {
           data: {
-            email,
-            name,
-            password,
+            role,
             phone,
             country,
-            role,
             companyName: role === 'SUPPLIER' ? companyName : undefined,
-          } as any,
+          },
         },
       });
 
-      // Auto-login after successful signup
-      const ok = await login({ credentials: { email, password } } as any);
-      if (ok) {
-        router.push('/');
-      } else {
-        router.push('/login');
-      }
+      // Reload the profile (roles now set) on the existing token, then go home.
+      await refreshUserToken();
+      router.push('/');
     } catch (err: any) {
-      setError(err?.message?.replace(/^GraphQL error: /, '') ?? 'Registration failed');
+      setError(
+        err?.message?.replace(/^GraphQL error: /, '') ??
+          'Could not finish setting up your account',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -91,16 +102,15 @@ export default function RegisterPage() {
 
   return (
     <Box minHeight="100vh" bg={solvoColors.bg} position="relative" overflow="hidden">
-      {/* Atmospheric gradients */}
       <Box
         position="absolute"
         top="-200px"
-        left="-200px"
+        right="-200px"
         width="500px"
         height="500px"
         borderRadius="full"
         style={{
-          background: 'radial-gradient(circle, rgba(251, 191, 36, 0.12), transparent 70%)',
+          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15), transparent 70%)',
           filter: 'blur(40px)',
           pointerEvents: 'none',
         }}
@@ -134,10 +144,10 @@ export default function RegisterPage() {
             </Flex>
 
             <Text fontFamily={solvoFonts.serif} fontSize="32px" color={solvoColors.text} marginBottom="6px">
-              Create your account.
+              Almost there{user?.name ? `, ${user.name.split(' ')[0]}` : ''}.
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
-              Tell us who you are so we can set up your workspace.
+              Tell us how you'll use the platform so we can set up your workspace.
             </Text>
 
             {/* Role toggle */}
@@ -194,43 +204,6 @@ export default function RegisterPage() {
             </Flex>
 
             <form onSubmit={handleSubmit}>
-              <Flex gap="12px" wrap="wrap" marginBottom="14px">
-                <Box flex="1" minWidth="180px">
-                  <label style={labelStyle}>Full name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    minLength={4}
-                    style={inputStyle}
-                  />
-                </Box>
-                <Box flex="1" minWidth="180px">
-                  <label style={labelStyle}>Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    style={inputStyle}
-                  />
-                </Box>
-              </Flex>
-
-              <Box marginBottom="14px">
-                <label style={labelStyle}>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  placeholder="At least 8 characters"
-                  style={inputStyle}
-                />
-              </Box>
-
               <Box marginBottom="14px" className="solvo-phone-field">
                 <label style={labelStyle}>Phone</label>
                 <PhoneInput
@@ -265,9 +238,6 @@ export default function RegisterPage() {
                     },
                   }}
                 />
-                <Text fontSize="xs" color={solvoColors.textSubtle} marginTop="4px">
-                  Country detected from the dial code: <strong>{country}</strong>
-                </Text>
               </Box>
 
               {role === 'SUPPLIER' && (
@@ -298,7 +268,7 @@ export default function RegisterPage() {
 
               <button
                 type="submit"
-                disabled={submitting || isLoading}
+                disabled={submitting}
                 style={{
                   width: '100%',
                   padding: '12px 16px',
@@ -310,39 +280,13 @@ export default function RegisterPage() {
                   fontSize: '15px',
                   cursor: 'pointer',
                   fontFamily: solvoFonts.sans,
-                  opacity: submitting || isLoading ? 0.6 : 1,
+                  opacity: submitting ? 0.6 : 1,
                 }}
               >
-                {submitting ? 'Creating account…' : 'Create account'}
+                {submitting ? 'Setting up…' : 'Finish setup'}
               </button>
             </form>
-
-            {/* Divider */}
-            <Flex align="center" gap="12px" marginTop="20px" marginBottom="16px">
-              <Box flex="1" height="1px" bg={solvoColors.border} />
-              <Text fontSize="xs" color={solvoColors.textSubtle}>
-                or sign up with
-              </Text>
-              <Box flex="1" height="1px" bg={solvoColors.border} />
-            </Flex>
-
-            <SocialAuthButtons callbackUrl="/" />
-
-            <Flex justify="center" marginTop="20px">
-              <Text fontSize="sm" color={solvoColors.textMuted}>
-                Already have an account?{' '}
-                <Link href="/login" style={{ color: solvoColors.indigo, fontWeight: 600 }}>
-                  Sign in
-                </Link>
-              </Text>
-            </Flex>
           </Box>
-
-          <Flex justify="center" marginTop="16px">
-            <Link href="/" style={{ color: solvoColors.textSubtle, fontSize: '13px' }}>
-              ← Back home
-            </Link>
-          </Flex>
         </motion.div>
       </Flex>
     </Box>
