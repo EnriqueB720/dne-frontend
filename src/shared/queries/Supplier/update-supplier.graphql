@@ -1,0 +1,16 @@
+mutation updateSupplier($data: SupplierUpdateInput!) {
+  updateSupplier(data: $data) {
+    supplierId
+    companyName
+    slug
+    tagline
+    description
+    businessPhone
+    businessEmail
+    whatsappNumber
+    websiteUrl
+    city
+    minCapacity
+    maxCapacity
+  }
+}

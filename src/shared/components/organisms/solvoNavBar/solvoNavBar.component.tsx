@@ -31,16 +31,26 @@ export interface SolvoNavBarProps {
   onMenuClick?: () => void;
 }
 
-const navItems = [
-  { label: 'Chat', href: '/' },
-  { label: 'Packages', href: '/packages' },
-  { label: 'Requests', href: '/requests' },
-  { label: 'Quotes', href: '/quotes' },
-  { label: 'Bookings', href: '/bookings' },
-  { label: 'Messages', href: '/messages' },
-  { label: 'Calendar', href: '/calendar' },
-  { label: 'Dashboard', href: '/dashboard' },
-];
+/**
+ * Build the nav menu for the current viewer. The Dashboard slot is role-
+ * aware: supplier-only users see "Workspace" → /provider, everyone else
+ * sees "Dashboard" → /dashboard.
+ */
+function buildNavItems(user: { isCustomer?: boolean; isSupplier?: boolean } | undefined) {
+  const supplierOnly = !!user?.isSupplier && !user?.isCustomer;
+  return [
+    { label: 'Chat', href: '/' },
+    { label: 'Packages', href: '/packages' },
+    { label: 'Requests', href: '/requests' },
+    { label: 'Quotes', href: '/quotes' },
+    { label: 'Bookings', href: '/bookings' },
+    { label: 'Messages', href: '/messages' },
+    { label: 'Calendar', href: '/calendar' },
+    supplierOnly
+      ? { label: 'Workspace', href: '/provider' }
+      : { label: 'Dashboard', href: '/dashboard' },
+  ];
+}
 
 const navButtonStyle: React.CSSProperties = {
   background: 'transparent',
@@ -113,7 +123,12 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
     router.push('/');
   };
 
-  const renderNavLink = (item: typeof navItems[number], onClick?: () => void) => {
+  const navItems = React.useMemo(
+    () => buildNavItems(user as { isCustomer?: boolean; isSupplier?: boolean } | undefined),
+    [user],
+  );
+
+  const renderNavLink = (item: { label: string; href: string }, onClick?: () => void) => {
     const isActive = activePath === item.href.split('?')[0];
     const textEl = (
       <Text
@@ -441,7 +456,7 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
                   </Box>
 
                   <Link
-                    href="/dashboard"
+                    href={user.isSupplier && !user.isCustomer ? '/provider' : '/dashboard'}
                     style={{ textDecoration: 'none', display: 'block' }}
                     onClick={() => setUserMenuOpen(false)}
                   >
@@ -455,7 +470,27 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
                     >
                       <UserIcon size={14} color={solvoColors.textMuted} />
                       <Text fontSize="sm" color={solvoColors.text}>
-                        Dashboard
+                        {user.isSupplier && !user.isCustomer ? 'Workspace' : 'Dashboard'}
+                      </Text>
+                    </Flex>
+                  </Link>
+
+                  <Link
+                    href={user.isSupplier && !user.isCustomer ? '/provider/settings' : '/profile'}
+                    style={{ textDecoration: 'none', display: 'block' }}
+                    onClick={() => setUserMenuOpen(false)}
+                  >
+                    <Flex
+                      align="center"
+                      gap="8px"
+                      padding="8px 12px"
+                      borderRadius="8px"
+                      cursor="pointer"
+                      _hover={{ bg: solvoColors.bg }}
+                    >
+                      <UserIcon size={14} color={solvoColors.textMuted} />
+                      <Text fontSize="sm" color={solvoColors.text}>
+                        Settings
                       </Text>
                     </Flex>
                   </Link>

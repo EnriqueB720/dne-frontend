@@ -1,47 +1,144 @@
+import { useContext, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Star, ShieldCheck, MapPin, Calendar, MessageCircle, Check } from 'lucide-react';
+import {
+  ArrowLeft,
+  Calendar,
+  Heart,
+  MapPin,
+  MessageCircle,
+  ShieldCheck,
+  Star,
+} from 'lucide-react';
 import { Box, Flex, Text, SolvoNavBar, Pill } from '@components';
-import { solvoColors, solvoFonts, SOLVO_PROVIDERS } from '@constants';
+import { solvoColors, solvoFonts } from '@constants';
+import AuthContext from '@/shared/contexts/auth.context';
+import {
+  useFavoritesByCustomerQuery,
+  useSupplierQuery,
+  useToggleFavoriteMutation,
+} from '@generated';
 
 const PHOTO_TILES = ['🍽️', '🥗', '🍰', '🥂', '🌮'];
 
-const SERVICES = [
-  { name: 'Birthday catering', price: '₡165,000' },
-  { name: 'Corporate events', price: '₡240,000' },
-  { name: 'Weddings & banquets', price: '₡480,000' },
-  { name: 'Private dinners', price: '₡120,000' },
-];
+const formatColones = (value: string | number | null | undefined): string => {
+  if (value == null) return '—';
+  const n = typeof value === 'string' ? Number(value) : value;
+  if (!Number.isFinite(n)) return '—';
+  if (n >= 1_000_000) return `₡${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `₡${Math.round(n / 1_000)}k`;
+  return `₡${Math.round(n).toLocaleString('en-US')}`;
+};
 
-const TIERS = [
-  {
-    tier: 'Essentials',
-    price: '₡180,000',
-    features: ['Buffet style for 25', '2 main dishes', 'Basic setup', 'Self-serve drinks'],
-  },
-  {
-    tier: 'Standard',
-    price: '₡285,000',
-    features: ['Full service for 35', '3-course menu', 'Setup & cleanup', '1 server'],
-    popular: true,
-  },
-  {
-    tier: 'Premium',
-    price: '₡480,000',
-    features: ['Premium menu + bar', 'Wait staff (2)', 'Dessert table', 'Linen & decor'],
-  },
-];
+const formatReviewDate = (iso: string): string => {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+};
 
-const REVIEWS = [
-  { initial: 'L', name: 'Laura M.', date: 'Nov 2025', rating: 5, text: 'Absolutely incredible. They handled everything from setup to cleanup, and the food was outstanding. Will definitely book again.' },
-  { initial: 'D', name: 'Diego S.', date: 'Oct 2025', rating: 5, text: 'Quick to respond, professional, and the menu was customized perfectly to our needs. Highly recommend.' },
-  { initial: 'P', name: 'Patricia V.', date: 'Sep 2025', rating: 4, text: 'Great food and service. A bit late on setup but they made up for it during the event.' },
-];
+const initialsFrom = (id: number): string =>
+  String.fromCharCode(65 + (id % 26));
 
 export default function ProviderProfile() {
   const router = useRouter();
   const { id } = router.query;
-  const provider = SOLVO_PROVIDERS.find((p) => p.id === Number(id)) || SOLVO_PROVIDERS[0];
+  const supplierId = useMemo(() => {
+    const raw = Array.isArray(id) ? id[0] : id;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [id]);
+
+  const { user, isAuthenticated } = useContext(AuthContext);
+  const customerId = user?.customerId ?? null;
+
+  const supplierQuery = useSupplierQuery({
+    variables: { where: { supplierId: supplierId ?? 0 } },
+    skip: !supplierId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const supplier = supplierQuery.data?.supplier ?? null;
+
+  // Favorites — only fetched for signed-in customers
+  const favoritesQuery = useFavoritesByCustomerQuery({
+    variables: { customerId: customerId ?? 0 },
+    skip: !customerId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const isFavorited = useMemo(() => {
+    if (!supplier || !customerId) return false;
+    return !!favoritesQuery.data?.favoritesByCustomer.find(
+      (f: any) => f.supplierId === supplier.supplierId,
+    );
+  }, [favoritesQuery.data, supplier, customerId]);
+
+  const [toggleFavorite, toggleState] = useToggleFavoriteMutation();
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const showFavorited = optimistic ?? isFavorited;
+
+  // Reset optimistic flag when query catches up
+  useEffect(() => {
+    if (optimistic !== null && optimistic === isFavorited) {
+      setOptimistic(null);
+    }
+  }, [optimistic, isFavorited]);
+
+  const handleToggleFavorite = async () => {
+    if (!customerId || !supplier) return;
+    setOptimistic(!showFavorited);
+    try {
+      await toggleFavorite({
+        variables: {
+          data: { customerId, supplierId: supplier.supplierId },
+        },
+      });
+      favoritesQuery.refetch();
+    } catch {
+      setOptimistic(null);
+    }
+  };
+
+  // ── Gates ───────────────────────────────────────────────────────────
+  if (!supplierId) {
+    return (
+      <Box minHeight="100vh" bg={solvoColors.bg}>
+        <SolvoNavBar />
+        <Flex minHeight="60vh" align="center" justify="center">
+          <Text color={solvoColors.textSubtle}>Invalid provider link.</Text>
+        </Flex>
+      </Box>
+    );
+  }
+
+  if (supplierQuery.loading && !supplier) {
+    return (
+      <Box minHeight="100vh" bg={solvoColors.bg}>
+        <SolvoNavBar />
+        <Flex minHeight="60vh" align="center" justify="center">
+          <Text color={solvoColors.textSubtle}>Loading…</Text>
+        </Flex>
+      </Box>
+    );
+  }
+
+  if (!supplier) {
+    return (
+      <Box minHeight="100vh" bg={solvoColors.bg}>
+        <SolvoNavBar />
+        <Flex minHeight="60vh" align="center" justify="center" direction="column" gap="8px">
+          <Text fontFamily={solvoFonts.serif} fontSize="22px" color={solvoColors.text}>
+            Provider not found
+          </Text>
+          <Link href="/" style={{ color: solvoColors.indigo }}>
+            Back to home
+          </Link>
+        </Flex>
+      </Box>
+    );
+  }
+
+  const reviews = (supplier.reviewsReceived ?? []).slice(0, 6);
+  const categories = (supplier.categories ?? [])
+    .map((sc: any) => sc.category?.categoryName)
+    .filter(Boolean) as string[];
 
   return (
     <Box minHeight="100vh" bg={solvoColors.bg}>
@@ -49,56 +146,42 @@ export default function ProviderProfile() {
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: '24px 16px', md: '32px 24px' }}>
         <Link href="/" style={{ textDecoration: 'none' }}>
-          <Flex align="center" gap="6px" color={solvoColors.textMuted} fontSize="sm" marginBottom="20px" _hover={{ color: solvoColors.text }}>
+          <Flex
+            align="center"
+            gap="6px"
+            color={solvoColors.textMuted}
+            fontSize="sm"
+            marginBottom="20px"
+            _hover={{ color: solvoColors.text }}
+          >
             <ArrowLeft size={14} />
-            Back to chat
+            Back
           </Flex>
         </Link>
 
-        {/* Photo gallery */}
+        {/* Photo gallery — placeholder until real photo uploads exist */}
         <Box
           display="grid"
           gridTemplateColumns="repeat(4, 1fr)"
-          gridTemplateRows="repeat(2, 1fr)"
+          gridTemplateRows="repeat(2, 120px)"
           gap="8px"
-          height={{ base: '300px', md: '400px' }}
+          marginBottom="40px"
           borderRadius="24px"
           overflow="hidden"
-          marginBottom="32px"
         >
           {PHOTO_TILES.map((emoji, i) => (
             <Flex
               key={i}
-              gridColumn={i === 0 ? 'span 2' : 'span 1'}
-              gridRow={i === 0 ? 'span 2' : 'span 1'}
               align="center"
               justify="center"
-              fontSize={i === 0 ? '80px' : '40px'}
+              gridColumn={i === 0 ? 'span 2' : undefined}
+              gridRow={i === 0 ? 'span 2' : undefined}
+              fontSize={i === 0 ? '64px' : '32px'}
               style={{
-                background: i === 0
-                  ? `linear-gradient(135deg, ${solvoColors.indigoLight}, ${solvoColors.amberLight})`
-                  : `linear-gradient(135deg, ${solvoColors.bg}, ${solvoColors.indigoLight})`,
+                background: `linear-gradient(135deg, ${solvoColors.indigoLight}, ${solvoColors.bg})`,
               }}
-              position="relative"
             >
               {emoji}
-              {i === PHOTO_TILES.length - 1 && (
-                <Flex
-                  position="absolute"
-                  bottom="12px"
-                  right="12px"
-                  bg="white"
-                  padding="6px 12px"
-                  borderRadius="full"
-                  fontSize="xs"
-                  fontWeight="500"
-                  color={solvoColors.text}
-                  cursor="pointer"
-                  _hover={{ bg: solvoColors.bg }}
-                >
-                  Show all 24 photos
-                </Flex>
-              )}
             </Flex>
           ))}
         </Box>
@@ -112,233 +195,350 @@ export default function ProviderProfile() {
           {/* Main column */}
           <Box>
             <Flex align="center" gap="10px" marginBottom="6px">
-              <Text fontFamily={solvoFonts.serif} fontSize="4xl" fontWeight="500" color={solvoColors.text}>
-                {provider.name}
+              <Text
+                fontFamily={solvoFonts.serif}
+                fontSize="4xl"
+                fontWeight="500"
+                color={solvoColors.text}
+              >
+                {supplier.companyName}
               </Text>
-              {provider.verified && (
-                <Box color={solvoColors.indigo}>
+              {supplier.verified && (
+                <Box color={solvoColors.indigo} title="Verified business">
                   <ShieldCheck size={20} />
                 </Box>
               )}
             </Flex>
 
-            <Flex gap="16px" align="center" wrap="wrap" marginBottom="20px">
-              <Flex align="center" gap="4px">
-                <Star size={14} fill={solvoColors.amberText} color={solvoColors.amberText} />
-                <Text fontSize="sm" fontWeight="500">{provider.rating}</Text>
-                <Text fontSize="sm" color={solvoColors.textSubtle}>({provider.reviews} reviews)</Text>
-              </Flex>
-              <Flex align="center" gap="4px" color={solvoColors.textSubtle}>
-                <MapPin size={14} />
-                <Text fontSize="sm">{provider.location}</Text>
-              </Flex>
-              <Flex align="center" gap="4px" color={solvoColors.textSubtle}>
-                <Calendar size={14} />
-                <Text fontSize="sm">Joined 2021</Text>
-              </Flex>
+            <Flex gap="16px" align="center" wrap="wrap" marginBottom="14px">
+              {supplier.rating != null && (
+                <Flex align="center" gap="4px">
+                  <Star size={14} fill={solvoColors.amberText} color={solvoColors.amberText} />
+                  <Text fontSize="sm" fontWeight="500">
+                    {Number(supplier.rating).toFixed(1)}
+                  </Text>
+                  {!!supplier.reviewCount && (
+                    <Text fontSize="sm" color={solvoColors.textSubtle}>
+                      ({supplier.reviewCount} review{supplier.reviewCount === 1 ? '' : 's'})
+                    </Text>
+                  )}
+                </Flex>
+              )}
+              {supplier.city && (
+                <Flex align="center" gap="4px" color={solvoColors.textSubtle}>
+                  <MapPin size={14} />
+                  <Text fontSize="sm">{supplier.city}</Text>
+                </Flex>
+              )}
+              {supplier.responseTimeMinutes != null && (
+                <Flex align="center" gap="4px" color={solvoColors.textSubtle}>
+                  <Calendar size={14} />
+                  <Text fontSize="sm">
+                    Replies in ~{supplier.responseTimeMinutes} min
+                  </Text>
+                </Flex>
+              )}
             </Flex>
 
-            <Text fontSize="lg" color={solvoColors.textMuted} lineHeight="1.7" marginBottom="40px">
-              We're a Costa Rica-based catering team passionate about beautiful food and seamless service. From intimate dinners to corporate events for 100+, we handle every detail so you can enjoy your event.
-            </Text>
+            {categories.length > 0 && (
+              <Flex gap="6px" wrap="wrap" marginBottom="20px">
+                {categories.map((c) => (
+                  <Pill key={c} tone="default">
+                    {c}
+                  </Pill>
+                ))}
+              </Flex>
+            )}
+
+            {supplier.description && (
+              <Text
+                fontSize="lg"
+                color={solvoColors.textMuted}
+                lineHeight={1.7}
+                marginBottom="40px"
+              >
+                {supplier.description}
+              </Text>
+            )}
 
             {/* Services */}
-            <Text fontFamily={solvoFonts.serif} fontSize="2xl" fontWeight="500" color={solvoColors.text} marginBottom="16px">
-              Services
-            </Text>
-            <Box display="grid" gridTemplateColumns={{ base: '1fr', sm: '1fr 1fr' }} gap="10px" marginBottom="40px">
-              {SERVICES.map((s) => (
+            {supplier.services && supplier.services.length > 0 && (
+              <>
+                <Text
+                  fontFamily={solvoFonts.serif}
+                  fontSize="2xl"
+                  fontWeight="500"
+                  color={solvoColors.text}
+                  marginBottom="16px"
+                >
+                  Services
+                </Text>
                 <Box
-                  key={s.name}
-                  padding="14px 16px"
-                  bg="white"
-                  borderWidth="1px"
-                  borderColor={solvoColors.border}
-                  borderRadius="14px"
-                >
-                  <Text fontWeight="500" color={solvoColors.text} fontSize="sm">{s.name}</Text>
-                  <Text fontSize="xs" color={solvoColors.textSubtle}>From {s.price}</Text>
-                </Box>
-              ))}
-            </Box>
-
-            {/* Pricing tiers */}
-            <Text fontFamily={solvoFonts.serif} fontSize="2xl" fontWeight="500" color={solvoColors.text} marginBottom="16px">
-              Pricing tiers
-            </Text>
-            <Box display="grid" gridTemplateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap="12px" marginBottom="40px">
-              {TIERS.map((t) => (
-                <Flex
-                  key={t.tier}
-                  direction="column"
+                  display="grid"
+                  gridTemplateColumns={{ base: '1fr', sm: '1fr 1fr' }}
                   gap="10px"
-                  padding="20px"
-                  bg="white"
-                  borderWidth={t.popular ? '2px' : '1px'}
-                  borderColor={t.popular ? solvoColors.indigo : solvoColors.border}
-                  borderRadius="16px"
-                  position="relative"
+                  marginBottom="40px"
                 >
-                  {t.popular && (
+                  {supplier.services.map((s: any) => (
                     <Box
-                      position="absolute"
-                      top="-10px"
-                      left="14px"
-                      bg={solvoColors.indigo}
-                      color="white"
-                      padding="3px 10px"
-                      borderRadius="full"
-                      fontSize="10px"
-                      fontWeight="600"
+                      key={s.serviceId}
+                      padding="14px 16px"
+                      bg="white"
+                      borderWidth="1px"
+                      borderColor={solvoColors.border}
+                      borderRadius="14px"
                     >
-                      POPULAR
+                      <Text fontWeight="500" color={solvoColors.text} fontSize="sm">
+                        {s.name}
+                      </Text>
+                      {s.basePrice && (
+                        <Text fontSize="xs" color={solvoColors.textSubtle}>
+                          From {formatColones(s.basePrice)}
+                        </Text>
+                      )}
+                      {s.description && (
+                        <Text fontSize="xs" color={solvoColors.textSubtle} marginTop="4px">
+                          {s.description}
+                        </Text>
+                      )}
                     </Box>
-                  )}
-                  <Text fontFamily={solvoFonts.serif} fontSize="xl" fontWeight="500">{t.tier}</Text>
-                  <Text fontFamily={solvoFonts.serif} fontSize="2xl" fontWeight="500" color={solvoColors.text}>{t.price}</Text>
-                  <Flex direction="column" gap="6px">
-                    {t.features.map((f) => (
-                      <Flex key={f} align="center" gap="6px">
-                        <Box color={solvoColors.emeraldText}><Check size={14} strokeWidth={3} /></Box>
-                        <Text fontSize="sm" color={solvoColors.textMuted}>{f}</Text>
-                      </Flex>
-                    ))}
-                  </Flex>
-                </Flex>
-              ))}
-            </Box>
+                  ))}
+                </Box>
+              </>
+            )}
 
             {/* Reviews */}
-            <Text fontFamily={solvoFonts.serif} fontSize="2xl" fontWeight="500" color={solvoColors.text} marginBottom="16px">
+            <Text
+              fontFamily={solvoFonts.serif}
+              fontSize="2xl"
+              fontWeight="500"
+              color={solvoColors.text}
+              marginBottom="16px"
+            >
               Reviews
             </Text>
-            <Flex direction="column" gap="14px">
-              {REVIEWS.map((r, i) => (
-                <Box
-                  key={i}
-                  padding="20px"
-                  bg="white"
-                  borderWidth="1px"
-                  borderColor={solvoColors.border}
-                  borderRadius="14px"
-                >
-                  <Flex align="center" gap="12px" marginBottom="10px">
-                    <Flex
-                      width="40px"
-                      height="40px"
-                      borderRadius="full"
-                      bg={solvoColors.indigoLight}
-                      color={solvoColors.indigo}
-                      align="center"
-                      justify="center"
-                      fontWeight="600"
-                    >
-                      {r.initial}
+            {reviews.length === 0 ? (
+              <Box
+                padding="24px"
+                bg="white"
+                borderWidth="1px"
+                borderColor={solvoColors.border}
+                borderRadius="14px"
+                textAlign="center"
+              >
+                <Text fontSize="sm" color={solvoColors.textSubtle}>
+                  No reviews yet — be the first to book and review.
+                </Text>
+              </Box>
+            ) : (
+              <Flex direction="column" gap="14px">
+                {reviews.map((r: any) => (
+                  <Flex
+                    key={r.reviewId}
+                    direction="column"
+                    gap="8px"
+                    padding="16px 18px"
+                    bg="white"
+                    borderWidth="1px"
+                    borderColor={solvoColors.border}
+                    borderRadius="14px"
+                  >
+                    <Flex align="center" justify="space-between">
+                      <Flex align="center" gap="10px">
+                        <Flex
+                          width="36px"
+                          height="36px"
+                          borderRadius="full"
+                          bg={solvoColors.indigoLight}
+                          color={solvoColors.indigo}
+                          align="center"
+                          justify="center"
+                          fontWeight={600}
+                          fontSize="14px"
+                        >
+                          {initialsFrom(r.customerId)}
+                        </Flex>
+                        <Box>
+                          <Text fontSize="sm" fontWeight={600} color={solvoColors.text}>
+                            Customer
+                          </Text>
+                          <Text fontSize="xs" color={solvoColors.textSubtle}>
+                            {formatReviewDate(r.createdAt)}
+                          </Text>
+                        </Box>
+                      </Flex>
+                      <Flex align="center" gap="3px">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star
+                            key={i}
+                            size={12}
+                            fill={i < r.rating ? solvoColors.amberText : 'transparent'}
+                            color={solvoColors.amberText}
+                          />
+                        ))}
+                      </Flex>
                     </Flex>
-                    <Box>
-                      <Text fontWeight="600" fontSize="sm" color={solvoColors.text}>{r.name}</Text>
-                      <Text fontSize="xs" color={solvoColors.textSubtle}>{r.date}</Text>
-                    </Box>
-                    <Flex flex="1" />
-                    <Flex gap="2px">
-                      {Array.from({ length: 5 }).map((_, idx) => (
-                        <Star
-                          key={idx}
-                          size={13}
-                          fill={idx < r.rating ? solvoColors.amberText : 'transparent'}
-                          color={solvoColors.amberText}
-                        />
-                      ))}
-                    </Flex>
+                    {r.text && (
+                      <Text fontSize="sm" color={solvoColors.text} lineHeight={1.55}>
+                        {r.text}
+                      </Text>
+                    )}
+                    {r.supplierResponse && (
+                      <Box
+                        marginTop="4px"
+                        padding="10px 12px"
+                        borderLeftWidth="3px"
+                        borderLeftStyle="solid"
+                        borderLeftColor={solvoColors.indigo}
+                        bg={solvoColors.bg}
+                      >
+                        <Text fontSize="11px" fontWeight={600} color={solvoColors.indigo} marginBottom="2px">
+                          {supplier.companyName} responded
+                        </Text>
+                        <Text fontSize="13px" color={solvoColors.textMuted}>
+                          {r.supplierResponse}
+                        </Text>
+                      </Box>
+                    )}
                   </Flex>
-                  <Text fontSize="sm" color={solvoColors.textMuted} lineHeight="1.6">
-                    {r.text}
-                  </Text>
-                </Box>
-              ))}
-            </Flex>
+                ))}
+              </Flex>
+            )}
           </Box>
 
           {/* Sidebar */}
-          <Box position={{ lg: 'sticky' }} top="96px" height="fit-content">
+          <Box>
             <Box
-              padding="24px"
+              padding="20px"
               bg="white"
               borderWidth="1px"
               borderColor={solvoColors.border}
               borderRadius="20px"
+              position={{ base: 'static', lg: 'sticky' }}
+              top="96px"
             >
               <Text
                 fontSize="xs"
                 color={solvoColors.textSubtle}
-                letterSpacing="0.08em"
-                fontWeight="600"
+                letterSpacing="0.06em"
+                fontWeight={600}
                 marginBottom="6px"
               >
-                ESTIMATED FOR YOUR EVENT
+                INTERESTED?
               </Text>
-              <Text fontFamily={solvoFonts.serif} fontSize="3xl" fontWeight="500" color={solvoColors.text}>
-                {provider.priceLabel}
+              <Text
+                fontFamily={solvoFonts.serif}
+                fontSize="22px"
+                color={solvoColors.text}
+                marginBottom="14px"
+              >
+                Get matched in minutes
               </Text>
-              <Text fontSize="sm" color={solvoColors.textSubtle} marginBottom="20px">
-                35 guests · Standard tier
+              <Text fontSize="xs" color={solvoColors.textMuted} marginBottom="14px">
+                Start a request from the AI chat and {supplier.companyName} will be matched if they fit.
               </Text>
 
-              <Flex direction="column" gap="8px" marginBottom="20px">
-                <Flex
-                  as="button"
-                  align="center"
-                  justify="center"
-                  gap="8px"
-                  padding="12px"
-                  bg={solvoColors.emerald}
-                  color="white"
-                  borderRadius="12px"
-                  fontWeight="500"
-                  fontSize="sm"
-                  cursor="pointer"
-                  _hover={{ opacity: 0.9 }}
-                >
-                  <MessageCircle size={14} />
-                  WhatsApp
-                </Flex>
-                <Flex
-                  as="button"
-                  justify="center"
-                  padding="12px"
-                  bg={solvoColors.text}
-                  color="white"
-                  borderRadius="12px"
-                  fontWeight="500"
-                  fontSize="sm"
-                  cursor="pointer"
-                  _hover={{ bg: solvoColors.indigo }}
-                >
-                  Request booking
-                </Flex>
-                <Flex
-                  as="button"
-                  justify="center"
-                  padding="12px"
-                  borderWidth="1px"
-                  borderColor={solvoColors.border}
-                  color={solvoColors.text}
-                  borderRadius="12px"
-                  fontWeight="500"
-                  fontSize="sm"
-                  cursor="pointer"
-                  _hover={{ borderColor: solvoColors.borderHover }}
-                >
-                  Get custom quote
-                </Flex>
+              <Flex direction="column" gap="8px">
+                {supplier.whatsappNumber && (
+                  <a
+                    href={`https://wa.me/${supplier.whatsappNumber.replace(/[^\d+]/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: 'block',
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      background: solvoColors.emerald,
+                      color: 'white',
+                      fontWeight: 600,
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <Flex align="center" justify="center" gap="6px">
+                      <MessageCircle size={14} />
+                      WhatsApp
+                    </Flex>
+                  </a>
+                )}
+
+                <Link href="/" style={{ textDecoration: 'none' }}>
+                  <Box
+                    padding="12px 16px"
+                    borderRadius="12px"
+                    bg={solvoColors.text}
+                    color="white"
+                    fontWeight={600}
+                    fontSize="14px"
+                    textAlign="center"
+                    cursor="pointer"
+                  >
+                    Start a request
+                  </Box>
+                </Link>
+
+                {/* Save / Saved heart toggle — only for signed-in customers */}
+                {customerId && (
+                  <button
+                    type="button"
+                    onClick={handleToggleFavorite}
+                    disabled={toggleState.loading}
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      border: `1px solid ${showFavorited ? solvoColors.roseText : solvoColors.border}`,
+                      background: showFavorited ? solvoColors.roseLight : 'white',
+                      color: showFavorited ? solvoColors.roseText : solvoColors.text,
+                      fontWeight: 600,
+                      fontSize: '14px',
+                      cursor: toggleState.loading ? 'wait' : 'pointer',
+                      opacity: toggleState.loading ? 0.7 : 1,
+                    }}
+                  >
+                    <Flex align="center" justify="center" gap="6px">
+                      <Heart
+                        size={14}
+                        fill={showFavorited ? solvoColors.roseText : 'transparent'}
+                      />
+                      {showFavorited ? 'Saved' : 'Save'}
+                    </Flex>
+                  </button>
+                )}
               </Flex>
 
-              <Box borderTop="1px solid" borderColor={solvoColors.border} paddingTop="16px">
-                <Flex direction="column" gap="8px" fontSize="xs" color={solvoColors.textMuted}>
-                  <Flex justify="space-between"><Text>Response time</Text><Text fontWeight="500">~5 min</Text></Flex>
-                  <Flex justify="space-between"><Text>Response rate</Text><Text fontWeight="500">99%</Text></Flex>
-                  <Flex justify="space-between"><Text>Identity</Text><Pill tone="emerald">✓ Verified</Pill></Flex>
-                </Flex>
+              {/* Trust strip */}
+              <Box
+                marginTop="20px"
+                paddingTop="16px"
+                borderTopWidth="1px"
+                borderTopStyle="solid"
+                borderTopColor={solvoColors.border}
+              >
+                {supplier.responseTimeMinutes != null && (
+                  <Flex justify="space-between" marginBottom="6px">
+                    <Text fontSize="xs" color={solvoColors.textSubtle}>Response time</Text>
+                    <Text fontSize="xs" fontWeight={600} color={solvoColors.text}>
+                      ~{supplier.responseTimeMinutes} min
+                    </Text>
+                  </Flex>
+                )}
+                {supplier.verified && (
+                  <Flex justify="space-between" marginBottom="6px">
+                    <Text fontSize="xs" color={solvoColors.textSubtle}>Identity</Text>
+                    <Text fontSize="xs" fontWeight={600} color={solvoColors.emeraldText}>
+                      ✓ Verified
+                    </Text>
+                  </Flex>
+                )}
+                {supplier.minCapacity != null && supplier.maxCapacity != null && (
+                  <Flex justify="space-between">
+                    <Text fontSize="xs" color={solvoColors.textSubtle}>Capacity</Text>
+                    <Text fontSize="xs" fontWeight={600} color={solvoColors.text}>
+                      {supplier.minCapacity}–{supplier.maxCapacity}
+                    </Text>
+                  </Flex>
+                )}
               </Box>
             </Box>
           </Box>

@@ -2,5 +2,16 @@ query suppliers {
   suppliers {
     supplierId
     companyName
+    city
+    rating
+    reviewCount
+    verified
+    categories {
+      isPrimary
+      category {
+        categoryId
+        categoryName
+      }
+    }
   }
 }

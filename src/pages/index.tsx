@@ -53,8 +53,10 @@ import {
   useCreateRequestMutation,
   useCreateQuoteMutation,
   useSearchSuppliersLazyQuery,
+  useSuppliersQuery,
 } from '@generated';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import AuthContext from '@/shared/contexts/auth.context';
 import { useUserLocation } from '@hooks';
 
@@ -740,6 +742,12 @@ interface ChatEmptyStateProps {
 }
 
 function ChatEmptyState({ onSend, onGoHome }: ChatEmptyStateProps) {
+  // Featured providers — pulled live from the DB so the user has a one-click
+  // path into a real storefront without typing a query first.
+  const router = useRouter();
+  const suppliersQuery = useSuppliersQuery({ fetchPolicy: 'cache-and-network' });
+  const featured = (suppliersQuery.data?.suppliers ?? []).slice(0, 6);
+
   return (
     <Flex
       direction="column"
@@ -823,12 +831,105 @@ function ChatEmptyState({ onSend, onGoHome }: ChatEmptyStateProps) {
           </motion.button>
         ))}
       </Flex>
+
+      {/* Browse providers — direct path to a storefront without typing a query */}
+      {featured.length > 0 && (
+        <Flex
+          direction="column"
+          gap="14px"
+          width="100%"
+          maxWidth="720px"
+          marginTop="12px"
+        >
+          <Flex justify="space-between" align="baseline">
+            <Text
+              fontSize="11px"
+              color={solvoColors.textSubtle}
+              letterSpacing="0.08em"
+              fontWeight="600"
+            >
+              BROWSE PROVIDERS
+            </Text>
+            <Text fontSize="11px" color={solvoColors.textSubtle}>
+              {featured.length} listed
+            </Text>
+          </Flex>
+          <Box
+            display="grid"
+            gridTemplateColumns={{ base: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }}
+            gap="10px"
+          >
+            {featured.map((s: any) => {
+              const primary = s.categories?.find((c: any) => c.isPrimary)
+                ?? s.categories?.[0];
+              return (
+                <Box
+                  key={s.supplierId}
+                  onClick={() => router.push(`/providers/${s.supplierId}`)}
+                  padding="14px 16px"
+                  bg="white"
+                  borderWidth="1px"
+                  borderColor={solvoColors.border}
+                  borderRadius="14px"
+                  cursor="pointer"
+                  _hover={{ borderColor: solvoColors.borderHover }}
+                >
+                  <Flex align="center" gap="10px" marginBottom="6px">
+                    <Flex
+                      width="32px"
+                      height="32px"
+                      borderRadius="10px"
+                      bg={solvoColors.indigoLight}
+                      color={solvoColors.indigo}
+                      align="center"
+                      justify="center"
+                      fontSize="13px"
+                      fontWeight={600}
+                    >
+                      {(s.companyName ?? '?').slice(0, 1)}
+                    </Flex>
+                    <Box minWidth="0" flex="1">
+                      <Text fontWeight={600} fontSize="13px" color={solvoColors.text} truncate>
+                        {s.companyName}
+                      </Text>
+                      <Text fontSize="11px" color={solvoColors.textSubtle} truncate>
+                        {primary?.category?.categoryName ?? s.city ?? '—'}
+                      </Text>
+                    </Box>
+                  </Flex>
+                  <Flex justify="space-between" align="center">
+                    {s.rating != null ? (
+                      <Flex align="center" gap="3px">
+                        <Text fontSize="11px" color={solvoColors.amberText}>★</Text>
+                        <Text fontSize="11px" fontWeight={500}>
+                          {Number(s.rating).toFixed(1)}
+                        </Text>
+                        {!!s.reviewCount && (
+                          <Text fontSize="11px" color={solvoColors.textSubtle}>
+                            ({s.reviewCount})
+                          </Text>
+                        )}
+                      </Flex>
+                    ) : (
+                      <Text fontSize="11px" color={solvoColors.textSubtle}>New</Text>
+                    )}
+                    <Text fontSize="11px" color={solvoColors.indigo}>
+                      View profile →
+                    </Text>
+                  </Flex>
+                </Box>
+              );
+            })}
+          </Box>
+        </Flex>
+      )}
     </Flex>
   );
 }
 
 // ── Main page component ────────────────────────────────────────────────────
 export default function Home() {
+  const router = useRouter();
   const [mode, setMode] = React.useState<'hero' | 'chat'>('hero');
   const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
   const [currentConvId, setCurrentConvId] = React.useState<string | null>(null);
@@ -2054,6 +2155,10 @@ export default function Home() {
               packageKeys={packageKeys}
               onTogglePackage={handleTogglePackage}
               onSelectProvider={handleSelectProvider}
+              onViewProfile={(p) => {
+                // Only real suppliers have a real DB id we can navigate to.
+                if (p.id > 0) router.push(`/providers/${p.id}`);
+              }}
             />
           )}
 

@@ -1,0 +1,12 @@
+query supplierDashboardStats($supplierId: Int!) {
+  supplierDashboardStats(supplierId: $supplierId) {
+    responseRate
+    conversionRate
+    activeLeadsCount
+    mtdEarnings
+    mtdGross
+    currency
+    platformFeeRate
+    weeklyLeadCounts
+  }
+}
