@@ -621,6 +621,7 @@ export type MutationToggleFavoriteArgs = {
   data: FavoriteToggleInput;
 };
 
+
 export type MutationUpdateAiConversationArgs = {
   data: AiConversationUpdateInput;
   deviceId?: InputMaybe<Scalars['String']['input']>;
@@ -1743,7 +1744,7 @@ export type CustomerQueryVariables = Exact<{
 }>;
 
 
-export type CustomerQuery = { __typename?: 'Query', customer: { __typename?: 'Customer', customerId: number, userId: number, defaultCity?: string | null, defaultAddress?: string | null, marketingOptIn: boolean, user?: { __typename?: 'User', userId: number, email: string, name: string, phone: string, country: string } | null } };
+export type CustomerQuery = { __typename?: 'Query', customer: { __typename?: 'Customer', customerId: number, userId: number, defaultCity?: string | null, defaultAddress?: string | null, marketingOptIn: boolean, user?: { __typename?: 'User', userId: number, email: string, name: string, phone?: string | null, country: string } | null } };
 
 export type UpdateCustomerMutationVariables = Exact<{
   data: CustomerUpdateInput;
@@ -1972,7 +1973,7 @@ export type UpdateUserMutationVariables = Exact<{
 }>;
 
 
-export type UpdateUserMutation = { __typename?: 'Mutation', updateUser: { __typename?: 'User', userId: number, name: string, phone: string, country: string } };
+export type UpdateUserMutation = { __typename?: 'Mutation', updateUser: { __typename?: 'User', userId: number, name: string, phone?: string | null, country: string } };
 
 
 export const AiCompleteDocument = gql`
