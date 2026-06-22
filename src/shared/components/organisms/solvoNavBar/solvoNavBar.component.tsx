@@ -78,6 +78,14 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
   const { isAuthenticated, user, logout } = React.useContext(AuthContext);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [avatarError, setAvatarError] = React.useState(false);
+
+  // Reset the image-fallback when the avatar URL changes (e.g. after login).
+  React.useEffect(() => {
+    setAvatarError(false);
+  }, [user?.profilePicture]);
+
+  const showAvatarImage = !!user?.profilePicture && !avatarError;
   const userMenuRef = React.useRef<HTMLDivElement>(null);
   const mobileMenuRef = React.useRef<HTMLDivElement>(null);
 
@@ -386,10 +394,32 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  overflow: 'hidden',
+                  padding: 0,
                 }}
                 title={user.name ?? user.email}
               >
-                {getInitials(user.name)}
+                {showAvatarImage ? (
+                  // Plain <img> (not next/image) so we don't have to whitelist
+                  // googleusercontent in next.config. no-referrer avoids Google
+                  // returning 403 for the avatar request.
+                  <img
+                    src={user.profilePicture}
+                    alt={user.name ?? 'Profile'}
+                    width={36}
+                    height={36}
+                    referrerPolicy="no-referrer"
+                    onError={() => setAvatarError(true)}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                  />
+                ) : (
+                  getInitials(user.name)
+                )}
               </motion.button>
 
               <AnimatePresence>

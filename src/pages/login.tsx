@@ -6,6 +6,7 @@ import { Sparkles } from 'lucide-react';
 import { Box, Flex, Text } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
+import SocialAuthButtons from '@/shared/components/molecules/socialAuthButtons/social-auth-buttons.component';
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -162,6 +163,17 @@ export default function LoginPage() {
                 {isLoading ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
+
+            {/* Divider */}
+            <Flex align="center" gap="12px" marginTop="20px" marginBottom="16px">
+              <Box flex="1" height="1px" bg={solvoColors.border} />
+              <Text fontSize="xs" color={solvoColors.textSubtle}>
+                or
+              </Text>
+              <Box flex="1" height="1px" bg={solvoColors.border} />
+            </Flex>
+
+            <SocialAuthButtons callbackUrl="/" />
 
             <Flex justify="center" marginTop="20px">
               <Text fontSize="sm" color={solvoColors.textMuted}>
