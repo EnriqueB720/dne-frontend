@@ -225,6 +225,13 @@ export type CategoryWhereInput = {
   categoryId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type CompleteOnboardingInput = {
+  companyName?: InputMaybe<Scalars['String']['input']>;
+  country?: InputMaybe<Scalars['String']['input']>;
+  phone?: InputMaybe<Scalars['String']['input']>;
+  role: Scalars['String']['input'];
+};
+
 export type Conversation = {
   __typename?: 'Conversation';
   contactShareWarnings: Scalars['Float']['output'];
@@ -365,6 +372,7 @@ export type Mutation = {
   cancelCalendarEvent: CalendarEvent;
   closeRequest: Request;
   completeBooking: Booking;
+  completeOnboarding: LoginOutput;
   createAiConversation: AiConversation;
   createCalendarEvent: CalendarEvent;
   createCategory: Category;
@@ -389,6 +397,7 @@ export type Mutation = {
   sendAiMessage: SendAiMessageResult;
   sendMessage: Message;
   signup: User;
+  socialLogin: LoginOutput;
   updateAiConversation: AiConversation;
   updateAiMessageProviders: AiMessage;
   updateCalendarEvent: CalendarEvent;
@@ -430,6 +439,11 @@ export type MutationCloseRequestArgs = {
 
 export type MutationCompleteBookingArgs = {
   data: BookingCompleteInput;
+};
+
+
+export type MutationCompleteOnboardingArgs = {
+  data: CompleteOnboardingInput;
 };
 
 
@@ -554,6 +568,11 @@ export type MutationSendMessageArgs = {
 
 export type MutationSignupArgs = {
   data: SignUpInput;
+};
+
+
+export type MutationSocialLoginArgs = {
+  data: SocialLoginInput;
 };
 
 
@@ -1159,6 +1178,11 @@ export type SignUpInput = {
   role?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type SocialLoginInput = {
+  provider: Scalars['String']['input'];
+  token: Scalars['String']['input'];
+};
+
 export type Subscription = {
   __typename?: 'Subscription';
   bookingEventForCustomer: BookingEvent;
@@ -1281,7 +1305,7 @@ export type User = {
   isSupplier?: Maybe<Scalars['Boolean']['output']>;
   language: Language;
   name: Scalars['String']['output'];
-  phone: Scalars['String']['output'];
+  phone?: Maybe<Scalars['String']['output']>;
   profilePicture?: Maybe<Scalars['String']['output']>;
   role: Role;
   subscription?: Maybe<Array<PlanSubscription>>;
@@ -1390,19 +1414,26 @@ export type UpdateAiMessageProvidersMutationVariables = Exact<{
 
 export type UpdateAiMessageProvidersMutation = { __typename?: 'Mutation', updateAiMessageProviders: { __typename?: 'AiMessage', messageId: string, providersJson?: string | null } };
 
+export type CompleteOnboardingMutationVariables = Exact<{
+  data: CompleteOnboardingInput;
+}>;
+
+
+export type CompleteOnboardingMutation = { __typename?: 'Mutation', completeOnboarding: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, isCustomer?: boolean | null, isSupplier?: boolean | null } } };
+
 export type LoginQueryVariables = Exact<{
   data: LoginUserInput;
 }>;
 
 
-export type LoginQuery = { __typename?: 'Query', login: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, email: string, language: Language, country: string, name: string, phone: string, role: Role, profilePicture?: string | null, isCustomer?: boolean | null, isSupplier?: boolean | null, isAdmin?: boolean | null, subscription?: Array<{ __typename?: 'PlanSubscription', subscriptionId: number, status: string, startDate: any, endDate: any, plan?: { __typename?: 'Pricing', planId: number, planName: string, price: string } | null }> | null, supplier?: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string }> | null, customer?: { __typename?: 'Customer', customerId: number, defaultCity?: string | null } | null } } };
+export type LoginQuery = { __typename?: 'Query', login: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, email: string, language: Language, country: string, name: string, phone?: string | null, role: Role, profilePicture?: string | null, isCustomer?: boolean | null, isSupplier?: boolean | null, isAdmin?: boolean | null, subscription?: Array<{ __typename?: 'PlanSubscription', subscriptionId: number, status: string, startDate: any, endDate: any, plan?: { __typename?: 'Pricing', planId: number, planName: string, price: string } | null }> | null, supplier?: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string }> | null, customer?: { __typename?: 'Customer', customerId: number, defaultCity?: string | null } | null } } };
 
 export type RefreshUserQueryVariables = Exact<{
   data: Scalars['String']['input'];
 }>;
 
 
-export type RefreshUserQuery = { __typename?: 'Query', refreshUser: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, email: string, language: Language, country: string, name: string, phone: string, role: Role, profilePicture?: string | null, isCustomer?: boolean | null, isSupplier?: boolean | null, isAdmin?: boolean | null, subscription?: Array<{ __typename?: 'PlanSubscription', subscriptionId: number, status: string, startDate: any, endDate: any, plan?: { __typename?: 'Pricing', planId: number, planName: string, price: string } | null }> | null, supplier?: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string }> | null, customer?: { __typename?: 'Customer', customerId: number, defaultCity?: string | null } | null } } };
+export type RefreshUserQuery = { __typename?: 'Query', refreshUser: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, email: string, language: Language, country: string, name: string, phone?: string | null, role: Role, profilePicture?: string | null, isCustomer?: boolean | null, isSupplier?: boolean | null, isAdmin?: boolean | null, subscription?: Array<{ __typename?: 'PlanSubscription', subscriptionId: number, status: string, startDate: any, endDate: any, plan?: { __typename?: 'Pricing', planId: number, planName: string, price: string } | null }> | null, supplier?: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string }> | null, customer?: { __typename?: 'Customer', customerId: number, defaultCity?: string | null } | null } } };
 
 export type SignupMutationVariables = Exact<{
   data: SignUpInput;
@@ -1410,6 +1441,13 @@ export type SignupMutationVariables = Exact<{
 
 
 export type SignupMutation = { __typename?: 'Mutation', signup: { __typename?: 'User', userId: number, email: string, name: string, role: Role, isCustomer?: boolean | null, isSupplier?: boolean | null, customer?: { __typename?: 'Customer', customerId: number } | null, supplier?: Array<{ __typename?: 'Supplier', supplierId: number }> | null } };
+
+export type SocialLoginMutationVariables = Exact<{
+  data: SocialLoginInput;
+}>;
+
+
+export type SocialLoginMutation = { __typename?: 'Mutation', socialLogin: { __typename?: 'LoginOutput', access_token: string, expiresAt: any, user: { __typename?: 'User', userId: number, email: string, name: string, isCustomer?: boolean | null, isSupplier?: boolean | null } } };
 
 export type BookingEventForCustomerSubscriptionVariables = Exact<{
   customerId: Scalars['Int']['input'];
@@ -2178,6 +2216,45 @@ export function useUpdateAiMessageProvidersMutation(baseOptions?: Apollo.Mutatio
 export type UpdateAiMessageProvidersMutationHookResult = ReturnType<typeof useUpdateAiMessageProvidersMutation>;
 export type UpdateAiMessageProvidersMutationResult = Apollo.MutationResult<UpdateAiMessageProvidersMutation>;
 export type UpdateAiMessageProvidersMutationOptions = Apollo.BaseMutationOptions<UpdateAiMessageProvidersMutation, UpdateAiMessageProvidersMutationVariables>;
+export const CompleteOnboardingDocument = gql`
+    mutation completeOnboarding($data: CompleteOnboardingInput!) {
+  completeOnboarding(data: $data) {
+    access_token
+    expiresAt
+    user {
+      userId
+      isCustomer
+      isSupplier
+    }
+  }
+}
+    `;
+export type CompleteOnboardingMutationFn = Apollo.MutationFunction<CompleteOnboardingMutation, CompleteOnboardingMutationVariables>;
+
+/**
+ * __useCompleteOnboardingMutation__
+ *
+ * To run a mutation, you first call `useCompleteOnboardingMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCompleteOnboardingMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [completeOnboardingMutation, { data, loading, error }] = useCompleteOnboardingMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useCompleteOnboardingMutation(baseOptions?: Apollo.MutationHookOptions<CompleteOnboardingMutation, CompleteOnboardingMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CompleteOnboardingMutation, CompleteOnboardingMutationVariables>(CompleteOnboardingDocument, options);
+      }
+export type CompleteOnboardingMutationHookResult = ReturnType<typeof useCompleteOnboardingMutation>;
+export type CompleteOnboardingMutationResult = Apollo.MutationResult<CompleteOnboardingMutation>;
+export type CompleteOnboardingMutationOptions = Apollo.BaseMutationOptions<CompleteOnboardingMutation, CompleteOnboardingMutationVariables>;
 export const LoginDocument = gql`
     query login($data: LoginUserInput!) {
   login(data: $data) {
@@ -2374,6 +2451,47 @@ export function useSignupMutation(baseOptions?: Apollo.MutationHookOptions<Signu
 export type SignupMutationHookResult = ReturnType<typeof useSignupMutation>;
 export type SignupMutationResult = Apollo.MutationResult<SignupMutation>;
 export type SignupMutationOptions = Apollo.BaseMutationOptions<SignupMutation, SignupMutationVariables>;
+export const SocialLoginDocument = gql`
+    mutation socialLogin($data: SocialLoginInput!) {
+  socialLogin(data: $data) {
+    access_token
+    expiresAt
+    user {
+      userId
+      email
+      name
+      isCustomer
+      isSupplier
+    }
+  }
+}
+    `;
+export type SocialLoginMutationFn = Apollo.MutationFunction<SocialLoginMutation, SocialLoginMutationVariables>;
+
+/**
+ * __useSocialLoginMutation__
+ *
+ * To run a mutation, you first call `useSocialLoginMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSocialLoginMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [socialLoginMutation, { data, loading, error }] = useSocialLoginMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useSocialLoginMutation(baseOptions?: Apollo.MutationHookOptions<SocialLoginMutation, SocialLoginMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SocialLoginMutation, SocialLoginMutationVariables>(SocialLoginDocument, options);
+      }
+export type SocialLoginMutationHookResult = ReturnType<typeof useSocialLoginMutation>;
+export type SocialLoginMutationResult = Apollo.MutationResult<SocialLoginMutation>;
+export type SocialLoginMutationOptions = Apollo.BaseMutationOptions<SocialLoginMutation, SocialLoginMutationVariables>;
 export const BookingEventForCustomerDocument = gql`
     subscription bookingEventForCustomer($customerId: Int!) {
   bookingEventForCustomer(customerId: $customerId) {

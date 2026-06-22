@@ -1,0 +1,11 @@
+mutation completeOnboarding($data: CompleteOnboardingInput!) {
+  completeOnboarding(data: $data) {
+    access_token
+    expiresAt
+    user {
+      userId
+      isCustomer
+      isSupplier
+    }
+  }
+}

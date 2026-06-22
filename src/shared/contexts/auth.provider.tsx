@@ -1,5 +1,6 @@
 import React, { FC, useCallback, useEffect, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
+import { signOut } from 'next-auth/react';
 
 import AuthContext from './auth.context';
 
@@ -112,8 +113,11 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
 
       await client.clearStore();
       await AuthService.logout();
+      // Also tear down any NextAuth (social) session. No-op for password users.
+      await signOut({ redirect: false }).catch(() => {});
 
       setIsAuthenticated(false);
+      setUser(undefined);
     } catch (error) { }
 
     setIsLoading(false);
