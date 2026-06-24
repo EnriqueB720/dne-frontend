@@ -107,12 +107,11 @@ function packageGroupKey(r: any): string {
 }
 
 // Rotating tints for adjacent package batches so they read as distinct groups.
-// Borders use Tailwind 200-level tints of the matching accent.
+// Limited to two non-status blues — emerald/amber/rose all map to status pills
+// on this page, so using them as a package highlight would be misleading.
 const PKG_PALETTE: { bg: string; border: string; accent: string }[] = [
   { bg: solvoColors.indigoLight, border: solvoColors.indigoBorder, accent: solvoColors.indigo },
-  { bg: solvoColors.emeraldLight, border: '#A7F3D0', accent: solvoColors.emeraldText },
-  { bg: solvoColors.amberLight, border: '#FDE68A', accent: solvoColors.amberText },
-  { bg: solvoColors.roseLight, border: '#FECDD3', accent: solvoColors.roseText },
+  { bg: '#F0F9FF', border: '#BAE6FD', accent: '#0369A1' }, // sky
 ];
 
 /** Bucket requests into ordered groups by package signature (first-seen order). */
