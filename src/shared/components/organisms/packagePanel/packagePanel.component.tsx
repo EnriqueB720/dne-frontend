@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Package, Trash2, Send, ShoppingBag } from 'lucide-react';
+import { X, Package, Trash2, Send, ShoppingBag, Info } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import type { PackageItem } from '@/shared/jotai/package.atom';
@@ -46,6 +46,10 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
     (sum, item) => sum + parsePriceColones(item.priceLabel),
     0,
   );
+
+  // Tooltip on the "Estimated total" info icon — prices are listing estimates,
+  // confirmed for real only in each supplier's quote.
+  const [showPriceInfo, setShowPriceInfo] = React.useState(false);
 
   // Close drawer on Escape (only matters below lg)
   React.useEffect(() => {
@@ -341,9 +345,55 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
         >
           {/* Subtotal */}
           <Flex justify="space-between" align="center" marginBottom="12px">
-            <Text fontSize="sm" color={solvoColors.textMuted}>
-              Estimated total
-            </Text>
+            <Flex align="center" gap="5px">
+              <Text fontSize="sm" color={solvoColors.textMuted}>
+                Estimated total
+              </Text>
+              <Box
+                position="relative"
+                display="inline-flex"
+                onMouseEnter={() => setShowPriceInfo(true)}
+                onMouseLeave={() => setShowPriceInfo(false)}
+              >
+                <Box
+                  as="button"
+                  display="inline-flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  color={solvoColors.textSubtle}
+                  cursor="help"
+                  onClick={() => setShowPriceInfo((v) => !v)}
+                  aria-label="About these prices"
+                  style={{ border: 'none', background: 'transparent', padding: 0 }}
+                >
+                  <Info size={13} />
+                </Box>
+                {showPriceInfo && (
+                  <Box
+                    position="absolute"
+                    bottom="calc(100% + 8px)"
+                    left="50%"
+                    width="210px"
+                    padding="8px 10px"
+                    borderRadius="8px"
+                    bg={solvoColors.text}
+                    color="white"
+                    zIndex={1200}
+                    style={{
+                      transform: 'translateX(-50%)',
+                      boxShadow: solvoShadows.floatingPanel,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <Text fontSize="11px" lineHeight="1.5" color="white">
+                      Prices shown are estimates from each provider&apos;s listing and
+                      may vary. The final price is confirmed in the quote each
+                      supplier sends you.
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+            </Flex>
             <Text
               fontFamily={solvoFonts.serif}
               fontSize="lg"

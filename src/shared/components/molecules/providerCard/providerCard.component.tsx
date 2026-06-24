@@ -352,8 +352,9 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
 
               <Flex flex="1" />
 
-              {/* Package toggle button */}
-              {onTogglePackage && (
+              {/* Package toggle button — only for in-network (real) suppliers;
+                  AI-suggested providers can't be added to a package. */}
+              {onTogglePackage && provider.isRealSupplier && (
                 <motion.button
                   onClick={() => onTogglePackage(provider)}
                   whileTap={{ scale: 0.95 }}

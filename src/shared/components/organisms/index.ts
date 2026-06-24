@@ -4,6 +4,7 @@ import ChatSidebar from './chatSidebar/chatSidebar.component';
 import ChatThread from './chatThread/chatThread.component';
 import ChatComposer from './chatComposer/chatComposer.component';
 import PackagePanel from './packagePanel/packagePanel.component';
+import MultiQuoteModal from './multiQuoteModal/multiQuoteModal.component';
 
 export {
   PostGrid,
@@ -12,4 +13,6 @@ export {
   ChatThread,
   ChatComposer,
   PackagePanel,
+  MultiQuoteModal,
 };
+export type { MultiQuoteFormData } from './multiQuoteModal/multiQuoteModal.component';
