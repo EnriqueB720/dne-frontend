@@ -381,80 +381,85 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
 
               <Flex flex="1" />
 
-              {/* Package toggle button */}
-              {onTogglePackage && (
-                <motion.button
-                  onClick={() => onTogglePackage(provider)}
-                  whileTap={{ scale: 0.95 }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '8px 14px',
-                    borderRadius: '10px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    border: `1px solid ${isInPackage ? solvoColors.emeraldText : solvoColors.border}`,
-                    background: isInPackage ? '#D1FAE5' : 'white',
-                    color: isInPackage ? solvoColors.emeraldText : solvoColors.textMuted,
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {isInPackage ? (
-                    <>
-                      <PackageCheck size={14} />
-                      Remove
-                    </>
-                  ) : (
-                    <>
-                      <PackagePlus size={14} />
-                      Add to package
-                    </>
-                  )}
-                </motion.button>
-              )}
+              {/* Buttons stay on a single row regardless of how many
+                  contact links pushed onto the previous lines. */}
+              <Flex gap="8px" align="center" flexShrink={0}>
+                {onTogglePackage && (
+                  <motion.button
+                    onClick={() => onTogglePackage(provider)}
+                    whileTap={{ scale: 0.95 }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '8px 14px',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      border: `1px solid ${isInPackage ? solvoColors.emeraldText : solvoColors.border}`,
+                      background: isInPackage ? '#D1FAE5' : 'white',
+                      color: isInPackage ? solvoColors.emeraldText : solvoColors.textMuted,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {isInPackage ? (
+                      <>
+                        <PackageCheck size={14} />
+                        Remove
+                      </>
+                    ) : (
+                      <>
+                        <PackagePlus size={14} />
+                        Add to package
+                      </>
+                    )}
+                  </motion.button>
+                )}
 
-              {/* View profile (in-network only) — out-of-network providers
-                  have no DB-backed storefront, so the slot is empty. */}
-              {provider.isRealSupplier && (
+                {/* View profile (in-network only) — out-of-network providers
+                    have no DB-backed storefront, so the slot is empty. */}
+                {provider.isRealSupplier && (
+                  <Flex
+                    as="button"
+                    align="center"
+                    gap="6px"
+                    padding="8px 14px"
+                    borderRadius="10px"
+                    bg="white"
+                    borderWidth="1px"
+                    borderColor={solvoColors.text}
+                    color={solvoColors.text}
+                    fontSize="sm"
+                    fontWeight="500"
+                    cursor="pointer"
+                    onClick={() => onViewProfile?.(provider)}
+                    style={{ whiteSpace: 'nowrap' }}
+                    _hover={{ bg: solvoColors.bg }}
+                  >
+                    View profile
+                  </Flex>
+                )}
+
                 <Flex
                   as="button"
                   align="center"
                   gap="6px"
                   padding="8px 14px"
                   borderRadius="10px"
-                  bg="white"
-                  borderWidth="1px"
-                  borderColor={solvoColors.text}
-                  color={solvoColors.text}
+                  bg={solvoColors.text}
+                  color="white"
                   fontSize="sm"
                   fontWeight="500"
                   cursor="pointer"
-                  onClick={() => onViewProfile?.(provider)}
-                  _hover={{ bg: solvoColors.bg }}
+                  onClick={() => onSelect?.(provider)}
+                  style={{ whiteSpace: 'nowrap' }}
+                  _hover={{ bg: solvoColors.indigo }}
                 >
-                  View profile
+                  Select
+                  <ArrowRight size={14} />
                 </Flex>
-              )}
-
-              {/* Select / view profile */}
-              <Flex
-                as="button"
-                align="center"
-                gap="6px"
-                padding="8px 14px"
-                borderRadius="10px"
-                bg={solvoColors.text}
-                color="white"
-                fontSize="sm"
-                fontWeight="500"
-                cursor="pointer"
-                onClick={() => onSelect?.(provider)}
-                _hover={{ bg: solvoColors.indigo }}
-              >
-                Select
-                <ArrowRight size={14} />
               </Flex>
             </Flex>
           </Box>
