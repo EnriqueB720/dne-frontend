@@ -1,0 +1,11 @@
+query topSuppliers($adminUserId: Int!, $limit: Int) {
+  topSuppliers(adminUserId: $adminUserId, limit: $limit) {
+    supplierId
+    companyName
+    city
+    bookingCount
+    quoteCount
+    grossRevenue
+    rating
+  }
+}

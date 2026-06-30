@@ -1,0 +1,11 @@
+query adminStats($adminUserId: Int!) {
+  adminStats(adminUserId: $adminUserId) {
+    totalUsers
+    totalCustomers
+    totalSuppliers
+    totalBookings
+    mtdRevenue
+    allTimeRevenue
+    currency
+  }
+}

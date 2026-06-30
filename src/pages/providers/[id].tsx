@@ -8,16 +8,34 @@ import {
   MapPin,
   MessageCircle,
   ShieldCheck,
+  Sparkles,
   Star,
 } from 'lucide-react';
 import { Box, Flex, Text, SolvoNavBar, Pill } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
+  PromotionTier,
   useFavoritesByCustomerQuery,
   useSupplierQuery,
   useToggleFavoriteMutation,
 } from '@generated';
+
+/**
+ * Whether a supplier currently qualifies for the "Sponsored" badge. Treats
+ * an expired or future-dated FEATURED promotion as inactive.
+ */
+function isSponsoredActive(
+  tier: PromotionTier | null | undefined,
+  startDate: unknown,
+  endDate: unknown,
+): boolean {
+  if (tier !== PromotionTier.Featured) return false;
+  const now = Date.now();
+  if (startDate && new Date(startDate as string).getTime() > now) return false;
+  if (endDate && new Date(endDate as string).getTime() < now) return false;
+  return true;
+}
 
 const PHOTO_TILES = ['🍽️', '🥗', '🍰', '🥂', '🌮'];
 
@@ -207,6 +225,26 @@ export default function ProviderProfile() {
                 <Box color={solvoColors.indigo} title="Verified business">
                   <ShieldCheck size={20} />
                 </Box>
+              )}
+              {isSponsoredActive(
+                supplier.promotionTier,
+                supplier.promotionStartDate,
+                supplier.promotionEndDate,
+              ) && (
+                <Flex
+                  align="center"
+                  gap="4px"
+                  padding="3px 10px"
+                  borderRadius="full"
+                  bg={solvoColors.indigoLight}
+                  color={solvoColors.indigo}
+                  fontSize="11px"
+                  fontWeight={600}
+                  title="Featured placement"
+                >
+                  <Sparkles size={12} />
+                  Sponsored
+                </Flex>
               )}
             </Flex>
 

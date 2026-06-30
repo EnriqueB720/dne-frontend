@@ -79,14 +79,20 @@ export default function Dashboard() {
   const viewerUserId = user?.userId ?? null;
   const displayName = user?.name?.split(' ')[0] ?? 'there';
 
-  // Supplier-only users land on the supplier workspace instead of seeing the
-  // "for customers" gate. Dual-role users (rare) still get the customer view
-  // since the URL they typed/clicked was /dashboard.
+  // Routing rules for /dashboard:
+  //  • Admins → /admin (their workspace, even if isCustomer is true from signup)
+  //  • Supplier-only users → /provider workspace
+  //  • Everyone else → the customer view rendered below
   useEffect(() => {
-    if (isAuthenticated && !customerId && supplierId) {
+    if (!isAuthenticated) return;
+    if (user?.isAdmin) {
+      router.replace('/admin');
+      return;
+    }
+    if (!customerId && supplierId) {
       router.replace('/provider');
     }
-  }, [isAuthenticated, customerId, supplierId, router]);
+  }, [isAuthenticated, user?.isAdmin, customerId, supplierId, router]);
 
   const [tab, setTab] = useState<TabId>('active');
 

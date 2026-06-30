@@ -13,6 +13,9 @@ query searchSuppliers($data: SupplierSearchInput!) {
     maxCapacity
     verified
     premium
+    promotionTier
+    promotionStartDate
+    promotionEndDate
     businessPhone
     businessEmail
     whatsappNumber
