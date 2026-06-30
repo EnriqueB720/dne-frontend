@@ -707,8 +707,13 @@ function RevenueBars({
   }
 
   const max = Math.max(...rows.map((r) => Number(r.platformFee)), 1);
-  // Show every Nth label so the axis doesn't overlap at long windows.
-  const labelStride = Math.max(1, Math.floor(rows.length / 8));
+  // Pick a handful of evenly-spaced labels along the x-axis so they fit
+  // within the card at any window size (7 / 30 / 90).
+  const labelCount = Math.min(rows.length, 7);
+  const labelRows = Array.from({ length: labelCount }, (_, k) => {
+    const idx = Math.round((k * (rows.length - 1)) / Math.max(labelCount - 1, 1));
+    return rows[idx];
+  });
 
   return (
     <Box>
@@ -752,14 +757,12 @@ function RevenueBars({
         })}
       </Flex>
       <Flex justify="space-between" marginTop="8px" padding="0 2px">
-        {rows.map((r, i) => (
+        {labelRows.map((r) => (
           <Text
             key={r.day}
             fontSize="10px"
             color={solvoColors.textSubtle}
-            flex="1"
-            textAlign="center"
-            style={{ visibility: i % labelStride === 0 ? 'visible' : 'hidden' }}
+            style={{ whiteSpace: 'nowrap' }}
           >
             {r.day.slice(5)}
           </Text>

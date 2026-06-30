@@ -337,19 +337,6 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
 
             {/* Action row */}
             <Flex gap="10px" wrap="wrap" align="center">
-              {/* Text links */}
-              <Text
-                as="button"
-                fontSize="sm"
-                fontWeight="500"
-                color={solvoColors.text}
-                cursor="pointer"
-                onClick={() => onViewProfile?.(provider)}
-                _hover={{ color: solvoColors.indigo }}
-              >
-                View profile
-              </Text>
-
               <a
                 href={link.href}
                 target="_blank"
