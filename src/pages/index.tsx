@@ -2363,7 +2363,9 @@ export default function Home() {
               onRemove={handleRemovePackageItem}
               onClear={handleClearPackage}
               onRequestQuotes={() => {
-                if (pkgState.items.length === 0) return;
+                // A package needs at least two providers — a single one is just
+                // a normal quote via the provider card's "Select".
+                if (pkgState.items.length < 2) return;
                 setRequestError(null);
                 setPackageQuoteOpen(true);
               }}

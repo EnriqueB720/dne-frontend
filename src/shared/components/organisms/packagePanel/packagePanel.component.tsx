@@ -47,6 +47,10 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
     0,
   );
 
+  // A package is only meaningful with 2+ providers — a single one is just a
+  // normal quote (via the provider card's "Select").
+  const canRequest = items.length >= 2;
+
   // Tooltip on the "Estimated total" info icon — prices are listing estimates,
   // confirmed for real only in each supplier's quote.
   const [showPriceInfo, setShowPriceInfo] = React.useState(false);
@@ -427,9 +431,11 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
             ))}
           </Flex>
 
-          {/* Request quotes button */}
+          {/* Request quotes button — a package needs at least two providers;
+              a single provider is just a normal quote via the card's "Select". */}
           <button
-            onClick={onRequestQuotes}
+            onClick={canRequest ? onRequestQuotes : undefined}
+            disabled={!canRequest}
             style={{
               width: '100%',
               display: 'flex',
@@ -443,7 +449,8 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
               color: 'white',
               fontSize: '13px',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: canRequest ? 'pointer' : 'not-allowed',
+              opacity: canRequest ? 1 : 0.45,
             }}
           >
             <Send size={14} />
@@ -456,7 +463,9 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
             textAlign="center"
             marginTop="8px"
           >
-            We'll contact each provider on your behalf
+            {canRequest
+              ? "We'll contact each provider on your behalf"
+              : 'Add another provider to request quotes as a package'}
           </Text>
         </Box>
       )}
