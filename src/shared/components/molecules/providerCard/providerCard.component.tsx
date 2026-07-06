@@ -384,7 +384,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
               {/* Buttons stay on a single row regardless of how many
                   contact links pushed onto the previous lines. */}
               <Flex gap="8px" align="center" flexShrink={0}>
-                {onTogglePackage && (
+                {onTogglePackage && provider.isRealSupplier && (
                   <motion.button
                     onClick={() => onTogglePackage(provider)}
                     whileTap={{ scale: 0.95 }}
