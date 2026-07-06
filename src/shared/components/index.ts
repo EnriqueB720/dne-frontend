@@ -51,7 +51,9 @@ import {
   ChatThread,
   ChatComposer,
   PackagePanel,
+  MultiQuoteModal,
 } from '@organisms';
+export type { MultiQuoteFormData } from '@organisms';
 
 export {
   Footer,
@@ -99,4 +101,5 @@ export {
   ChatThread,
   ChatComposer,
   PackagePanel,
+  MultiQuoteModal,
 }

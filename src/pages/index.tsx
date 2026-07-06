@@ -24,6 +24,8 @@ import {
   ChatThread,
   ChatComposer,
   PackagePanel,
+  MultiQuoteModal,
+  type MultiQuoteFormData,
   type ProviderData,
 } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
@@ -1019,17 +1021,17 @@ export default function Home() {
     [messages],
   );
 
-  const handleConfirmRequest = React.useCallback(async () => {
-    if (!selectModal) return;
-
-    // Resolve customerId (auth first, fall back to localStorage / prompt for testing)
+  // Resolve the active customerId — auth first, falling back to a
+  // localStorage / prompt value for testing. Sets `requestError` and returns
+  // null when it can't resolve one. Shared by the single- and multi-quote flows.
+  const resolveCustomerId = React.useCallback((): number | null => {
     let customerId = user?.customerId ?? null;
     if (!customerId) {
       if (isAuthenticated && user && !user.isCustomer) {
         setRequestError(
           'Your account is registered as a supplier — switch to a customer account to create requests.',
         );
-        return;
+        return null;
       }
       let customerIdStr =
         typeof window !== 'undefined'
@@ -1038,15 +1040,24 @@ export default function Home() {
       if (!customerIdStr) {
         customerIdStr =
           window.prompt('Enter your customer ID (or sign in to skip this prompt):') ?? '';
-        if (!customerIdStr.trim()) return;
+        if (!customerIdStr.trim()) return null;
         window.localStorage.setItem('solvo.test.customerId', customerIdStr.trim());
       }
       customerId = Number(customerIdStr);
       if (!Number.isFinite(customerId) || customerId <= 0) {
         setRequestError('Invalid customer ID');
-        return;
+        return null;
       }
     }
+    return customerId;
+  }, [user, isAuthenticated]);
+
+  const handleConfirmRequest = React.useCallback(async () => {
+    if (!selectModal) return;
+
+    // Resolve customerId (auth first, fall back to localStorage / prompt for testing)
+    const customerId = resolveCustomerId();
+    if (!customerId) return;
 
     if (!selectModal.serviceDate) {
       setRequestError('Pick a service date so the supplier can confirm availability.');
@@ -1112,7 +1123,7 @@ export default function Home() {
     } catch (err: any) {
       setRequestError(err?.message ?? 'Failed to create request');
     }
-  }, [selectModal, user, isAuthenticated, createRequest, createQuote, currentConvId]);
+  }, [selectModal, resolveCustomerId, createRequest, createQuote, currentConvId]);
 
   // ── Package builder ────────────────────────────────────────────────────
   const [pkgState, setPkgState] = useAtom(packageAtom);
@@ -1148,6 +1159,128 @@ export default function Home() {
   const handleClearPackage = React.useCallback(() => {
     setPkgState({ items: [] });
   }, [setPkgState]);
+
+  // ── Multi-quote: package → one request + quote per supplier ───────────────
+  const [packageQuoteOpen, setPackageQuoteOpen] = React.useState(false);
+  const [submittingPackage, setSubmittingPackage] = React.useState(false);
+  const [packageResult, setPackageResult] = React.useState<{
+    requestCount: number;
+    quoteCount: number;
+  } | null>(null);
+
+  const handleConfirmPackageQuotes = React.useCallback(
+    async (form: MultiQuoteFormData) => {
+      setRequestError(null);
+      const items = pkgState.items;
+      if (items.length === 0) return;
+
+      const customerId = resolveCustomerId();
+      if (!customerId) return;
+
+      if (!form.serviceDate) {
+        setRequestError('Pick a service date so suppliers can confirm availability.');
+        return;
+      }
+
+      // Every provider needs a budget — that amount becomes the supplier's
+      // individual quote price.
+      const missingBudget = items.find((it) => {
+        const v = Number(form.budgets[it.packageKey]);
+        return !Number.isFinite(v) || v <= 0;
+      });
+      if (missingBudget) {
+        setRequestError(`Enter a budget for ${missingBudget.name}.`);
+        return;
+      }
+
+      const guestCount = form.guestCount ? Number(form.guestCount) : null;
+      const city = form.city.trim() || null;
+      const baseQuery = form.rawQuery.trim();
+
+      setSubmittingPackage(true);
+      let quoteCount = 0;
+      const requestIds: number[] = [];
+      try {
+        // One request (and, for real suppliers, one quote) per provider. The
+        // shared event details are reused across all of them; only the budget
+        // differs per supplier.
+        for (const item of items) {
+          const budget = Number(form.budgets[item.packageKey]);
+          const rawQuery = baseQuery
+            ? `${baseQuery} — ${item.name}`
+            : `Interested in ${item.name}`;
+
+          const { data } = await createRequest({
+            variables: {
+              data: {
+                customerId,
+                rawQuery,
+                city,
+                serviceDate: form.serviceDate,
+                guestCount,
+                budgetMin: budget,
+                budgetMax: budget,
+              } as any,
+            },
+          });
+          const requestId = data?.createRequest.requestId;
+          if (!requestId) continue;
+          requestIds.push(requestId);
+
+          if (currentConvId) {
+            linkConversationToRequest(currentConvId, requestId).catch(() => {
+              /* non-critical — request exists, link is just a convenience */
+            });
+          }
+
+          // Auto-create the quote only for real DB suppliers — the per-supplier
+          // budget becomes that quote's total price.
+          if (item.isRealSupplier && item.id > 0) {
+            const validUntil = new Date();
+            validUntil.setDate(validUntil.getDate() + 14);
+            await createQuote({
+              variables: {
+                data: {
+                  requestId,
+                  supplierId: item.id,
+                  totalPrice: budget,
+                  currency: 'CRC',
+                  message: form.message || `Quote for "${rawQuery}".`,
+                  validUntil: validUntil.toISOString(),
+                } as any,
+              },
+            })
+              .then(() => {
+                quoteCount += 1;
+              })
+              .catch(() => {
+                /* non-fatal — request is created, supplier can quote manually */
+              });
+          }
+        }
+
+        if (requestIds.length === 0) {
+          throw new Error('No requests were created');
+        }
+
+        setPackageResult({ requestCount: requestIds.length, quoteCount });
+        setPackageQuoteOpen(false);
+        handleClearPackage();
+      } catch (err: any) {
+        setRequestError(err?.message ?? 'Failed to request quotes');
+      } finally {
+        setSubmittingPackage(false);
+      }
+    },
+    [
+      pkgState.items,
+      resolveCustomerId,
+      createRequest,
+      createQuote,
+      currentConvId,
+      handleClearPackage,
+    ],
+  );
 
   // ── Load conversations on mount + whenever auth state flips ───────────
   // Re-running on `isAuthenticated` change is what makes login show the
@@ -2094,6 +2227,67 @@ export default function Home() {
           </Text>
         </Box>
       )}
+
+      {/* Multi-quote modal — opened from the package panel's "Request quotes" */}
+      {packageQuoteOpen && (
+        <MultiQuoteModal
+          items={pkgState.items}
+          defaultRawQuery={
+            messages.filter((m) => m.role === 'user').slice(-1)[0]?.content ?? ''
+          }
+          submitting={submittingPackage}
+          error={requestError}
+          onConfirm={handleConfirmPackageQuotes}
+          onClose={() => !submittingPackage && setPackageQuoteOpen(false)}
+        />
+      )}
+
+      {/* Multi-quote success toast */}
+      {packageResult && (
+        <Box
+          position="fixed"
+          top="80px"
+          right="24px"
+          padding="14px 18px"
+          borderRadius="12px"
+          bg={solvoColors.surface}
+          border={`1px solid ${solvoColors.emerald}`}
+          maxWidth="360px"
+          zIndex={1000}
+          style={{ boxShadow: solvoShadows.floatingPanel }}
+        >
+          <Text fontSize="sm" fontWeight={600} color={solvoColors.text} marginBottom="4px">
+            {packageResult.requestCount} request
+            {packageResult.requestCount === 1 ? '' : 's'} created
+          </Text>
+          <Text fontSize="xs" color={solvoColors.textMuted} marginBottom="10px">
+            {packageResult.quoteCount} quote{packageResult.quoteCount === 1 ? '' : 's'} sent
+            to suppliers. Track replies under your requests.
+          </Text>
+          <Flex gap="10px">
+            <Link href="/requests" style={{ textDecoration: 'none' }}>
+              <Text
+                as="span"
+                fontSize="xs"
+                fontWeight={600}
+                color={solvoColors.indigo}
+                cursor="pointer"
+              >
+                View requests →
+              </Text>
+            </Link>
+            <Text
+              as="span"
+              fontSize="xs"
+              color={solvoColors.textSubtle}
+              cursor="pointer"
+              onClick={() => setPackageResult(null)}
+            >
+              Dismiss
+            </Text>
+          </Flex>
+        </Box>
+      )}
     </>
   );
 
@@ -2168,11 +2362,13 @@ export default function Home() {
               items={pkgState.items}
               onRemove={handleRemovePackageItem}
               onClear={handleClearPackage}
-              onRequestQuotes={() =>
-                alert(
-                  `Requesting quotes for ${pkgState.items.length} provider(s): ${pkgState.items.map((i) => i.name).join(', ')}`,
-                )
-              }
+              onRequestQuotes={() => {
+                // A package needs at least two providers — a single one is just
+                // a normal quote via the provider card's "Select".
+                if (pkgState.items.length < 2) return;
+                setRequestError(null);
+                setPackageQuoteOpen(true);
+              }}
               isOpen={packageOpen}
               onClose={() => setPackageOpen(false)}
             />

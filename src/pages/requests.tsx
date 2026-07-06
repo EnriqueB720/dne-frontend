@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, MessageSquare } from 'lucide-react';
+import { Bell, MessageSquare, Package } from 'lucide-react';
 import { Box, Flex, Text, Pill, SolvoNavBar, QuoteCreateModal } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
@@ -84,6 +84,50 @@ const sectionStyle: React.CSSProperties = {
 
 const formatDate = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString() : '—';
+
+// Requests created together from a package each become their own row, but they
+// share identical event details and a rawQuery of the form
+// "<shared text> — <supplier name>". We group rows by that signature so a
+// multi-provider package reads as one batch on the customer's list.
+const PKG_SEP = ' — ';
+
+function packageBaseQuery(rawQuery?: string | null): string {
+  const raw = rawQuery ?? '';
+  const idx = raw.lastIndexOf(PKG_SEP);
+  return idx > 0 ? raw.slice(0, idx) : raw;
+}
+
+function packageGroupKey(r: any): string {
+  return [
+    packageBaseQuery(r.rawQuery),
+    r.serviceDate ?? '',
+    r.city ?? '',
+    r.guestCount ?? '',
+  ].join('|');
+}
+
+// Rotating tints for adjacent package batches so they read as distinct groups.
+// Limited to two non-status blues — emerald/amber/rose all map to status pills
+// on this page, so using them as a package highlight would be misleading.
+const PKG_PALETTE: { bg: string; border: string; accent: string }[] = [
+  { bg: solvoColors.indigoLight, border: solvoColors.indigoBorder, accent: solvoColors.indigo },
+  { bg: '#F0F9FF', border: '#BAE6FD', accent: '#0369A1' }, // sky
+];
+
+/** Bucket requests into ordered groups by package signature (first-seen order). */
+function groupRequests(requests: any[]): any[][] {
+  const map = new Map<string, any[]>();
+  const order: string[] = [];
+  for (const r of requests) {
+    const key = packageGroupKey(r);
+    if (!map.has(key)) {
+      map.set(key, []);
+      order.push(key);
+    }
+    map.get(key)!.push(r);
+  }
+  return order.map((k) => map.get(k)!);
+}
 
 export default function RequestsTestPage() {
   const { isAuthenticated, user } = useContext(AuthContext);
@@ -367,6 +411,128 @@ export default function RequestsTestPage() {
     quotesState.loading ||
     acceptState.loading;
 
+  // A single request row — reused for standalone requests and rows inside a
+  // package batch.
+  const renderRequestRow = (r: any) => {
+    const tone = STATUS_TONE[r.status] ?? STATUS_TONE.CLOSED;
+    const isSelected = r.requestId === selectedRequestId;
+    const unread = unreadByRequest.get(r.requestId) ?? 0;
+    return (
+      <Box
+        key={r.requestId}
+        onClick={() => handleSelectRequest(r.requestId)}
+        position="relative"
+        padding="12px 14px"
+        borderRadius="10px"
+        border={`1px solid ${isSelected ? solvoColors.text : unread > 0 ? solvoColors.indigoBorder : solvoColors.border}`}
+        bg={isSelected ? '#FAFAF9' : solvoColors.surface}
+        cursor="pointer"
+      >
+        {unread > 0 && (
+          <Box
+            position="absolute"
+            top="-6px"
+            left="-6px"
+            minWidth="22px"
+            height="22px"
+            padding="0 6px"
+            borderRadius="9999px"
+            bg={solvoColors.indigo}
+            color={solvoColors.surface}
+            fontSize="11px"
+            fontWeight={700}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            style={{ boxShadow: `0 0 0 2px ${solvoColors.surface}` }}
+          >
+            {unread}
+          </Box>
+        )}
+        <Flex justify="space-between" align="center" gap="10px">
+          <Box minWidth="0" flex="1">
+            <Flex align="center" gap="6px" marginBottom="2px">
+              <Text fontSize="sm" fontWeight={600} color={solvoColors.text} truncate>
+                {role === 'supplier'
+                  ? (
+                      (r as any).customer?.user?.name
+                        ? `${(r as any).customer.user.name} — ${r.rawQuery}`
+                        : r.rawQuery
+                    )
+                  : r.rawQuery}
+              </Text>
+              {unread > 0 && (
+                <Box
+                  padding="1px 7px"
+                  borderRadius="9999px"
+                  bg={solvoColors.indigoLight}
+                  color={solvoColors.indigo}
+                  fontSize="10px"
+                  fontWeight={700}
+                  letterSpacing="0.04em"
+                  flexShrink={0}
+                >
+                  NEW
+                </Box>
+              )}
+            </Flex>
+            <Text fontSize="xs" color={solvoColors.textSubtle}>
+              {r.city ?? 'No city'} · {r.guestCount ?? '—'} guests · {formatDate(r.createdAt)}
+            </Text>
+          </Box>
+          <Flex align="center" gap="8px" flexShrink={0}>
+            <Box
+              padding="4px 10px"
+              borderRadius="9999px"
+              bg={tone.bg}
+              color={tone.fg}
+              fontSize="11px"
+              fontWeight={600}
+            >
+              {r.status}
+            </Box>
+            {/* Quick "Send quote" CTA on Open leads rows — opens a popup */}
+            {role === 'supplier' && supplierTab === 'open' && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setQuoteModalFor({
+                    requestId: r.requestId,
+                    preview: r.rawQuery,
+                    customerName: r.customer?.user?.name,
+                    meta: [
+                      r.city,
+                      r.guestCount ? `${r.guestCount} guests` : null,
+                      r.serviceDate
+                        ? new Date(r.serviceDate).toLocaleDateString(undefined, {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · '),
+                  });
+                }}
+                style={{
+                  ...buttonBaseStyle,
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  background: solvoColors.text,
+                  color: solvoColors.surface,
+                }}
+              >
+                Send quote
+              </button>
+            )}
+          </Flex>
+        </Flex>
+      </Box>
+    );
+  };
+
   // ── Gating: not signed in / not a customer ────────────────────────────
   if (!isAuthenticated || !user) {
     return (
@@ -537,125 +703,77 @@ export default function RequestsTestPage() {
                 </Text>
               ) : (
                 <Flex direction="column" gap="8px">
-                  {requests.map((r) => {
-                    const tone = STATUS_TONE[r.status] ?? STATUS_TONE.CLOSED;
-                    const isSelected = r.requestId === selectedRequestId;
-                    const unread = unreadByRequest.get(r.requestId) ?? 0;
-                    return (
-                      <Box
-                        key={r.requestId}
-                        onClick={() => handleSelectRequest(r.requestId)}
-                        position="relative"
-                        padding="12px 14px"
-                        borderRadius="10px"
-                        border={`1px solid ${isSelected ? solvoColors.text : unread > 0 ? solvoColors.indigoBorder : solvoColors.border}`}
-                        bg={isSelected ? '#FAFAF9' : solvoColors.surface}
-                        cursor="pointer"
-                      >
-                        {unread > 0 && (
-                          <Box
-                            position="absolute"
-                            top="-6px"
-                            left="-6px"
-                            minWidth="22px"
-                            height="22px"
-                            padding="0 6px"
-                            borderRadius="9999px"
-                            bg={solvoColors.indigo}
-                            color={solvoColors.surface}
-                            fontSize="11px"
-                            fontWeight={700}
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
-                            style={{ boxShadow: `0 0 0 2px ${solvoColors.surface}` }}
-                          >
-                            {unread}
-                          </Box>
-                        )}
-                        <Flex justify="space-between" align="center" gap="10px">
-                          <Box minWidth="0" flex="1">
-                            <Flex align="center" gap="6px" marginBottom="2px">
-                              <Text fontSize="sm" fontWeight={600} color={solvoColors.text} truncate>
-                                {role === 'supplier'
-                                  ? (
-                                      (r as any).customer?.user?.name
-                                        ? `${(r as any).customer.user.name} — ${r.rawQuery}`
-                                        : r.rawQuery
-                                    )
-                                  : r.rawQuery}
-                              </Text>
-                              {unread > 0 && (
-                                <Box
-                                  padding="1px 7px"
-                                  borderRadius="9999px"
-                                  bg={solvoColors.indigoLight}
-                                  color={solvoColors.indigo}
-                                  fontSize="10px"
-                                  fontWeight={700}
-                                  letterSpacing="0.04em"
-                                  flexShrink={0}
-                                >
-                                  NEW
-                                </Box>
-                              )}
-                            </Flex>
-                            <Text fontSize="xs" color={solvoColors.textSubtle}>
-                              {r.city ?? 'No city'} · {r.guestCount ?? '—'} guests · {formatDate(r.createdAt)}
-                            </Text>
-                          </Box>
-                          <Flex align="center" gap="8px" flexShrink={0}>
-                            <Box
-                              padding="4px 10px"
-                              borderRadius="9999px"
-                              bg={tone.bg}
-                              color={tone.fg}
-                              fontSize="11px"
-                              fontWeight={600}
+                  {(() => {
+                    // Counter so each package batch picks the next palette tint,
+                    // making adjacent packages visually distinct.
+                    let pkgIdx = 0;
+                    return groupRequests(requests).map((group) => {
+                      // Standalone request — render the row as-is.
+                      if (group.length < 2) return renderRequestRow(group[0]);
+
+                      // Package batch — bracket the rows with a shared highlight so
+                      // it's clear they came from one multi-provider request.
+                      const first = group[0];
+                      const palette = PKG_PALETTE[pkgIdx % PKG_PALETTE.length];
+                      pkgIdx += 1;
+                      const groupUnread = group.reduce(
+                        (sum, r) => sum + (unreadByRequest.get(r.requestId) ?? 0),
+                        0,
+                      );
+                      return (
+                        <Box
+                          key={`pkg-${first.requestId}`}
+                          border={`1px solid ${palette.border}`}
+                          borderRadius="14px"
+                          bg={palette.bg}
+                          padding="10px"
+                        >
+                          <Flex align="center" gap="8px" marginBottom="10px" paddingX="4px">
+                            <Flex
+                              width="22px"
+                              height="22px"
+                              borderRadius="7px"
+                              bg={palette.accent}
+                              color={solvoColors.surface}
+                              align="center"
+                              justify="center"
+                              flexShrink={0}
                             >
-                              {r.status}
-                            </Box>
-                            {/* Quick "Send quote" CTA on Open leads rows — opens a popup */}
-                            {role === 'supplier' && supplierTab === 'open' && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setQuoteModalFor({
-                                    requestId: r.requestId,
-                                    preview: r.rawQuery,
-                                    customerName: r.customer?.user?.name,
-                                    meta: [
-                                      r.city,
-                                      r.guestCount ? `${r.guestCount} guests` : null,
-                                      r.serviceDate
-                                        ? new Date(r.serviceDate).toLocaleDateString(undefined, {
-                                            weekday: 'short',
-                                            month: 'short',
-                                            day: 'numeric',
-                                          })
-                                        : null,
-                                    ]
-                                      .filter(Boolean)
-                                      .join(' · '),
-                                  });
-                                }}
-                                style={{
-                                  ...buttonBaseStyle,
-                                  padding: '6px 12px',
-                                  fontSize: '12px',
-                                  background: solvoColors.text,
-                                  color: solvoColors.surface,
-                                }}
+                              <Package size={12} />
+                            </Flex>
+                            <Text fontSize="xs" fontWeight={700} color={palette.accent} truncate>
+                              Package · {group.length} providers
+                            </Text>
+                            {groupUnread > 0 && (
+                              <Box
+                                padding="1px 7px"
+                                borderRadius="9999px"
+                                bg={palette.accent}
+                                color={solvoColors.surface}
+                                fontSize="10px"
+                                fontWeight={700}
+                                flexShrink={0}
                               >
-                                Send quote
-                              </button>
+                                {groupUnread} NEW
+                              </Box>
                             )}
+                            <Text
+                              fontSize="11px"
+                              color={palette.accent}
+                              marginLeft="auto"
+                              flexShrink={0}
+                              style={{ opacity: 0.8 }}
+                            >
+                              {first.city ?? 'No city'} · {first.guestCount ?? '—'} guests
+                            </Text>
                           </Flex>
-                        </Flex>
-                      </Box>
-                    );
-                  })}
+                          <Flex direction="column" gap="8px">
+                            {group.map((r) => renderRequestRow(r))}
+                          </Flex>
+                        </Box>
+                      );
+                    });
+                  })()}
                 </Flex>
               )}
             </Box>
