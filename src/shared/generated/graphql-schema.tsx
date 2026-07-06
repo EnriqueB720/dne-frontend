@@ -18,6 +18,17 @@ export type Scalars = {
   DateTime: { input: any; output: any; }
 };
 
+export type AdminStats = {
+  __typename?: 'AdminStats';
+  allTimeRevenue: Scalars['String']['output'];
+  currency: Scalars['String']['output'];
+  mtdRevenue: Scalars['String']['output'];
+  totalBookings: Scalars['Int']['output'];
+  totalCustomers: Scalars['Int']['output'];
+  totalSuppliers: Scalars['Int']['output'];
+  totalUsers: Scalars['Int']['output'];
+};
+
 export type AiChatMessageInput = {
   content: Scalars['String']['input'];
   role: Scalars['String']['input'];
@@ -98,6 +109,15 @@ export type AiMessageUsage = {
   __typename?: 'AiMessageUsage';
   inputTokens?: Maybe<Scalars['Float']['output']>;
   outputTokens?: Maybe<Scalars['Float']['output']>;
+};
+
+export type AiUsageBreakdownRow = {
+  __typename?: 'AiUsageBreakdownRow';
+  costUsd: Scalars['String']['output'];
+  inputTokens: Scalars['Int']['output'];
+  modelName: Scalars['String']['output'];
+  outputTokens: Scalars['Int']['output'];
+  requests: Scalars['Int']['output'];
 };
 
 export type Booking = {
@@ -433,6 +453,7 @@ export type Mutation = {
   rollbackLastAiTurn: Scalars['Float']['output'];
   sendAiMessage: SendAiMessageResult;
   sendMessage: Message;
+  setSupplierPromotion: SupplierPromotionResult;
   signup: User;
   socialLogin: LoginOutput;
   toggleFavorite: FavoriteToggleResult;
@@ -604,6 +625,11 @@ export type MutationSendAiMessageArgs = {
 
 export type MutationSendMessageArgs = {
   data: MessageSendInput;
+};
+
+
+export type MutationSetSupplierPromotionArgs = {
+  data: SetSupplierPromotionInput;
 };
 
 
@@ -799,11 +825,18 @@ export type PricingWhereInput = {
   planId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export enum PromotionTier {
+  Featured = 'FEATURED',
+  None = 'NONE'
+}
+
 export type Query = {
   __typename?: 'Query';
+  adminStats: AdminStats;
   aiConversation: AiConversation;
   aiConversations: Array<AiConversation>;
   aiMessages: Array<AiMessage>;
+  aiUsageBreakdown: Array<AiUsageBreakdownRow>;
   booking: Booking;
   bookingsByCustomer: Array<Booking>;
   bookingsBySupplier: Array<Booking>;
@@ -829,14 +862,21 @@ export type Query = {
   request: Request;
   requestsByCustomer: Array<Request>;
   requestsBySupplier: Array<Request>;
+  revenueByDay: Array<RevenueByDayRow>;
   search: Search;
   searchSuppliers: Array<Supplier>;
   subscription: PlanSubscription;
   supplier: Supplier;
   supplierDashboardStats: SupplierDashboardStats;
   suppliers: Array<Supplier>;
+  topSuppliers: Array<TopSupplierRow>;
   unreadNotificationCount: Scalars['Int']['output'];
   user: User;
+};
+
+
+export type QueryAdminStatsArgs = {
+  adminUserId: Scalars['Int']['input'];
 };
 
 
@@ -854,6 +894,12 @@ export type QueryAiConversationsArgs = {
 export type QueryAiMessagesArgs = {
   conversationId: Scalars['String']['input'];
   deviceId?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAiUsageBreakdownArgs = {
+  adminUserId: Scalars['Int']['input'];
+  daysBack?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -1000,6 +1046,12 @@ export type QueryRequestsBySupplierArgs = {
 };
 
 
+export type QueryRevenueByDayArgs = {
+  adminUserId: Scalars['Int']['input'];
+  daysBack?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QuerySearchArgs = {
   query?: InputMaybe<Scalars['String']['input']>;
   skip?: InputMaybe<Scalars['Float']['input']>;
@@ -1024,6 +1076,12 @@ export type QuerySupplierArgs = {
 
 export type QuerySupplierDashboardStatsArgs = {
   supplierId: Scalars['Int']['input'];
+};
+
+
+export type QueryTopSuppliersArgs = {
+  adminUserId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -1199,6 +1257,13 @@ export type RequestWhereInput = {
   requestId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type RevenueByDayRow = {
+  __typename?: 'RevenueByDayRow';
+  bookings: Scalars['Int']['output'];
+  day: Scalars['String']['output'];
+  platformFee: Scalars['String']['output'];
+};
+
 export type Review = {
   __typename?: 'Review';
   bookingId: Scalars['Int']['output'];
@@ -1260,6 +1325,14 @@ export type Service = {
   serviceId: Scalars['Float']['output'];
   supplierId: Scalars['Float']['output'];
   unitLabel?: Maybe<Scalars['String']['output']>;
+};
+
+export type SetSupplierPromotionInput = {
+  adminUserId: Scalars['Int']['input'];
+  endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  startDate?: InputMaybe<Scalars['DateTime']['input']>;
+  supplierId: Scalars['Int']['input'];
+  tier: PromotionTier;
 };
 
 export type SignUpInput = {
@@ -1361,6 +1434,9 @@ export type Supplier = {
   minCapacity?: Maybe<Scalars['Float']['output']>;
   posts?: Maybe<Array<Post>>;
   premium?: Maybe<Scalars['Boolean']['output']>;
+  promotionEndDate?: Maybe<Scalars['DateTime']['output']>;
+  promotionStartDate?: Maybe<Scalars['DateTime']['output']>;
+  promotionTier: PromotionTier;
   rating?: Maybe<Scalars['String']['output']>;
   responseTimeMinutes?: Maybe<Scalars['Float']['output']>;
   reviewCount?: Maybe<Scalars['Float']['output']>;
@@ -1400,6 +1476,14 @@ export type SupplierDashboardStats = {
   weeklyLeadCounts: Array<Scalars['Int']['output']>;
 };
 
+export type SupplierPromotionResult = {
+  __typename?: 'SupplierPromotionResult';
+  promotionEndDate?: Maybe<Scalars['DateTime']['output']>;
+  promotionStartDate?: Maybe<Scalars['DateTime']['output']>;
+  promotionTier: PromotionTier;
+  supplierId: Scalars['Int']['output'];
+};
+
 export type SupplierSearchInput = {
   categoryId?: InputMaybe<Scalars['Int']['input']>;
   city?: InputMaybe<Scalars['String']['input']>;
@@ -1426,6 +1510,17 @@ export type SupplierUpdateInput = {
 
 export type SupplierWhereInput = {
   supplierId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type TopSupplierRow = {
+  __typename?: 'TopSupplierRow';
+  bookingCount: Scalars['Int']['output'];
+  city?: Maybe<Scalars['String']['output']>;
+  companyName: Scalars['String']['output'];
+  grossRevenue: Scalars['String']['output'];
+  quoteCount: Scalars['Int']['output'];
+  rating?: Maybe<Scalars['String']['output']>;
+  supplierId: Scalars['Int']['output'];
 };
 
 export type User = {
@@ -1470,6 +1565,49 @@ export type UserWhereInput = {
   email?: InputMaybe<Scalars['String']['input']>;
   userId?: InputMaybe<Scalars['Int']['input']>;
 };
+
+export type AdminStatsQueryVariables = Exact<{
+  adminUserId: Scalars['Int']['input'];
+}>;
+
+
+export type AdminStatsQuery = { __typename?: 'Query', adminStats: { __typename?: 'AdminStats', totalUsers: number, totalCustomers: number, totalSuppliers: number, totalBookings: number, mtdRevenue: string, allTimeRevenue: string, currency: string } };
+
+export type AdminSuppliersQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AdminSuppliersQuery = { __typename?: 'Query', suppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, city?: string | null, rating?: string | null, reviewCount?: number | null, verified?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null }> };
+
+export type AiUsageBreakdownQueryVariables = Exact<{
+  adminUserId: Scalars['Int']['input'];
+  daysBack?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type AiUsageBreakdownQuery = { __typename?: 'Query', aiUsageBreakdown: Array<{ __typename?: 'AiUsageBreakdownRow', modelName: string, requests: number, inputTokens: number, outputTokens: number, costUsd: string }> };
+
+export type RevenueByDayQueryVariables = Exact<{
+  adminUserId: Scalars['Int']['input'];
+  daysBack?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type RevenueByDayQuery = { __typename?: 'Query', revenueByDay: Array<{ __typename?: 'RevenueByDayRow', day: string, platformFee: string, bookings: number }> };
+
+export type SetSupplierPromotionMutationVariables = Exact<{
+  data: SetSupplierPromotionInput;
+}>;
+
+
+export type SetSupplierPromotionMutation = { __typename?: 'Mutation', setSupplierPromotion: { __typename?: 'SupplierPromotionResult', supplierId: number, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null } };
+
+export type TopSuppliersQueryVariables = Exact<{
+  adminUserId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type TopSuppliersQuery = { __typename?: 'Query', topSuppliers: Array<{ __typename?: 'TopSupplierRow', supplierId: number, companyName: string, city?: string | null, bookingCount: number, quoteCount: number, grossRevenue: string, rating?: string | null }> };
 
 export type AiCompleteMutationVariables = Exact<{
   data: AiCompletionInput;
@@ -1940,7 +2078,7 @@ export type SearchSuppliersQueryVariables = Exact<{
 }>;
 
 
-export type SearchSuppliersQuery = { __typename?: 'Query', searchSuppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, businessPhone?: string | null, businessEmail?: string | null, whatsappNumber?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, basePrice: string, currency: string, pricingModel: PricingModel }> | null }> };
+export type SearchSuppliersQuery = { __typename?: 'Query', searchSuppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null, businessPhone?: string | null, businessEmail?: string | null, whatsappNumber?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, basePrice: string, currency: string, pricingModel: PricingModel }> | null }> };
 
 export type SupplierDashboardStatsQueryVariables = Exact<{
   supplierId: Scalars['Int']['input'];
@@ -1954,12 +2092,12 @@ export type SupplierQueryVariables = Exact<{
 }>;
 
 
-export type SupplierQuery = { __typename?: 'Query', supplier: { __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, businessPhone?: string | null, businessEmail?: string | null, whatsappNumber?: string | null, websiteUrl?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, pricingModel: PricingModel, basePrice: string, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', categoryId: number, isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null, reviewsReceived?: Array<{ __typename?: 'Review', reviewId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, supplierResponse?: string | null, createdAt: any }> | null } };
+export type SupplierQuery = { __typename?: 'Query', supplier: { __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, businessPhone?: string | null, businessEmail?: string | null, whatsappNumber?: string | null, websiteUrl?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, pricingModel: PricingModel, basePrice: string, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', categoryId: number, isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null, reviewsReceived?: Array<{ __typename?: 'Review', reviewId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, supplierResponse?: string | null, createdAt: any }> | null } };
 
 export type SuppliersQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SuppliersQuery = { __typename?: 'Query', suppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, city?: string | null, rating?: string | null, reviewCount?: number | null, verified?: boolean | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null }> };
+export type SuppliersQuery = { __typename?: 'Query', suppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, city?: string | null, rating?: string | null, reviewCount?: number | null, verified?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null }> };
 
 export type UpdateSupplierMutationVariables = Exact<{
   data: SupplierUpdateInput;
@@ -1976,6 +2114,285 @@ export type UpdateUserMutationVariables = Exact<{
 export type UpdateUserMutation = { __typename?: 'Mutation', updateUser: { __typename?: 'User', userId: number, name: string, phone?: string | null, country: string } };
 
 
+export const AdminStatsDocument = gql`
+    query adminStats($adminUserId: Int!) {
+  adminStats(adminUserId: $adminUserId) {
+    totalUsers
+    totalCustomers
+    totalSuppliers
+    totalBookings
+    mtdRevenue
+    allTimeRevenue
+    currency
+  }
+}
+    `;
+
+/**
+ * __useAdminStatsQuery__
+ *
+ * To run a query within a React component, call `useAdminStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAdminStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAdminStatsQuery({
+ *   variables: {
+ *      adminUserId: // value for 'adminUserId'
+ *   },
+ * });
+ */
+export function useAdminStatsQuery(baseOptions: Apollo.QueryHookOptions<AdminStatsQuery, AdminStatsQueryVariables> & ({ variables: AdminStatsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<AdminStatsQuery, AdminStatsQueryVariables>(AdminStatsDocument, options);
+      }
+export function useAdminStatsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<AdminStatsQuery, AdminStatsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<AdminStatsQuery, AdminStatsQueryVariables>(AdminStatsDocument, options);
+        }
+// @ts-ignore
+export function useAdminStatsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<AdminStatsQuery, AdminStatsQueryVariables>): Apollo.UseSuspenseQueryResult<AdminStatsQuery, AdminStatsQueryVariables>;
+export function useAdminStatsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AdminStatsQuery, AdminStatsQueryVariables>): Apollo.UseSuspenseQueryResult<AdminStatsQuery | undefined, AdminStatsQueryVariables>;
+export function useAdminStatsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AdminStatsQuery, AdminStatsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<AdminStatsQuery, AdminStatsQueryVariables>(AdminStatsDocument, options);
+        }
+export type AdminStatsQueryHookResult = ReturnType<typeof useAdminStatsQuery>;
+export type AdminStatsLazyQueryHookResult = ReturnType<typeof useAdminStatsLazyQuery>;
+export type AdminStatsSuspenseQueryHookResult = ReturnType<typeof useAdminStatsSuspenseQuery>;
+export type AdminStatsQueryResult = Apollo.QueryResult<AdminStatsQuery, AdminStatsQueryVariables>;
+export const AdminSuppliersDocument = gql`
+    query adminSuppliers {
+  suppliers {
+    supplierId
+    companyName
+    city
+    rating
+    reviewCount
+    verified
+    promotionTier
+    promotionStartDate
+    promotionEndDate
+  }
+}
+    `;
+
+/**
+ * __useAdminSuppliersQuery__
+ *
+ * To run a query within a React component, call `useAdminSuppliersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAdminSuppliersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAdminSuppliersQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useAdminSuppliersQuery(baseOptions?: Apollo.QueryHookOptions<AdminSuppliersQuery, AdminSuppliersQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<AdminSuppliersQuery, AdminSuppliersQueryVariables>(AdminSuppliersDocument, options);
+      }
+export function useAdminSuppliersLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<AdminSuppliersQuery, AdminSuppliersQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<AdminSuppliersQuery, AdminSuppliersQueryVariables>(AdminSuppliersDocument, options);
+        }
+// @ts-ignore
+export function useAdminSuppliersSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<AdminSuppliersQuery, AdminSuppliersQueryVariables>): Apollo.UseSuspenseQueryResult<AdminSuppliersQuery, AdminSuppliersQueryVariables>;
+export function useAdminSuppliersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AdminSuppliersQuery, AdminSuppliersQueryVariables>): Apollo.UseSuspenseQueryResult<AdminSuppliersQuery | undefined, AdminSuppliersQueryVariables>;
+export function useAdminSuppliersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AdminSuppliersQuery, AdminSuppliersQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<AdminSuppliersQuery, AdminSuppliersQueryVariables>(AdminSuppliersDocument, options);
+        }
+export type AdminSuppliersQueryHookResult = ReturnType<typeof useAdminSuppliersQuery>;
+export type AdminSuppliersLazyQueryHookResult = ReturnType<typeof useAdminSuppliersLazyQuery>;
+export type AdminSuppliersSuspenseQueryHookResult = ReturnType<typeof useAdminSuppliersSuspenseQuery>;
+export type AdminSuppliersQueryResult = Apollo.QueryResult<AdminSuppliersQuery, AdminSuppliersQueryVariables>;
+export const AiUsageBreakdownDocument = gql`
+    query aiUsageBreakdown($adminUserId: Int!, $daysBack: Int) {
+  aiUsageBreakdown(adminUserId: $adminUserId, daysBack: $daysBack) {
+    modelName
+    requests
+    inputTokens
+    outputTokens
+    costUsd
+  }
+}
+    `;
+
+/**
+ * __useAiUsageBreakdownQuery__
+ *
+ * To run a query within a React component, call `useAiUsageBreakdownQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAiUsageBreakdownQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAiUsageBreakdownQuery({
+ *   variables: {
+ *      adminUserId: // value for 'adminUserId'
+ *      daysBack: // value for 'daysBack'
+ *   },
+ * });
+ */
+export function useAiUsageBreakdownQuery(baseOptions: Apollo.QueryHookOptions<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables> & ({ variables: AiUsageBreakdownQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>(AiUsageBreakdownDocument, options);
+      }
+export function useAiUsageBreakdownLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>(AiUsageBreakdownDocument, options);
+        }
+// @ts-ignore
+export function useAiUsageBreakdownSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>): Apollo.UseSuspenseQueryResult<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>;
+export function useAiUsageBreakdownSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>): Apollo.UseSuspenseQueryResult<AiUsageBreakdownQuery | undefined, AiUsageBreakdownQueryVariables>;
+export function useAiUsageBreakdownSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>(AiUsageBreakdownDocument, options);
+        }
+export type AiUsageBreakdownQueryHookResult = ReturnType<typeof useAiUsageBreakdownQuery>;
+export type AiUsageBreakdownLazyQueryHookResult = ReturnType<typeof useAiUsageBreakdownLazyQuery>;
+export type AiUsageBreakdownSuspenseQueryHookResult = ReturnType<typeof useAiUsageBreakdownSuspenseQuery>;
+export type AiUsageBreakdownQueryResult = Apollo.QueryResult<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>;
+export const RevenueByDayDocument = gql`
+    query revenueByDay($adminUserId: Int!, $daysBack: Int) {
+  revenueByDay(adminUserId: $adminUserId, daysBack: $daysBack) {
+    day
+    platformFee
+    bookings
+  }
+}
+    `;
+
+/**
+ * __useRevenueByDayQuery__
+ *
+ * To run a query within a React component, call `useRevenueByDayQuery` and pass it any options that fit your needs.
+ * When your component renders, `useRevenueByDayQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useRevenueByDayQuery({
+ *   variables: {
+ *      adminUserId: // value for 'adminUserId'
+ *      daysBack: // value for 'daysBack'
+ *   },
+ * });
+ */
+export function useRevenueByDayQuery(baseOptions: Apollo.QueryHookOptions<RevenueByDayQuery, RevenueByDayQueryVariables> & ({ variables: RevenueByDayQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<RevenueByDayQuery, RevenueByDayQueryVariables>(RevenueByDayDocument, options);
+      }
+export function useRevenueByDayLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<RevenueByDayQuery, RevenueByDayQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<RevenueByDayQuery, RevenueByDayQueryVariables>(RevenueByDayDocument, options);
+        }
+// @ts-ignore
+export function useRevenueByDaySuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<RevenueByDayQuery, RevenueByDayQueryVariables>): Apollo.UseSuspenseQueryResult<RevenueByDayQuery, RevenueByDayQueryVariables>;
+export function useRevenueByDaySuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<RevenueByDayQuery, RevenueByDayQueryVariables>): Apollo.UseSuspenseQueryResult<RevenueByDayQuery | undefined, RevenueByDayQueryVariables>;
+export function useRevenueByDaySuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<RevenueByDayQuery, RevenueByDayQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<RevenueByDayQuery, RevenueByDayQueryVariables>(RevenueByDayDocument, options);
+        }
+export type RevenueByDayQueryHookResult = ReturnType<typeof useRevenueByDayQuery>;
+export type RevenueByDayLazyQueryHookResult = ReturnType<typeof useRevenueByDayLazyQuery>;
+export type RevenueByDaySuspenseQueryHookResult = ReturnType<typeof useRevenueByDaySuspenseQuery>;
+export type RevenueByDayQueryResult = Apollo.QueryResult<RevenueByDayQuery, RevenueByDayQueryVariables>;
+export const SetSupplierPromotionDocument = gql`
+    mutation setSupplierPromotion($data: SetSupplierPromotionInput!) {
+  setSupplierPromotion(data: $data) {
+    supplierId
+    promotionTier
+    promotionStartDate
+    promotionEndDate
+  }
+}
+    `;
+export type SetSupplierPromotionMutationFn = Apollo.MutationFunction<SetSupplierPromotionMutation, SetSupplierPromotionMutationVariables>;
+
+/**
+ * __useSetSupplierPromotionMutation__
+ *
+ * To run a mutation, you first call `useSetSupplierPromotionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetSupplierPromotionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setSupplierPromotionMutation, { data, loading, error }] = useSetSupplierPromotionMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useSetSupplierPromotionMutation(baseOptions?: Apollo.MutationHookOptions<SetSupplierPromotionMutation, SetSupplierPromotionMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SetSupplierPromotionMutation, SetSupplierPromotionMutationVariables>(SetSupplierPromotionDocument, options);
+      }
+export type SetSupplierPromotionMutationHookResult = ReturnType<typeof useSetSupplierPromotionMutation>;
+export type SetSupplierPromotionMutationResult = Apollo.MutationResult<SetSupplierPromotionMutation>;
+export type SetSupplierPromotionMutationOptions = Apollo.BaseMutationOptions<SetSupplierPromotionMutation, SetSupplierPromotionMutationVariables>;
+export const TopSuppliersDocument = gql`
+    query topSuppliers($adminUserId: Int!, $limit: Int) {
+  topSuppliers(adminUserId: $adminUserId, limit: $limit) {
+    supplierId
+    companyName
+    city
+    bookingCount
+    quoteCount
+    grossRevenue
+    rating
+  }
+}
+    `;
+
+/**
+ * __useTopSuppliersQuery__
+ *
+ * To run a query within a React component, call `useTopSuppliersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useTopSuppliersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useTopSuppliersQuery({
+ *   variables: {
+ *      adminUserId: // value for 'adminUserId'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useTopSuppliersQuery(baseOptions: Apollo.QueryHookOptions<TopSuppliersQuery, TopSuppliersQueryVariables> & ({ variables: TopSuppliersQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<TopSuppliersQuery, TopSuppliersQueryVariables>(TopSuppliersDocument, options);
+      }
+export function useTopSuppliersLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<TopSuppliersQuery, TopSuppliersQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<TopSuppliersQuery, TopSuppliersQueryVariables>(TopSuppliersDocument, options);
+        }
+// @ts-ignore
+export function useTopSuppliersSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<TopSuppliersQuery, TopSuppliersQueryVariables>): Apollo.UseSuspenseQueryResult<TopSuppliersQuery, TopSuppliersQueryVariables>;
+export function useTopSuppliersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<TopSuppliersQuery, TopSuppliersQueryVariables>): Apollo.UseSuspenseQueryResult<TopSuppliersQuery | undefined, TopSuppliersQueryVariables>;
+export function useTopSuppliersSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<TopSuppliersQuery, TopSuppliersQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<TopSuppliersQuery, TopSuppliersQueryVariables>(TopSuppliersDocument, options);
+        }
+export type TopSuppliersQueryHookResult = ReturnType<typeof useTopSuppliersQuery>;
+export type TopSuppliersLazyQueryHookResult = ReturnType<typeof useTopSuppliersLazyQuery>;
+export type TopSuppliersSuspenseQueryHookResult = ReturnType<typeof useTopSuppliersSuspenseQuery>;
+export type TopSuppliersQueryResult = Apollo.QueryResult<TopSuppliersQuery, TopSuppliersQueryVariables>;
 export const AiCompleteDocument = gql`
     mutation aiComplete($data: AiCompletionInput!) {
   aiComplete(data: $data) {
@@ -4871,6 +5288,9 @@ export const SearchSuppliersDocument = gql`
     maxCapacity
     verified
     premium
+    promotionTier
+    promotionStartDate
+    promotionEndDate
     businessPhone
     businessEmail
     whatsappNumber
@@ -4992,6 +5412,9 @@ export const SupplierDocument = gql`
     maxCapacity
     verified
     premium
+    promotionTier
+    promotionStartDate
+    promotionEndDate
     services {
       serviceId
       name
@@ -5067,6 +5490,9 @@ export const SuppliersDocument = gql`
     rating
     reviewCount
     verified
+    promotionTier
+    promotionStartDate
+    promotionEndDate
     categories {
       isPrimary
       category {

@@ -1,0 +1,8 @@
+mutation setSupplierPromotion($data: SetSupplierPromotionInput!) {
+  setSupplierPromotion(data: $data) {
+    supplierId
+    promotionTier
+    promotionStartDate
+    promotionEndDate
+  }
+}

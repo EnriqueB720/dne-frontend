@@ -1,4 +1,4 @@
-query suppliers {
+query adminSuppliers {
   suppliers {
     supplierId
     companyName
@@ -9,12 +9,5 @@ query suppliers {
     promotionTier
     promotionStartDate
     promotionEndDate
-    categories {
-      isPrimary
-      category {
-        categoryId
-        categoryName
-      }
-    }
   }
 }

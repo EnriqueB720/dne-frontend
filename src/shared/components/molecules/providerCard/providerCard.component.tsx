@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {
-  Star, ShieldCheck, Clock, MapPin, Check, MessageCircle,
+  Star, ShieldCheck, Clock, MapPin, Check,
   ArrowRight, Globe, Mail, Phone, PackagePlus, PackageCheck,
   Database, Sparkles,
 } from 'lucide-react';
@@ -30,6 +30,12 @@ export interface ProviderData {
   phone?: string;
   /** True when this card represents a real supplier from the DB (vs. AI-invented). */
   isRealSupplier?: boolean;
+  /**
+   * True when the supplier is currently a paid FEATURED placement (within
+   * its active date window). Adds a "Sponsored" badge so users can tell
+   * paid placement apart from organic ranking.
+   */
+  sponsored?: boolean;
 }
 
 function buildSearchUrl(provider: ProviderData): string {
@@ -57,7 +63,6 @@ export interface ProviderCardProps {
   provider: ProviderData;
   index?: number;
   onSelect?: (provider: ProviderData) => void;
-  onWhatsApp?: (provider: ProviderData) => void;
   onViewProfile?: (provider: ProviderData) => void;
   /** Whether this provider is currently in the user's package */
   isInPackage?: boolean;
@@ -69,12 +74,17 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
   provider,
   index = 0,
   onSelect,
-  onWhatsApp,
   onViewProfile,
   isInPackage = false,
   onTogglePackage,
 }) => {
   const isRecommended = !!provider.recommended;
+  const isSponsored = !!provider.sponsored;
+  // Sponsored gets the same halo as recommended so admin-promoted cards
+  // pop out. When a card is both, the AI Recommended ribbon wins (it's
+  // algorithmic and earned), and the Sponsored pill in the title row
+  // still tells the user why this one was boosted.
+  const showSponsoredRibbon = isSponsored && !isRecommended;
 
   const linkStyle: React.CSSProperties = {
     display: 'inline-flex',
@@ -118,6 +128,22 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
           ✨ AI Recommended · Best match
         </Box>
       )}
+      {showSponsoredRibbon && (
+        <Box
+          position="absolute"
+          top="-12px"
+          left="24px"
+          bg={solvoColors.indigo}
+          color="white"
+          padding="4px 12px"
+          borderRadius="full"
+          fontSize="11px"
+          fontWeight="500"
+          zIndex={1}
+        >
+          ✨ Featured · Top result
+        </Box>
+      )}
 
       <Box
         bg="white"
@@ -125,7 +151,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
         borderColor={
           isInPackage
             ? solvoColors.emeraldText
-            : isRecommended
+            : isRecommended || isSponsored
             ? solvoColors.indigoBorder
             : solvoColors.border
         }
@@ -134,7 +160,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
         boxShadow={
           isInPackage
             ? '0 0 0 3px rgba(16, 185, 129, 0.12)'
-            : isRecommended
+            : isRecommended || isSponsored
             ? solvoShadows.recommendedHalo
             : 'none'
         }
@@ -223,6 +249,22 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                   AI suggestion
                 </Flex>
               )}
+              {provider.sponsored && (
+                <Flex
+                  align="center"
+                  gap="4px"
+                  padding="2px 8px"
+                  borderRadius="full"
+                  bg={solvoColors.indigoLight}
+                  color={solvoColors.indigo}
+                  fontSize="11px"
+                  fontWeight={600}
+                  title="Featured placement"
+                >
+                  <Sparkles size={11} />
+                  Sponsored
+                </Flex>
+              )}
               {/* "In package" badge */}
               {isInPackage && (
                 <Flex
@@ -295,19 +337,6 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
 
             {/* Action row */}
             <Flex gap="10px" wrap="wrap" align="center">
-              {/* Text links */}
-              <Text
-                as="button"
-                fontSize="sm"
-                fontWeight="500"
-                color={solvoColors.text}
-                cursor="pointer"
-                onClick={() => onViewProfile?.(provider)}
-                _hover={{ color: solvoColors.indigo }}
-              >
-                View profile
-              </Text>
-
               <a
                 href={link.href}
                 target="_blank"
@@ -352,77 +381,85 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
 
               <Flex flex="1" />
 
-              {/* Package toggle button — only for in-network (real) suppliers;
-                  AI-suggested providers can't be added to a package. */}
-              {onTogglePackage && provider.isRealSupplier && (
-                <motion.button
-                  onClick={() => onTogglePackage(provider)}
-                  whileTap={{ scale: 0.95 }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '8px 14px',
-                    borderRadius: '10px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    border: `1px solid ${isInPackage ? solvoColors.emeraldText : solvoColors.border}`,
-                    background: isInPackage ? '#D1FAE5' : 'white',
-                    color: isInPackage ? solvoColors.emeraldText : solvoColors.textMuted,
-                    transition: 'all 0.15s',
-                  }}
+              {/* Buttons stay on a single row regardless of how many
+                  contact links pushed onto the previous lines. */}
+              <Flex gap="8px" align="center" flexShrink={0}>
+                {onTogglePackage && provider.isRealSupplier && (
+                  <motion.button
+                    onClick={() => onTogglePackage(provider)}
+                    whileTap={{ scale: 0.95 }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '8px 14px',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      border: `1px solid ${isInPackage ? solvoColors.emeraldText : solvoColors.border}`,
+                      background: isInPackage ? '#D1FAE5' : 'white',
+                      color: isInPackage ? solvoColors.emeraldText : solvoColors.textMuted,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {isInPackage ? (
+                      <>
+                        <PackageCheck size={14} />
+                        Remove
+                      </>
+                    ) : (
+                      <>
+                        <PackagePlus size={14} />
+                        Add to package
+                      </>
+                    )}
+                  </motion.button>
+                )}
+
+                {/* View profile (in-network only) — out-of-network providers
+                    have no DB-backed storefront, so the slot is empty. */}
+                {provider.isRealSupplier && (
+                  <Flex
+                    as="button"
+                    align="center"
+                    gap="6px"
+                    padding="8px 14px"
+                    borderRadius="10px"
+                    bg="white"
+                    borderWidth="1px"
+                    borderColor={solvoColors.text}
+                    color={solvoColors.text}
+                    fontSize="sm"
+                    fontWeight="500"
+                    cursor="pointer"
+                    onClick={() => onViewProfile?.(provider)}
+                    style={{ whiteSpace: 'nowrap' }}
+                    _hover={{ bg: solvoColors.bg }}
+                  >
+                    View profile
+                  </Flex>
+                )}
+
+                <Flex
+                  as="button"
+                  align="center"
+                  gap="6px"
+                  padding="8px 14px"
+                  borderRadius="10px"
+                  bg={solvoColors.text}
+                  color="white"
+                  fontSize="sm"
+                  fontWeight="500"
+                  cursor="pointer"
+                  onClick={() => onSelect?.(provider)}
+                  style={{ whiteSpace: 'nowrap' }}
+                  _hover={{ bg: solvoColors.indigo }}
                 >
-                  {isInPackage ? (
-                    <>
-                      <PackageCheck size={14} />
-                      Remove
-                    </>
-                  ) : (
-                    <>
-                      <PackagePlus size={14} />
-                      Add to package
-                    </>
-                  )}
-                </motion.button>
-              )}
-
-              {/* WhatsApp */}
-              <Flex
-                as="button"
-                align="center"
-                gap="6px"
-                padding="8px 14px"
-                borderRadius="10px"
-                bg={solvoColors.emerald}
-                color="white"
-                fontSize="sm"
-                fontWeight="500"
-                cursor="pointer"
-                onClick={() => onWhatsApp?.(provider)}
-                _hover={{ opacity: 0.9 }}
-              >
-                <MessageCircle size={14} />
-                WhatsApp
-              </Flex>
-
-              {/* Select / view profile */}
-              <Flex
-                as="button"
-                align="center"
-                gap="6px"
-                padding="8px 14px"
-                borderRadius="10px"
-                bg={solvoColors.text}
-                color="white"
-                fontSize="sm"
-                fontWeight="500"
-                cursor="pointer"
-                onClick={() => onSelect?.(provider)}
-                _hover={{ bg: solvoColors.indigo }}
-              >
-                Select
-                <ArrowRight size={14} />
+                  Select
+                  <ArrowRight size={14} />
+                </Flex>
               </Flex>
             </Flex>
           </Box>

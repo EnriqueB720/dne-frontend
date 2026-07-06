@@ -2,7 +2,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, Menu, User as UserIcon, X } from 'lucide-react';
+import { LogOut, Menu, Shield, User as UserIcon, X } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
 import { Logo, NotificationBell } from '@molecules';
 import { solvoColors, solvoShadows } from '@constants';
@@ -36,8 +36,18 @@ export interface SolvoNavBarProps {
  * aware: supplier-only users see "Workspace" → /provider, everyone else
  * sees "Dashboard" → /dashboard.
  */
-function buildNavItems(user: { isCustomer?: boolean; isSupplier?: boolean } | undefined) {
-  const supplierOnly = !!user?.isSupplier && !user?.isCustomer;
+function buildNavItems(
+  user: { isCustomer?: boolean; isSupplier?: boolean; isAdmin?: boolean } | undefined,
+) {
+  const supplierOnly = !!user?.isSupplier && !user?.isCustomer && !user?.isAdmin;
+  // Admins land on /admin for the Dashboard slot — admin accounts often
+  // have `isCustomer: true` from signup, which would otherwise route them
+  // into the customer dashboard.
+  const dashboardSlot = user?.isAdmin
+    ? { label: 'Admin', href: '/admin' }
+    : supplierOnly
+      ? { label: 'Workspace', href: '/provider' }
+      : { label: 'Dashboard', href: '/dashboard' };
   return [
     { label: 'Chat', href: '/' },
     { label: 'Packages', href: '/packages' },
@@ -46,9 +56,7 @@ function buildNavItems(user: { isCustomer?: boolean; isSupplier?: boolean } | un
     { label: 'Bookings', href: '/bookings' },
     { label: 'Messages', href: '/messages' },
     { label: 'Calendar', href: '/calendar' },
-    supplierOnly
-      ? { label: 'Workspace', href: '/provider' }
-      : { label: 'Dashboard', href: '/dashboard' },
+    dashboardSlot,
   ];
 }
 
@@ -494,6 +502,28 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
                       </Text>
                     </Flex>
                   </Link>
+
+                  {user.isAdmin && (
+                    <Link
+                      href="/admin"
+                      style={{ textDecoration: 'none', display: 'block' }}
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <Flex
+                        align="center"
+                        gap="8px"
+                        padding="8px 12px"
+                        borderRadius="8px"
+                        cursor="pointer"
+                        _hover={{ bg: solvoColors.bg }}
+                      >
+                        <Shield size={14} color={solvoColors.indigo} />
+                        <Text fontSize="sm" color={solvoColors.indigo} fontWeight={600}>
+                          Admin
+                        </Text>
+                      </Flex>
+                    </Link>
+                  )}
 
                   <button
                     type="button"

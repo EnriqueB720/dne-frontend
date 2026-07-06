@@ -201,7 +201,28 @@ function dbSupplierToProviderData(s: any, index: number): ProviderData {
     email: s.businessEmail ?? undefined,
     phone: s.businessPhone ?? s.whatsappNumber ?? undefined,
     isRealSupplier: true,
+    sponsored: isSponsoredActive(
+      s.promotionTier,
+      s.promotionStartDate,
+      s.promotionEndDate,
+    ),
   };
+}
+
+/**
+ * Whether a supplier currently qualifies for the "Sponsored" badge — i.e.
+ * tier is FEATURED and the optional start/end window is currently active.
+ */
+function isSponsoredActive(
+  tier: string | null | undefined,
+  startDate: unknown,
+  endDate: unknown,
+): boolean {
+  if (tier !== 'FEATURED') return false;
+  const now = Date.now();
+  if (startDate && new Date(startDate as string).getTime() > now) return false;
+  if (endDate && new Date(endDate as string).getTime() < now) return false;
+  return true;
 }
 
 // ── AI grounding from provider cards ──────────────────────────────────────
@@ -891,9 +912,28 @@ function ChatEmptyState({ onSend, onGoHome }: ChatEmptyStateProps) {
                       {(s.companyName ?? '?').slice(0, 1)}
                     </Flex>
                     <Box minWidth="0" flex="1">
-                      <Text fontWeight={600} fontSize="13px" color={solvoColors.text} truncate>
-                        {s.companyName}
-                      </Text>
+                      <Flex align="center" gap="6px">
+                        <Text fontWeight={600} fontSize="13px" color={solvoColors.text} truncate>
+                          {s.companyName}
+                        </Text>
+                        {isSponsoredActive(
+                          s.promotionTier,
+                          s.promotionStartDate,
+                          s.promotionEndDate,
+                        ) && (
+                          <Text
+                            fontSize="10px"
+                            fontWeight={600}
+                            color={solvoColors.indigo}
+                            bg={solvoColors.indigoLight}
+                            padding="1px 6px"
+                            borderRadius="full"
+                            flexShrink={0}
+                          >
+                            Sponsored
+                          </Text>
+                        )}
+                      </Flex>
                       <Text fontSize="11px" color={solvoColors.textSubtle} truncate>
                         {primary?.category?.categoryName ?? s.city ?? '—'}
                       </Text>

@@ -1,0 +1,9 @@
+query aiUsageBreakdown($adminUserId: Int!, $daysBack: Int) {
+  aiUsageBreakdown(adminUserId: $adminUserId, daysBack: $daysBack) {
+    modelName
+    requests
+    inputTokens
+    outputTokens
+    costUsd
+  }
+}

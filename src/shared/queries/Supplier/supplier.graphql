@@ -17,6 +17,9 @@ query supplier($where: SupplierWhereInput!) {
     maxCapacity
     verified
     premium
+    promotionTier
+    promotionStartDate
+    promotionEndDate
     services {
       serviceId
       name
