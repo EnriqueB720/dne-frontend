@@ -1404,8 +1404,15 @@ export default function Home() {
       // that the user is starting a completely fresh request. In that case we
       // drop previous messages entirely so the parser doesn't blend the old
       // service ("DJ") into the new one ("AC repair").
+      //
+      // ADDITIVE FOLLOW-UPS ("I also need cleaning") also drop prior context —
+      // otherwise the parser sees ["I need DJ+catering+photo", "I also need
+      // cleaning"], joins them into one super-string, splits into 4 subrequests
+      // capped at 3, and re-serves the OLD topics while dropping the new one.
+      // Parsing the additive turn alone gives us just the new service.
       const isClearingContext = CONTEXT_CLEAR_RE.test(content);
-      const recentUserMsgs = isClearingContext
+      const isAdditiveTurn = isAdditiveFollowupRequest(content);
+      const recentUserMsgs = isClearingContext || isAdditiveTurn
         ? []
         : currentMessages
             .filter((m) => m.role === 'user')
