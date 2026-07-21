@@ -38,6 +38,7 @@ import {
   generateProvidersWithAi,
   wantsMoreResults,
   wantsOutsideNetwork,
+  isAdditiveFollowupRequest,
   type ParsedQuery,
 } from '@/shared/services/ai.service';
 import {
@@ -1496,11 +1497,15 @@ export default function Home() {
         // search outside the network, force service_request regardless of what
         // the LLM said. parseQueryWithAi already does this deterministically,
         // but this is a second safety net for any that slipped through.
-        if (wantsMoreResults(content) || wantsOutsideNetwork(content)) {
+        if (
+          wantsMoreResults(content) ||
+          wantsOutsideNetwork(content) ||
+          isAdditiveFollowupRequest(content)
+        ) {
           if (parsed.intent !== 'service_request') {
             parsed.intent = 'service_request';
             // eslint-disable-next-line no-console
-            console.log('[intent] overridden → service_request (explicit results/outside-network request)');
+            console.log('[intent] overridden → service_request (explicit results/outside-network/additive-followup request)');
           }
         } else if (recentGrounding && parsed.intent === 'service_request') {
           // Layer 2 (downgrade): once providers are on screen, most follow-ups
@@ -1887,12 +1892,14 @@ export default function Home() {
           console.log(
             `[providers] final card count = ${merged.length}`,
           );
-          // Include the previous providers as secondary context so the AI
-          // can acknowledge continuity ("switching from the DJs you saw…")
-          // without contradicting the new results it's about to introduce.
+          // Previous providers are included as CONTEXT ONLY. The AI kept
+          // re-summarizing them ("here are the 5 DJs again below") when
+          // the user asked for a new service — so the wording here is
+          // deliberately blunt about not re-listing them. Only the NEW
+          // results above are what the user is asking about right now.
           const resultCtx = searchResultContext(merged, parsed, outsideNetwork)
             + (recentGrounding
-              ? `\n\n## Previously shown in this conversation (for continuity — focus on the NEW results above):\n${recentGrounding}`
+              ? `\n\n## Previously shown in this conversation (memory only — DO NOT list, recommend, or re-describe these providers; the user is asking about the NEW results above):\n${recentGrounding}`
               : '');
           aiResult = await apiSendMessage(
             convId,

@@ -182,6 +182,8 @@ Intent rules — apply in this order (first match wins):
 3. SERVICE_REQUEST — the user wants us to find/recommend providers FOR THEM to pick from, or is refining an earlier search. This is the "show me options I can act on" intent.
    Signals (EN): "I need", "find me", "show me", "recommend me", "plan a", "get me", "any X under ₡…".
    Signals (ES): "necesito", "busco", "muéstrame", "recomiéndame", "quiero", "encuéntrame", "consígueme".
+
+   ⚠️ ADDITIVE FOLLOW-UPS — after prior providers are on screen, messages that add a NEW service ("nice, I also need cleaning", "y también necesito un fotógrafo", "and can you find me a bakery too") are ALWAYS service_request — not chat. The user is asking for a NEW search on the new topic. The parsed "service" field should be the NEWLY-mentioned service (e.g. "Cleaning"), NOT the previously-discussed one. Do NOT re-include prior topics in the "subrequests" array — they're already answered.
    Examples → service_request:
    - "I need catering for 35"
    - "Find me a DJ"
@@ -258,6 +260,22 @@ const QUESTION_PREFIX_RE =
 
 const SEARCH_VERB_RE =
   /\b(?:find|busco|necesito|need|show\s+me|muéstrame|muestrame|recomi[ée]ndame|recommend|encu[ée]ntrame|plan\s+(?:a|me)|i\s+want|quiero|book)\b/i;
+
+/**
+ * Detects additive follow-ups that introduce a NEW service on top of a
+ * prior search — "I also need cleaning", "y también necesito un DJ",
+ * "and I need a photographer". Once prior providers are on screen the
+ * LLM parser often mis-classifies these as `chat` (treating them as
+ * conversation about existing cards). This regex is the deterministic
+ * upgrade: if it fires we force `service_request` so a fresh search
+ * runs for the newly-mentioned service.
+ */
+const ADDITIVE_FOLLOWUP_RE =
+  /\b(?:(?:also|and)\s+(?:i\s+)?(?:need|want|would\s+like|require|am\s+looking\s+for)|(?:y\s+)?tambi[eé]n\s+(?:necesito|quiero|busco|ocupo))\b/i;
+
+export function isAdditiveFollowupRequest(message: string): boolean {
+  return ADDITIVE_FOLLOWUP_RE.test(message.trim());
+}
 
 /**
  * Detects requests to search OUTSIDE the Solvo supplier network — e.g.
@@ -578,11 +596,15 @@ export async function parseQueryWithAi(
       !SEARCH_VERB_RE.test(lastTurn)
     ) {
       intent = 'network_inquiry';
-    } else if (wantsMoreResults(lastTurn) || wantsOutsideNetwork(lastTurn)) {
-      // "show me more options", "muéstrame…", "search outside your network"…
-      // The LLM often classifies these as `chat` when phrased politely or when
-      // they follow a conversational exchange. We deterministically force
-      // service_request so the search pipeline always runs.
+    } else if (
+      wantsMoreResults(lastTurn) ||
+      wantsOutsideNetwork(lastTurn) ||
+      isAdditiveFollowupRequest(lastTurn)
+    ) {
+      // "show me more options" / "search outside your network" / "I also
+      // need cleaning" — the LLM often classifies these as `chat` when
+      // prior providers are already on screen. Deterministic upgrade so a
+      // fresh search always runs for a genuinely-new topic.
       intent = 'service_request';
     }
 
