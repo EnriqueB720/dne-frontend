@@ -38,6 +38,7 @@ import {
   generateProvidersWithAi,
   wantsMoreResults,
   wantsOutsideNetwork,
+  isAdditiveFollowupRequest,
   type ParsedQuery,
 } from '@/shared/services/ai.service';
 import {
@@ -1403,8 +1404,15 @@ export default function Home() {
       // that the user is starting a completely fresh request. In that case we
       // drop previous messages entirely so the parser doesn't blend the old
       // service ("DJ") into the new one ("AC repair").
+      //
+      // ADDITIVE FOLLOW-UPS ("I also need cleaning") also drop prior context —
+      // otherwise the parser sees ["I need DJ+catering+photo", "I also need
+      // cleaning"], joins them into one super-string, splits into 4 subrequests
+      // capped at 3, and re-serves the OLD topics while dropping the new one.
+      // Parsing the additive turn alone gives us just the new service.
       const isClearingContext = CONTEXT_CLEAR_RE.test(content);
-      const recentUserMsgs = isClearingContext
+      const isAdditiveTurn = isAdditiveFollowupRequest(content);
+      const recentUserMsgs = isClearingContext || isAdditiveTurn
         ? []
         : currentMessages
             .filter((m) => m.role === 'user')
@@ -1496,11 +1504,15 @@ export default function Home() {
         // search outside the network, force service_request regardless of what
         // the LLM said. parseQueryWithAi already does this deterministically,
         // but this is a second safety net for any that slipped through.
-        if (wantsMoreResults(content) || wantsOutsideNetwork(content)) {
+        if (
+          wantsMoreResults(content) ||
+          wantsOutsideNetwork(content) ||
+          isAdditiveFollowupRequest(content)
+        ) {
           if (parsed.intent !== 'service_request') {
             parsed.intent = 'service_request';
             // eslint-disable-next-line no-console
-            console.log('[intent] overridden → service_request (explicit results/outside-network request)');
+            console.log('[intent] overridden → service_request (explicit results/outside-network/additive-followup request)');
           }
         } else if (recentGrounding && parsed.intent === 'service_request') {
           // Layer 2 (downgrade): once providers are on screen, most follow-ups
@@ -1604,6 +1616,179 @@ export default function Home() {
           // provData stays null — informational answer, no cards rendered.
         } else {
           // ── Service request ────────────────────────────────────────────
+
+          // Multi-topic branch. When the parser detected the user asked for
+          // several distinct services in one message ("cleaning on Saturday
+          // AND catering on Sunday"), run a separate search + AI reply per
+          // sub-topic and push them as sequential assistant messages. Each
+          // reply is grounded ONLY on its own topic's cards, so the AI
+          // can't accidentally recommend one supplier as good at both.
+          if (parsed.subrequests && parsed.subrequests.length >= 2) {
+            const subs = parsed.subrequests.slice(0, 3);
+            // eslint-disable-next-line no-console
+            console.log(
+              `[intent] multi-topic — ${subs.length} sub-requests:`,
+              subs.map((s) => s.service).join(' | '),
+            );
+            const outsideNetworkAll = wantsOutsideNetwork(content);
+
+            for (const sub of subs) {
+              if (signal.aborted) break;
+
+              // Each sub-request inherits missing fields from the top-level
+              // parse. E.g. if the user said "cleaning and catering on
+              // Saturday", both inherit `when=Saturday`.
+              const subParsed: ParsedQuery = {
+                intent: 'service_request',
+                service: sub.service,
+                people: sub.people ?? parsed.people,
+                location: sub.location ?? parsed.location,
+                budget: sub.budget ?? parsed.budget,
+                when: sub.when ?? parsed.when,
+                dietary: sub.dietary ?? parsed.dietary,
+              };
+
+              const subLocation = (subParsed.location || '').trim();
+              const subCity = subLocation
+                .split(',')[0]
+                .replace(/^(in|at|near|around)\s+/i, '')
+                .trim();
+              const subGuests = subParsed.people
+                ? parseInt(subParsed.people.replace(/\D/g, ''), 10)
+                : NaN;
+
+              // DB search for this topic only.
+              let subDb: ProviderData[] = [];
+              if (!outsideNetworkAll) {
+                try {
+                  const res = await searchSuppliers({
+                    variables: {
+                      data: {
+                        serviceQuery: subParsed.service?.trim() || null,
+                        city: subCity || null,
+                        guestCount:
+                          Number.isFinite(subGuests) && subGuests > 0
+                            ? subGuests
+                            : null,
+                        limit: TOTAL_CARDS,
+                      } as any,
+                    },
+                    context: { fetchOptions: { signal } },
+                  });
+                  subDb = (res?.data?.searchSuppliers ?? []).map(
+                    (s: any, i: number) => dbSupplierToProviderData(s, i),
+                  );
+                } catch (dbErr) {
+                  if (!signal.aborted) {
+                    // eslint-disable-next-line no-console
+                    console.error(
+                      `[DB] sub-request ${sub.service} search ERROR:`,
+                      dbErr,
+                    );
+                  }
+                }
+              }
+
+              // AI top-up per topic.
+              const subNeedAi = outsideNetworkAll
+                ? TOTAL_CARDS
+                : Math.max(0, TOTAL_CARDS - subDb.length);
+              let subFill: Awaited<
+                ReturnType<typeof generateProvidersWithAi>
+              > | null = null;
+              if (subNeedAi > 0) {
+                try {
+                  subFill = await generateProvidersWithAi(
+                    subParsed,
+                    currentModel,
+                    locationForThisTurn,
+                    subNeedAi,
+                    signal,
+                    outsideNetworkAll,
+                  );
+                } catch (err) {
+                  if (!signal.aborted) {
+                    // eslint-disable-next-line no-console
+                    console.error(
+                      `[AI] sub-request ${sub.service} generate ERROR:`,
+                      err,
+                    );
+                  }
+                }
+              }
+
+              const subAi = subFill?.providers ?? [];
+              const subDbNames = new Set(
+                subDb.map((p) => p.name.toLowerCase()),
+              );
+              const subDedupedAi = subAi
+                .filter((p) => !subDbNames.has(p.name.toLowerCase()))
+                .map((p, i) => ({
+                  ...p,
+                  id: -1000 - i,
+                  isRealSupplier: false,
+                }));
+              const subMerged = [...subDb, ...subDedupedAi]
+                .slice(0, TOTAL_CARDS)
+                .map((p, i) => ({ ...p, recommended: i === 0 }));
+
+              // Ground the AI reply on this topic only. Prefix the user's
+              // original message with a hint of which sub-topic this reply
+              // covers so the model doesn't blend them.
+              const subCtx = searchResultContext(
+                subMerged,
+                subParsed,
+                outsideNetworkAll,
+              );
+              const subContent = `For the "${subParsed.service}" part of my request: ${content}`;
+
+              const subResult = await apiSendMessage(
+                convId,
+                subContent,
+                currentModel,
+                subCtx,
+                signal,
+                SOLVO_CHAT_SYSTEM_PROMPT,
+              );
+
+              const subMsg: UiMessage = {
+                messageId: subResult.messageId,
+                role: 'assistant',
+                content: subResult.content,
+                model: subResult.model,
+                parsedQuery: subParsed,
+                providers: subMerged,
+                createdAt: subResult.createdAt,
+              };
+              setMessages((prev) => [...prev, subMsg]);
+
+              if (subResult.messageId && convId) {
+                updateMessageProviders(
+                  convId,
+                  subResult.messageId,
+                  JSON.stringify(subMerged),
+                ).catch(() => {/* non-critical */});
+              }
+            }
+
+            // Bump sidebar once for the whole multi-topic turn.
+            setConversations((prev) =>
+              prev
+                .map((c) =>
+                  c.conversationId === convId
+                    ? { ...c, updatedAt: new Date().toISOString() }
+                    : c,
+                )
+                .sort(
+                  (a, b) =>
+                    new Date(b.updatedAt).getTime() -
+                    new Date(a.updatedAt).getTime(),
+                ),
+            );
+
+            return; // Skip the single-topic push at the bottom of this callback.
+          }
+
           // Detect "outside network" early — when set we skip the DB entirely
           // and fill all slots with AI-suggested general-market providers.
           const outsideNetwork = wantsOutsideNetwork(content);
@@ -1714,12 +1899,14 @@ export default function Home() {
           console.log(
             `[providers] final card count = ${merged.length}`,
           );
-          // Include the previous providers as secondary context so the AI
-          // can acknowledge continuity ("switching from the DJs you saw…")
-          // without contradicting the new results it's about to introduce.
+          // Previous providers are included as CONTEXT ONLY. The AI kept
+          // re-summarizing them ("here are the 5 DJs again below") when
+          // the user asked for a new service — so the wording here is
+          // deliberately blunt about not re-listing them. Only the NEW
+          // results above are what the user is asking about right now.
           const resultCtx = searchResultContext(merged, parsed, outsideNetwork)
             + (recentGrounding
-              ? `\n\n## Previously shown in this conversation (for continuity — focus on the NEW results above):\n${recentGrounding}`
+              ? `\n\n## Previously shown in this conversation (memory only — DO NOT list, recommend, or re-describe these providers; the user is asking about the NEW results above):\n${recentGrounding}`
               : '');
           aiResult = await apiSendMessage(
             convId,

@@ -95,6 +95,23 @@ export interface ChatUsage {
  */
 export type QueryIntent = 'service_request' | 'network_inquiry' | 'chat';
 
+/**
+ * A single searchable topic pulled out of the user's message. When the
+ * user asks for one thing, `ParsedQuery` itself is enough. When they ask
+ * for several (e.g. "cleaning on Saturday AND catering on Sunday"), the
+ * parser also fills `subrequests` so the chat layer can run one search +
+ * one reply per topic instead of blending them into a single search
+ * (which surfaces compromise suppliers no one is happy with).
+ */
+export interface SubRequest {
+  service: string;
+  people?: string;
+  location?: string;
+  budget?: string;
+  when?: string;
+  dietary?: string;
+}
+
 export interface ParsedQuery {
   service: string;
   people: string;
@@ -103,6 +120,13 @@ export interface ParsedQuery {
   when: string;
   dietary?: string;
   intent: QueryIntent;
+  /**
+   * Populated only when the user asked for more than one distinct
+   * service in a single message. `undefined` or length ≤ 1 means the
+   * top-level `service`/`when`/… fields already cover the intent — the
+   * chat runs its normal single-search flow.
+   */
+  subrequests?: SubRequest[];
 }
 
 export interface ParseQueryResult {
@@ -122,7 +146,8 @@ Schema:
   "location": "string location/neighborhood if mentioned (e.g. 'Santa Ana'). If the user did NOT mention a location AND device coordinates are provided in the user message, infer the most likely Costa Rican canton/neighborhood from those coordinates. Otherwise empty string ''.",
   "budget": "string budget formatted as '₡XXX,XXX' if mentioned, OR an empty string '' if not mentioned. NEVER write the word 'unspecified'.",
   "when": "string time/date if mentioned (e.g. 'Saturday', 'next week'), OR an empty string '' if not mentioned",
-  "dietary": "OPTIONAL: dietary or special needs as a short phrase, omit the field entirely if none"
+  "dietary": "OPTIONAL: dietary or special needs as a short phrase, omit the field entirely if none",
+  "subrequests": "OPTIONAL array of { service, people?, when?, location?, budget?, dietary? } — emit ONLY for multi-service requests, see 'Multi-service requests' below. Omit the field entirely for single-service messages."
 }
 
 Intent rules — apply in this order (first match wins):
@@ -157,6 +182,8 @@ Intent rules — apply in this order (first match wins):
 3. SERVICE_REQUEST — the user wants us to find/recommend providers FOR THEM to pick from, or is refining an earlier search. This is the "show me options I can act on" intent.
    Signals (EN): "I need", "find me", "show me", "recommend me", "plan a", "get me", "any X under ₡…".
    Signals (ES): "necesito", "busco", "muéstrame", "recomiéndame", "quiero", "encuéntrame", "consígueme".
+
+   ⚠️ ADDITIVE FOLLOW-UPS — after prior providers are on screen, messages that add a NEW service ("nice, I also need cleaning", "y también necesito un fotógrafo", "and can you find me a bakery too") are ALWAYS service_request — not chat. The user is asking for a NEW search on the new topic. The parsed "service" field should be the NEWLY-mentioned service (e.g. "Cleaning"), NOT the previously-discussed one. Do NOT re-include prior topics in the "subrequests" array — they're already answered.
    Examples → service_request:
    - "I need catering for 35"
    - "Find me a DJ"
@@ -173,7 +200,44 @@ Other rules:
 - For unknown fields, use empty string '' — do NOT invent values, do NOT write 'unspecified', 'flexible', 'any', etc.
 - The user's stated location ALWAYS wins over device coordinates. Only fall back to coordinates when the user didn't mention a location.
 - Keep stated values short and human-readable.
-- Output must be valid JSON parseable by JSON.parse — NOTHING else.`;
+- Output must be valid JSON parseable by JSON.parse — NOTHING else.
+
+Multi-service requests (OPTIONAL "subrequests" field):
+
+When a SERVICE_REQUEST message names TWO OR MORE distinct service categories that a single supplier would NOT reasonably offer together (a cleaning company doesn't cater, a DJ doesn't do AC repair), also emit a "subrequests" array — one entry per distinct service, up to 3 entries. Each entry has its own service/when/people/location/budget/dietary — inherited from the top-level fields where the user didn't specify per-service.
+
+Emit "subrequests" ONLY when:
+- The intent is service_request, AND
+- The message clearly separates services with "and", "plus", "también", "y también", "y para", commas between services, or sentence breaks, AND
+- The services are semantically distinct (catering vs cleaning vs DJ vs photography vs AC repair vs moving vs bakery vs decor).
+
+Do NOT emit subrequests when:
+- The user names one service with modifiers ("catering with wine pairing" is ONE service).
+- Both parts describe the same event that one provider typically handles ("DJ with lights" is ONE service).
+- The user is asking about network coverage (network_inquiry).
+
+Examples with subrequests:
+- "I need cleaning on Saturday and catering on Sunday" →
+    "service": "Cleaning", "when": "Saturday", ...,
+    "subrequests": [
+      { "service": "Cleaning", "when": "Saturday" },
+      { "service": "Catering", "when": "Sunday" }
+    ]
+- "Necesito un DJ para el sábado, catering para 40 personas y un fotógrafo" →
+    "service": "DJ", "when": "sábado", "people": "40 people", ...,
+    "subrequests": [
+      { "service": "DJ", "when": "sábado" },
+      { "service": "Catering", "people": "40 people" },
+      { "service": "Photography" }
+    ]
+
+Examples WITHOUT subrequests:
+- "I need catering for 40 people" → single service, omit subrequests
+- "DJ with lights and sound" → single service, omit subrequests
+- "Cleaning with eco-friendly products" → single service, omit subrequests
+
+When emitting subrequests, the top-level fields should still reflect the FIRST subrequest (so downstream code that only reads the top-level fields still works).
+Output must be valid JSON parseable by JSON.parse — NOTHING else.`;
 
 const FALLBACK_QUERY: ParsedQuery = {
   service: 'Service',
@@ -196,6 +260,22 @@ const QUESTION_PREFIX_RE =
 
 const SEARCH_VERB_RE =
   /\b(?:find|busco|necesito|need|show\s+me|muéstrame|muestrame|recomi[ée]ndame|recommend|encu[ée]ntrame|plan\s+(?:a|me)|i\s+want|quiero|book)\b/i;
+
+/**
+ * Detects additive follow-ups that introduce a NEW service on top of a
+ * prior search — "I also need cleaning", "y también necesito un DJ",
+ * "and I need a photographer". Once prior providers are on screen the
+ * LLM parser often mis-classifies these as `chat` (treating them as
+ * conversation about existing cards). This regex is the deterministic
+ * upgrade: if it fires we force `service_request` so a fresh search
+ * runs for the newly-mentioned service.
+ */
+const ADDITIVE_FOLLOWUP_RE =
+  /\b(?:(?:also|and)\s+(?:i\s+)?(?:need|want|would\s+like|require|am\s+looking\s+for)|(?:y\s+)?tambi[eé]n\s+(?:necesito|quiero|busco|ocupo))\b/i;
+
+export function isAdditiveFollowupRequest(message: string): boolean {
+  return ADDITIVE_FOLLOWUP_RE.test(message.trim());
+}
 
 /**
  * Detects requests to search OUTSIDE the Solvo supplier network — e.g.
@@ -516,11 +596,15 @@ export async function parseQueryWithAi(
       !SEARCH_VERB_RE.test(lastTurn)
     ) {
       intent = 'network_inquiry';
-    } else if (wantsMoreResults(lastTurn) || wantsOutsideNetwork(lastTurn)) {
-      // "show me more options", "muéstrame…", "search outside your network"…
-      // The LLM often classifies these as `chat` when phrased politely or when
-      // they follow a conversational exchange. We deterministically force
-      // service_request so the search pipeline always runs.
+    } else if (
+      wantsMoreResults(lastTurn) ||
+      wantsOutsideNetwork(lastTurn) ||
+      isAdditiveFollowupRequest(lastTurn)
+    ) {
+      // "show me more options" / "search outside your network" / "I also
+      // need cleaning" — the LLM often classifies these as `chat` when
+      // prior providers are already on screen. Deterministic upgrade so a
+      // fresh search always runs for a genuinely-new topic.
       intent = 'service_request';
     }
 
@@ -532,6 +616,24 @@ export async function parseQueryWithAi(
       detectExplicitLocation(lastTurn) ?? detectExplicitLocation(trimmed);
     const llmLocation = isEmpty(obj.location) ? '' : String(obj.location);
 
+    // Multi-service split. Only surface `subrequests` for `service_request`
+    // intents (parser can't split "compare these" into topics), require an
+    // array of ≥ 2 entries with real service strings, and cap at 3 so a
+    // "list 10 things" message can't fan out to 10 embeddings + 10 chat
+    // completions per turn.
+    const rawSubs = Array.isArray(obj.subrequests) ? obj.subrequests : [];
+    const subs: SubRequest[] = rawSubs
+      .filter((r: any) => r && typeof r === 'object' && !isEmpty(r.service))
+      .slice(0, 3)
+      .map((r: any) => ({
+        service: String(r.service),
+        people: !isEmpty(r.people) ? String(r.people) : undefined,
+        location: !isEmpty(r.location) ? String(r.location) : undefined,
+        budget: !isEmpty(r.budget) ? String(r.budget) : undefined,
+        when: !isEmpty(r.when) ? String(r.when) : undefined,
+        dietary: !isEmpty(r.dietary) ? String(r.dietary) : undefined,
+      }));
+
     parsed = {
       intent,
       service: String(obj.service ?? FALLBACK_QUERY.service),
@@ -540,6 +642,7 @@ export async function parseQueryWithAi(
       budget: isEmpty(obj.budget) ? '' : String(obj.budget),
       when: isEmpty(obj.when) ? '' : String(obj.when),
       dietary: !isEmpty(obj.dietary) ? String(obj.dietary) : undefined,
+      subrequests: intent === 'service_request' && subs.length >= 2 ? subs : undefined,
     };
   } catch {
     parsed = FALLBACK_QUERY;
