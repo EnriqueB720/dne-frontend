@@ -41,6 +41,8 @@ import {
   PackageCard,
   NotificationBell,
   QuoteCreateModal,
+  ReviewCreateModal,
+  ConfirmModal,
 } from '@molecules';
 export type { ProviderData, PackageData } from '@molecules';
 
@@ -96,6 +98,8 @@ export {
   PackageCard,
   NotificationBell,
   QuoteCreateModal,
+  ReviewCreateModal,
+  ConfirmModal,
   SolvoNavBar,
   ChatSidebar,
   ChatThread,

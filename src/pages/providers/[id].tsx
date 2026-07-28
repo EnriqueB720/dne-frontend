@@ -394,11 +394,13 @@ export default function ProviderProfile() {
                           fontWeight={600}
                           fontSize="14px"
                         >
-                          {initialsFrom(r.customerId)}
+                          {r.customer?.user?.name
+                            ? r.customer.user.name.charAt(0).toUpperCase()
+                            : initialsFrom(r.customerId)}
                         </Flex>
                         <Box>
                           <Text fontSize="sm" fontWeight={600} color={solvoColors.text}>
-                            Customer
+                            {r.customer?.user?.name ?? 'Customer'}
                           </Text>
                           <Text fontSize="xs" color={solvoColors.textSubtle}>
                             {formatReviewDate(r.createdAt)}
@@ -421,6 +423,33 @@ export default function ProviderProfile() {
                         {r.text}
                       </Text>
                     )}
+                    {(() => {
+                      const parts = [
+                        ['Quality', r.ratingQuality],
+                        ['Communication', r.ratingCommunication],
+                        ['Value', r.ratingValue],
+                        ['Punctuality', r.ratingPunctuality],
+                      ].filter(([, v]) => v != null) as Array<[string, number]>;
+                      if (parts.length === 0) return null;
+                      return (
+                        <Flex gap="6px" wrap="wrap">
+                          {parts.map(([label, v]) => (
+                            <Box
+                              key={label}
+                              padding="3px 8px"
+                              borderRadius="9999px"
+                              bg={solvoColors.bg}
+                              borderWidth="1px"
+                              borderColor={solvoColors.border}
+                            >
+                              <Text fontSize="11px" color={solvoColors.textMuted}>
+                                {label} {v}★
+                              </Text>
+                            </Box>
+                          ))}
+                        </Flex>
+                      );
+                    })()}
                     {r.supplierResponse && (
                       <Box
                         marginTop="4px"
