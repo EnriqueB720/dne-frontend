@@ -1,0 +1,3 @@
+mutation deleteReview($data: ReviewDeleteInput!) {
+  deleteReview(data: $data)
+}

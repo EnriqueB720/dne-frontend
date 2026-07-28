@@ -1,6 +1,8 @@
 import { useContext, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Box, Flex, Text, SolvoNavBar } from '@components';
+import { useRouter } from 'next/router';
+import { ExternalLink, Pencil, Star, Trash2 } from 'lucide-react';
+import { Box, Flex, Text, SolvoNavBar, ReviewCreateModal, ConfirmModal } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -10,6 +12,7 @@ import {
   useBookingsBySupplierLazyQuery,
   useCancelBookingMutation,
   useCompleteBookingMutation,
+  useDeleteReviewMutation,
   useBookingEventForCustomerSubscription,
   useBookingEventForSupplierSubscription,
 } from '@generated';
@@ -98,19 +101,30 @@ export default function BookingsPage() {
   const [filterStatus, setFilterStatus] = useState<BookingStatus | ''>('');
   const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  // When set, the review modal edits this review instead of creating one.
+  const [reviewBeingEdited, setReviewBeingEdited] = useState<any | null>(null);
+  const [confirmDeleteReview, setConfirmDeleteReview] = useState(false);
 
   const [fetchByCustomer, byCustomerState] = useBookingsByCustomerLazyQuery({ fetchPolicy: 'network-only' });
   const [fetchBySupplier, bySupplierState] = useBookingsBySupplierLazyQuery({ fetchPolicy: 'network-only' });
-  const [fetchDetail, detailState] = useBookingLazyQuery({ fetchPolicy: 'network-only' });
+  // cache-and-network: already-viewed bookings render instantly from cache
+  // while a background refetch keeps them fresh — no blank panel on click.
+  const [fetchDetail, detailState] = useBookingLazyQuery({ fetchPolicy: 'cache-and-network' });
   const [cancelBooking, cancelState] = useCancelBookingMutation();
   const [completeBooking, completeState] = useCompleteBookingMutation();
+  const [deleteReview, deleteReviewState] = useDeleteReviewMutation();
 
+  // Fall back to previousData so the list doesn't flash empty mid-refetch.
   const list =
     mode === 'customer'
-      ? byCustomerState.data?.bookingsByCustomer ?? []
-      : bySupplierState.data?.bookingsBySupplier ?? [];
+      ? (byCustomerState.data ?? byCustomerState.previousData)?.bookingsByCustomer ?? []
+      : (bySupplierState.data ?? bySupplierState.previousData)?.bookingsBySupplier ?? [];
 
   const detail = detailState.data?.booking;
+  // First visit to a booking that isn't cached yet — show a skeleton instead
+  // of collapsing the panel.
+  const detailFirstLoad = detailState.loading && !detail;
 
   const handleLoad = async () => {
     if (!actorId) return;
@@ -158,6 +172,18 @@ export default function BookingsPage() {
     await fetchDetail({ variables: { where: { bookingId } } });
   };
 
+  // Deep-link support: notification rows land on /bookings?id=N — select
+  // that booking as soon as the router and role are ready.
+  const router = useRouter();
+  useEffect(() => {
+    if (!router.isReady || !actorId) return;
+    const id = Number(router.query.id);
+    if (id && id !== selectedBookingId) {
+      handleSelect(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.id, actorId]);
+
   const handleCancel = async () => {
     if (!selectedBookingId) return;
     const reason = window.prompt('Cancel reason (optional)') ?? undefined;
@@ -190,17 +216,40 @@ export default function BookingsPage() {
         fetchDetail({ variables: { where: { bookingId: selectedBookingId } } }),
         handleLoad(),
       ]);
+      // The natural next step for a customer is the review — open it right away.
+      if (mode === 'customer') {
+        setReviewBeingEdited(null);
+        setReviewModalOpen(true);
+      }
     } catch (err: any) {
       setFeedback({ kind: 'err', text: err?.message ?? 'Complete failed' });
     }
   };
 
-  const busy =
-    byCustomerState.loading ||
-    bySupplierState.loading ||
-    detailState.loading ||
-    cancelState.loading ||
-    completeState.loading;
+  const handleDeleteReview = async () => {
+    const review = (detail as any)?.review;
+    if (!review || !customerId) return;
+    try {
+      await deleteReview({
+        variables: { data: { reviewId: review.reviewId, customerId } },
+      });
+      setConfirmDeleteReview(false);
+      setFeedback({ kind: 'ok', text: 'Review removed' });
+      await Promise.all([
+        fetchDetail({ variables: { where: { bookingId: detail!.bookingId } } }),
+        handleLoad(),
+      ]);
+    } catch (err: any) {
+      setConfirmDeleteReview(false);
+      setFeedback({ kind: 'err', text: err?.message ?? 'Failed to remove review' });
+    }
+  };
+
+  // Mutations in flight — disables the action buttons. Deliberately does NOT
+  // include query loading, so clicking around never dims the page.
+  const busy = cancelState.loading || completeState.loading || deleteReviewState.loading;
+  // List refetch in flight — only the Refresh button reflects this.
+  const listBusy = byCustomerState.loading || bySupplierState.loading;
 
   // ── Gating: not signed in / no roles ───────────────────────────────────
   if (!isAuthenticated || !user) {
@@ -305,16 +354,16 @@ export default function BookingsPage() {
             <button
               type="button"
               onClick={handleLoad}
-              disabled={busy}
+              disabled={listBusy}
               style={{
                 ...buttonBaseStyle,
                 background: solvoColors.surface,
                 color: solvoColors.text,
                 border: `1px solid ${solvoColors.border}`,
-                opacity: busy ? 0.5 : 1,
+                opacity: listBusy ? 0.5 : 1,
               }}
             >
-              {busy ? 'Refreshing…' : 'Refresh'}
+              {listBusy ? 'Refreshing…' : 'Refresh'}
             </button>
           </Flex>
         </Box>
@@ -376,16 +425,30 @@ export default function BookingsPage() {
                               {b.location} · {b.currency} {b.totalPrice} · {formatDate(b.serviceDate)}
                             </Text>
                           </Box>
-                          <Box
-                            padding="4px 10px"
-                            borderRadius="9999px"
-                            bg={tone.bg}
-                            color={tone.fg}
-                            fontSize="11px"
-                            fontWeight={600}
-                          >
-                            {b.status}
-                          </Box>
+                          <Flex direction="column" align="flex-end" gap="4px" flexShrink={0}>
+                            <Box
+                              padding="4px 10px"
+                              borderRadius="9999px"
+                              bg={tone.bg}
+                              color={tone.fg}
+                              fontSize="11px"
+                              fontWeight={600}
+                            >
+                              {b.status}
+                            </Box>
+                            {(b as any).review && (
+                              <Box
+                                padding="4px 10px"
+                                borderRadius="9999px"
+                                bg={solvoColors.amberLight}
+                                color={solvoColors.amberText}
+                                fontSize="11px"
+                                fontWeight={600}
+                              >
+                                ★ {(b as any).review.rating}
+                              </Box>
+                            )}
+                          </Flex>
                         </Flex>
                       </Box>
                     );
@@ -401,7 +464,18 @@ export default function BookingsPage() {
                 Booking detail
               </Text>
 
-              {!detail ? (
+              {detailFirstLoad ? (
+                // Skeleton keeps the panel height stable while the first
+                // fetch of this booking is in flight.
+                <Flex direction="column" gap="10px">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <Flex key={i} justify="space-between" gap="10px">
+                      <Box width="30%" height="12px" borderRadius="6px" bg={solvoColors.bg} />
+                      <Box width="45%" height="12px" borderRadius="6px" bg={solvoColors.bg} />
+                    </Flex>
+                  ))}
+                </Flex>
+              ) : !detail ? (
                 <Text fontSize="sm" color={solvoColors.textSubtle}>
                   Select a booking to view details.
                 </Text>
@@ -437,14 +511,30 @@ export default function BookingsPage() {
                         : `#${detail.customerId}`
                     }
                   />
-                  <DetailRow
-                    label="Supplier"
-                    value={
-                      (detail as any).supplier?.companyName
-                        ? `${(detail as any).supplier.companyName} · #${detail.supplierId}`
-                        : `#${detail.supplierId}`
-                    }
-                  />
+                  <Flex justify="space-between" align="flex-start" gap="10px" paddingY="4px">
+                    <Text fontSize="xs" color={solvoColors.textSubtle} textTransform="uppercase" letterSpacing="0.04em">
+                      Supplier
+                    </Text>
+                    <Box textAlign="right" maxWidth="60%">
+                      <Text fontSize="sm" color={solvoColors.text}>
+                        {(detail as any).supplier?.companyName ?? `#${detail.supplierId}`}
+                      </Text>
+                      <Link
+                        href={`/providers/${detail.supplierId}`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: solvoColors.indigo,
+                          textDecoration: 'none',
+                        }}
+                      >
+                        View profile & reviews <ExternalLink size={11} />
+                      </Link>
+                    </Box>
+                  </Flex>
                   <DetailRow label="Service date" value={formatDate(detail.serviceDate)} />
                   {detail.serviceEndDate && <DetailRow label="End date" value={formatDate(detail.serviceEndDate)} />}
                   <DetailRow label="Location" value={detail.location} />
@@ -457,6 +547,112 @@ export default function BookingsPage() {
                   {detail.cancelledBy && <DetailRow label="By" value={detail.cancelledBy} />}
                   {detail.cancellationReason && <DetailRow label="Reason" value={detail.cancellationReason} />}
                   {detail.completedAt && <DetailRow label="Completed" value={formatDate(detail.completedAt)} />}
+
+                  {/* Review — shown once the service is done */}
+                  {(detail as any).review ? (
+                    <Box
+                      marginTop="16px"
+                      padding="12px 14px"
+                      borderRadius="10px"
+                      bg={solvoColors.amberLight}
+                    >
+                      <Flex align="center" gap="6px" marginBottom="4px">
+                        <Flex gap="2px">
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <Star
+                              key={n}
+                              size={14}
+                              color={solvoColors.amberText}
+                              fill={n <= (detail as any).review.rating ? solvoColors.amberText : 'transparent'}
+                            />
+                          ))}
+                        </Flex>
+                        <Text fontSize="xs" fontWeight={600} color={solvoColors.amberText}>
+                          {mode === 'customer' ? 'Your review' : 'Customer review'}
+                        </Text>
+                      </Flex>
+                      {(detail as any).review.text && (
+                        <Text fontSize="sm" color={solvoColors.text}>
+                          "{(detail as any).review.text}"
+                        </Text>
+                      )}
+                      <SubRatingsLine review={(detail as any).review} />
+                      <Text fontSize="xs" color={solvoColors.textSubtle} marginTop="4px">
+                        {formatDate((detail as any).review.createdAt)}
+                      </Text>
+                      {mode === 'customer' && (
+                        <Flex gap="8px" marginTop="10px">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              setReviewBeingEdited((detail as any).review);
+                              setReviewModalOpen(true);
+                            }}
+                            style={{
+                              ...buttonBaseStyle,
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              background: solvoColors.surface,
+                              color: solvoColors.text,
+                              border: `1px solid ${solvoColors.border}`,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              opacity: busy ? 0.5 : 1,
+                            }}
+                          >
+                            <Pencil size={12} /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setConfirmDeleteReview(true)}
+                            style={{
+                              ...buttonBaseStyle,
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              background: solvoColors.surface,
+                              color: solvoColors.roseText,
+                              border: `1px solid ${solvoColors.border}`,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              opacity: busy ? 0.5 : 1,
+                            }}
+                          >
+                            <Trash2 size={12} /> Remove
+                          </button>
+                        </Flex>
+                      )}
+                    </Box>
+                  ) : (
+                    mode === 'customer' &&
+                    detail.status === BookingStatus.Completed && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReviewBeingEdited(null);
+                          setReviewModalOpen(true);
+                        }}
+                        disabled={busy}
+                        style={{
+                          ...buttonBaseStyle,
+                          width: '100%',
+                          marginTop: '16px',
+                          background: solvoColors.amberLight,
+                          color: solvoColors.amberText,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          opacity: busy ? 0.5 : 1,
+                        }}
+                      >
+                        <Star size={14} /> Leave a review
+                      </button>
+                    )
+                  )}
 
                   <button
                     type="button"
@@ -514,7 +710,81 @@ export default function BookingsPage() {
           </Box>
         </Flex>
       </Box>
+
+      {reviewModalOpen && detail && customerId && (
+        <ReviewCreateModal
+          bookingId={detail.bookingId}
+          customerId={customerId}
+          supplierName={(detail as any).supplier?.companyName}
+          bookingSummary={(detail as any).request?.rawQuery}
+          serviceDate={detail.serviceDate}
+          existingReview={reviewBeingEdited}
+          onSaved={async () => {
+            setFeedback({
+              kind: 'ok',
+              text: reviewBeingEdited
+                ? `Review updated for booking #${detail.bookingId}`
+                : `Review submitted for booking #${detail.bookingId}`,
+            });
+            await Promise.all([
+              fetchDetail({ variables: { where: { bookingId: detail.bookingId } } }),
+              handleLoad(),
+            ]);
+          }}
+          onClose={() => {
+            setReviewModalOpen(false);
+            setReviewBeingEdited(null);
+          }}
+        />
+      )}
+
+      {confirmDeleteReview && (detail as any)?.review && (
+        <ConfirmModal
+          title="Remove review?"
+          message={`Your review of ${(detail as any).supplier?.companyName ?? 'this supplier'} will be deleted and their rating recalculated. This can't be undone.`}
+          preview={
+            <>
+              <Flex gap="2px" marginBottom={(detail as any).review.text ? '6px' : '0'}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Star
+                    key={n}
+                    size={13}
+                    color={solvoColors.amberText}
+                    fill={n <= (detail as any).review.rating ? solvoColors.amberText : 'transparent'}
+                  />
+                ))}
+              </Flex>
+              {(detail as any).review.text && (
+                <Text fontSize="13px" color={solvoColors.text}>
+                  "{(detail as any).review.text}"
+                </Text>
+              )}
+            </>
+          }
+          confirmLabel="Remove review"
+          loading={deleteReviewState.loading}
+          onConfirm={handleDeleteReview}
+          onCancel={() => setConfirmDeleteReview(false)}
+        />
+      )}
     </Box>
+  );
+}
+
+/** Compact "Quality 4★ · Value 5★" line for whichever sub-ratings exist. */
+function SubRatingsLine({ review }: { review: any }) {
+  const parts = [
+    ['Quality', review.ratingQuality],
+    ['Communication', review.ratingCommunication],
+    ['Value', review.ratingValue],
+    ['Punctuality', review.ratingPunctuality],
+  ].filter(([, v]) => v != null) as Array<[string, number]>;
+
+  if (parts.length === 0) return null;
+  return (
+    <Text fontSize="xs" color={solvoColors.textMuted} marginTop="6px">
+      {parts.map(([label, v]) => `${label} ${v}★`).join(' · ')}
+    </Text>
   );
 }
 

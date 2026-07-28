@@ -1,0 +1,13 @@
+mutation updateReview($data: ReviewUpdateInput!) {
+  updateReview(data: $data) {
+    reviewId
+    bookingId
+    rating
+    text
+    ratingQuality
+    ratingCommunication
+    ratingValue
+    ratingPunctuality
+    createdAt
+  }
+}

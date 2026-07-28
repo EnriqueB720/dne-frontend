@@ -140,6 +140,7 @@ export type Booking = {
   quoteId: Scalars['Float']['output'];
   request?: Maybe<Request>;
   requestId: Scalars['Float']['output'];
+  review?: Maybe<Review>;
   serviceDate: Scalars['DateTime']['output'];
   serviceEndDate?: Maybe<Scalars['DateTime']['output']>;
   status: BookingStatus;
@@ -438,11 +439,13 @@ export type Mutation = {
   createPricing: Pricing;
   createQuote: Quote;
   createRequest: Request;
+  createReview: Review;
   createSubscription: PlanSubscription;
   createSupplier: Supplier;
   createUser: User;
   deleteAiConversation: Scalars['Boolean']['output'];
   deletePost: Scalars['Boolean']['output'];
+  deleteReview: Scalars['Boolean']['output'];
   linkAiConversationToRequest: AiConversation;
   markAllNotificationsAsRead: Scalars['Int']['output'];
   markMessagesAsRead: Scalars['Float']['output'];
@@ -463,6 +466,7 @@ export type Mutation = {
   updateCustomer: Customer;
   updatePost: Post;
   updateRequestStatus: Request;
+  updateReview: Review;
   updateSupplier: Supplier;
   updateUser: User;
   withdrawQuote: Quote;
@@ -549,6 +553,11 @@ export type MutationCreateRequestArgs = {
 };
 
 
+export type MutationCreateReviewArgs = {
+  data: ReviewCreateInput;
+};
+
+
 export type MutationCreateSubscriptionArgs = {
   data: SubscriptionCreateInput;
 };
@@ -572,6 +581,11 @@ export type MutationDeleteAiConversationArgs = {
 
 export type MutationDeletePostArgs = {
   whereUnique: PostWhereUniqueInput;
+};
+
+
+export type MutationDeleteReviewArgs = {
+  data: ReviewDeleteInput;
 };
 
 
@@ -679,6 +693,11 @@ export type MutationUpdatePostArgs = {
 
 export type MutationUpdateRequestStatusArgs = {
   data: RequestUpdateStatusInput;
+};
+
+
+export type MutationUpdateReviewArgs = {
+  data: ReviewUpdateInput;
 };
 
 
@@ -1268,6 +1287,7 @@ export type Review = {
   __typename?: 'Review';
   bookingId: Scalars['Int']['output'];
   createdAt: Scalars['DateTime']['output'];
+  customer?: Maybe<Customer>;
   customerId: Scalars['Int']['output'];
   rating: Scalars['Int']['output'];
   ratingCommunication?: Maybe<Scalars['Int']['output']>;
@@ -1278,6 +1298,33 @@ export type Review = {
   supplierId: Scalars['Int']['output'];
   supplierResponse?: Maybe<Scalars['String']['output']>;
   text?: Maybe<Scalars['String']['output']>;
+};
+
+export type ReviewCreateInput = {
+  bookingId: Scalars['Int']['input'];
+  customerId: Scalars['Int']['input'];
+  rating: Scalars['Int']['input'];
+  ratingCommunication?: InputMaybe<Scalars['Int']['input']>;
+  ratingPunctuality?: InputMaybe<Scalars['Int']['input']>;
+  ratingQuality?: InputMaybe<Scalars['Int']['input']>;
+  ratingValue?: InputMaybe<Scalars['Int']['input']>;
+  text?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ReviewDeleteInput = {
+  customerId: Scalars['Int']['input'];
+  reviewId: Scalars['Int']['input'];
+};
+
+export type ReviewUpdateInput = {
+  customerId: Scalars['Int']['input'];
+  rating: Scalars['Int']['input'];
+  ratingCommunication?: InputMaybe<Scalars['Int']['input']>;
+  ratingPunctuality?: InputMaybe<Scalars['Int']['input']>;
+  ratingQuality?: InputMaybe<Scalars['Int']['input']>;
+  ratingValue?: InputMaybe<Scalars['Int']['input']>;
+  reviewId: Scalars['Int']['input'];
+  text?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** Supported roles for users */
@@ -1747,7 +1794,7 @@ export type BookingQueryVariables = Exact<{
 }>;
 
 
-export type BookingQuery = { __typename?: 'Query', booking: { __typename?: 'Booking', bookingId: number, requestId: number, quoteId: number, customerId: number, supplierId: number, serviceDate: any, serviceEndDate?: any | null, location: string, guestCount?: number | null, totalPrice: string, platformFee: string, supplierPayout: string, currency: string, status: BookingStatus, paymentStatus: PaymentStatus, phoneRevealedAt?: any | null, cancellationReason?: string | null, cancelledAt?: any | null, cancelledBy?: string | null, completedAt?: any | null, createdAt: any, updatedAt: any, request?: { __typename?: 'Request', requestId: number, rawQuery: string, serviceDate?: any | null, guestCount?: number | null, city?: string | null } | null, quote?: { __typename?: 'Quote', quoteId: number, totalPrice: string, currency: string, validUntil: any, message?: string | null } | null, customer?: { __typename?: 'Customer', customerId: number, user?: { __typename?: 'User', userId: number, name: string, email: string } | null } | null, supplier?: { __typename?: 'Supplier', supplierId: number, companyName: string, city?: string | null, businessPhone?: string | null, whatsappNumber?: string | null } | null } };
+export type BookingQuery = { __typename?: 'Query', booking: { __typename?: 'Booking', bookingId: number, requestId: number, quoteId: number, customerId: number, supplierId: number, serviceDate: any, serviceEndDate?: any | null, location: string, guestCount?: number | null, totalPrice: string, platformFee: string, supplierPayout: string, currency: string, status: BookingStatus, paymentStatus: PaymentStatus, phoneRevealedAt?: any | null, cancellationReason?: string | null, cancelledAt?: any | null, cancelledBy?: string | null, completedAt?: any | null, createdAt: any, updatedAt: any, request?: { __typename?: 'Request', requestId: number, rawQuery: string, serviceDate?: any | null, guestCount?: number | null, city?: string | null } | null, quote?: { __typename?: 'Quote', quoteId: number, totalPrice: string, currency: string, validUntil: any, message?: string | null } | null, customer?: { __typename?: 'Customer', customerId: number, user?: { __typename?: 'User', userId: number, name: string, email: string } | null } | null, supplier?: { __typename?: 'Supplier', supplierId: number, companyName: string, city?: string | null, businessPhone?: string | null, whatsappNumber?: string | null } | null, review?: { __typename?: 'Review', reviewId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, createdAt: any } | null } };
 
 export type BookingsByCustomerQueryVariables = Exact<{
   customerId: Scalars['Int']['input'];
@@ -1755,7 +1802,7 @@ export type BookingsByCustomerQueryVariables = Exact<{
 }>;
 
 
-export type BookingsByCustomerQuery = { __typename?: 'Query', bookingsByCustomer: Array<{ __typename?: 'Booking', bookingId: number, requestId: number, quoteId: number, supplierId: number, serviceDate: any, location: string, guestCount?: number | null, totalPrice: string, currency: string, status: BookingStatus, paymentStatus: PaymentStatus, createdAt: any, supplier?: { __typename?: 'Supplier', supplierId: number, companyName: string } | null, request?: { __typename?: 'Request', requestId: number, rawQuery: string } | null }> };
+export type BookingsByCustomerQuery = { __typename?: 'Query', bookingsByCustomer: Array<{ __typename?: 'Booking', bookingId: number, requestId: number, quoteId: number, supplierId: number, serviceDate: any, location: string, guestCount?: number | null, totalPrice: string, currency: string, status: BookingStatus, paymentStatus: PaymentStatus, createdAt: any, supplier?: { __typename?: 'Supplier', supplierId: number, companyName: string } | null, request?: { __typename?: 'Request', requestId: number, rawQuery: string } | null, review?: { __typename?: 'Review', reviewId: number, rating: number } | null }> };
 
 export type BookingsBySupplierQueryVariables = Exact<{
   supplierId: Scalars['Int']['input'];
@@ -1763,7 +1810,7 @@ export type BookingsBySupplierQueryVariables = Exact<{
 }>;
 
 
-export type BookingsBySupplierQuery = { __typename?: 'Query', bookingsBySupplier: Array<{ __typename?: 'Booking', bookingId: number, requestId: number, quoteId: number, customerId: number, serviceDate: any, location: string, guestCount?: number | null, totalPrice: string, supplierPayout: string, currency: string, status: BookingStatus, paymentStatus: PaymentStatus, createdAt: any, customer?: { __typename?: 'Customer', customerId: number, user?: { __typename?: 'User', userId: number, name: string } | null } | null, request?: { __typename?: 'Request', requestId: number, rawQuery: string } | null }> };
+export type BookingsBySupplierQuery = { __typename?: 'Query', bookingsBySupplier: Array<{ __typename?: 'Booking', bookingId: number, requestId: number, quoteId: number, customerId: number, serviceDate: any, location: string, guestCount?: number | null, totalPrice: string, supplierPayout: string, currency: string, status: BookingStatus, paymentStatus: PaymentStatus, createdAt: any, customer?: { __typename?: 'Customer', customerId: number, user?: { __typename?: 'User', userId: number, name: string } | null } | null, request?: { __typename?: 'Request', requestId: number, rawQuery: string } | null, review?: { __typename?: 'Review', reviewId: number, rating: number } | null }> };
 
 export type CancelBookingMutationVariables = Exact<{
   data: BookingCancelInput;
@@ -2073,6 +2120,27 @@ export type UpdateRequestStatusMutationVariables = Exact<{
 
 export type UpdateRequestStatusMutation = { __typename?: 'Mutation', updateRequestStatus: { __typename?: 'Request', requestId: number, status: RequestStatus, updatedAt: any } };
 
+export type CreateReviewMutationVariables = Exact<{
+  data: ReviewCreateInput;
+}>;
+
+
+export type CreateReviewMutation = { __typename?: 'Mutation', createReview: { __typename?: 'Review', reviewId: number, bookingId: number, customerId: number, supplierId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, createdAt: any } };
+
+export type DeleteReviewMutationVariables = Exact<{
+  data: ReviewDeleteInput;
+}>;
+
+
+export type DeleteReviewMutation = { __typename?: 'Mutation', deleteReview: boolean };
+
+export type UpdateReviewMutationVariables = Exact<{
+  data: ReviewUpdateInput;
+}>;
+
+
+export type UpdateReviewMutation = { __typename?: 'Mutation', updateReview: { __typename?: 'Review', reviewId: number, bookingId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, createdAt: any } };
+
 export type SearchSuppliersQueryVariables = Exact<{
   data: SupplierSearchInput;
 }>;
@@ -2092,7 +2160,7 @@ export type SupplierQueryVariables = Exact<{
 }>;
 
 
-export type SupplierQuery = { __typename?: 'Query', supplier: { __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, businessPhone?: string | null, businessEmail?: string | null, whatsappNumber?: string | null, websiteUrl?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, pricingModel: PricingModel, basePrice: string, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', categoryId: number, isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null, reviewsReceived?: Array<{ __typename?: 'Review', reviewId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, supplierResponse?: string | null, createdAt: any }> | null } };
+export type SupplierQuery = { __typename?: 'Query', supplier: { __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, businessPhone?: string | null, businessEmail?: string | null, whatsappNumber?: string | null, websiteUrl?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, pricingModel: PricingModel, basePrice: string, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', categoryId: number, isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null, reviewsReceived?: Array<{ __typename?: 'Review', reviewId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, supplierResponse?: string | null, createdAt: any, customer?: { __typename?: 'Customer', customerId: number, user?: { __typename?: 'User', userId: number, name: string } | null } | null }> | null } };
 
 export type SuppliersQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -3222,6 +3290,16 @@ export const BookingDocument = gql`
       businessPhone
       whatsappNumber
     }
+    review {
+      reviewId
+      rating
+      text
+      ratingQuality
+      ratingCommunication
+      ratingValue
+      ratingPunctuality
+      createdAt
+    }
   }
 }
     `;
@@ -3283,6 +3361,10 @@ export const BookingsByCustomerDocument = gql`
     request {
       requestId
       rawQuery
+    }
+    review {
+      reviewId
+      rating
     }
   }
 }
@@ -3350,6 +3432,10 @@ export const BookingsBySupplierDocument = gql`
     request {
       requestId
       rawQuery
+    }
+    review {
+      reviewId
+      rating
     }
   }
 }
@@ -5272,6 +5358,121 @@ export function useUpdateRequestStatusMutation(baseOptions?: Apollo.MutationHook
 export type UpdateRequestStatusMutationHookResult = ReturnType<typeof useUpdateRequestStatusMutation>;
 export type UpdateRequestStatusMutationResult = Apollo.MutationResult<UpdateRequestStatusMutation>;
 export type UpdateRequestStatusMutationOptions = Apollo.BaseMutationOptions<UpdateRequestStatusMutation, UpdateRequestStatusMutationVariables>;
+export const CreateReviewDocument = gql`
+    mutation createReview($data: ReviewCreateInput!) {
+  createReview(data: $data) {
+    reviewId
+    bookingId
+    customerId
+    supplierId
+    rating
+    text
+    ratingQuality
+    ratingCommunication
+    ratingValue
+    ratingPunctuality
+    createdAt
+  }
+}
+    `;
+export type CreateReviewMutationFn = Apollo.MutationFunction<CreateReviewMutation, CreateReviewMutationVariables>;
+
+/**
+ * __useCreateReviewMutation__
+ *
+ * To run a mutation, you first call `useCreateReviewMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateReviewMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createReviewMutation, { data, loading, error }] = useCreateReviewMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useCreateReviewMutation(baseOptions?: Apollo.MutationHookOptions<CreateReviewMutation, CreateReviewMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateReviewMutation, CreateReviewMutationVariables>(CreateReviewDocument, options);
+      }
+export type CreateReviewMutationHookResult = ReturnType<typeof useCreateReviewMutation>;
+export type CreateReviewMutationResult = Apollo.MutationResult<CreateReviewMutation>;
+export type CreateReviewMutationOptions = Apollo.BaseMutationOptions<CreateReviewMutation, CreateReviewMutationVariables>;
+export const DeleteReviewDocument = gql`
+    mutation deleteReview($data: ReviewDeleteInput!) {
+  deleteReview(data: $data)
+}
+    `;
+export type DeleteReviewMutationFn = Apollo.MutationFunction<DeleteReviewMutation, DeleteReviewMutationVariables>;
+
+/**
+ * __useDeleteReviewMutation__
+ *
+ * To run a mutation, you first call `useDeleteReviewMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteReviewMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteReviewMutation, { data, loading, error }] = useDeleteReviewMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useDeleteReviewMutation(baseOptions?: Apollo.MutationHookOptions<DeleteReviewMutation, DeleteReviewMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DeleteReviewMutation, DeleteReviewMutationVariables>(DeleteReviewDocument, options);
+      }
+export type DeleteReviewMutationHookResult = ReturnType<typeof useDeleteReviewMutation>;
+export type DeleteReviewMutationResult = Apollo.MutationResult<DeleteReviewMutation>;
+export type DeleteReviewMutationOptions = Apollo.BaseMutationOptions<DeleteReviewMutation, DeleteReviewMutationVariables>;
+export const UpdateReviewDocument = gql`
+    mutation updateReview($data: ReviewUpdateInput!) {
+  updateReview(data: $data) {
+    reviewId
+    bookingId
+    rating
+    text
+    ratingQuality
+    ratingCommunication
+    ratingValue
+    ratingPunctuality
+    createdAt
+  }
+}
+    `;
+export type UpdateReviewMutationFn = Apollo.MutationFunction<UpdateReviewMutation, UpdateReviewMutationVariables>;
+
+/**
+ * __useUpdateReviewMutation__
+ *
+ * To run a mutation, you first call `useUpdateReviewMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateReviewMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateReviewMutation, { data, loading, error }] = useUpdateReviewMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useUpdateReviewMutation(baseOptions?: Apollo.MutationHookOptions<UpdateReviewMutation, UpdateReviewMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateReviewMutation, UpdateReviewMutationVariables>(UpdateReviewDocument, options);
+      }
+export type UpdateReviewMutationHookResult = ReturnType<typeof useUpdateReviewMutation>;
+export type UpdateReviewMutationResult = Apollo.MutationResult<UpdateReviewMutation>;
+export type UpdateReviewMutationOptions = Apollo.BaseMutationOptions<UpdateReviewMutation, UpdateReviewMutationVariables>;
 export const SearchSuppliersDocument = gql`
     query searchSuppliers($data: SupplierSearchInput!) {
   searchSuppliers(data: $data) {
@@ -5441,6 +5642,13 @@ export const SupplierDocument = gql`
       ratingPunctuality
       supplierResponse
       createdAt
+      customer {
+        customerId
+        user {
+          userId
+          name
+        }
+      }
     }
   }
 }

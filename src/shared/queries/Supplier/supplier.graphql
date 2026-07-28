@@ -46,6 +46,13 @@ query supplier($where: SupplierWhereInput!) {
       ratingPunctuality
       supplierResponse
       createdAt
+      customer {
+        customerId
+        user {
+          userId
+          name
+        }
+      }
     }
   }
 }

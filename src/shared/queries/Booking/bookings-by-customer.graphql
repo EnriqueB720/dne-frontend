@@ -20,5 +20,9 @@ query bookingsByCustomer($customerId: Int!, $status: BookingStatus) {
       requestId
       rawQuery
     }
+    review {
+      reviewId
+      rating
+    }
   }
 }
