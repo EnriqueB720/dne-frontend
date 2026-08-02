@@ -119,7 +119,20 @@ export default function LoginPage() {
               </Box>
 
               <Box marginBottom="18px">
-                <label style={labelStyle}>Password</label>
+                <Flex justify="space-between" align="baseline" marginBottom="6px">
+                  <label style={labelStyle}>Password</label>
+                  <Link
+                    href="/forgot-password"
+                    style={{
+                      fontSize: '12px',
+                      color: solvoColors.indigo,
+                      textDecoration: 'none',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Forgot your password?
+                  </Link>
+                </Flex>
                 <input
                   type="password"
                   value={password}
