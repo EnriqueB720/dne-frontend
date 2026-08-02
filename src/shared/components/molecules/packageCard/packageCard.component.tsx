@@ -48,7 +48,7 @@ const PackageCard: React.FC<PackageCardProps> = ({ pkg, index = 0, onBook, onCus
         borderWidth={isFeatured ? '2px' : '1px'}
         borderColor={isFeatured ? solvoColors.text : solvoColors.border}
         borderRadius="24px"
-        padding="28px"
+        padding={{ base: '20px', md: '28px' }}
         gap="20px"
         height="100%"
         boxShadow={isFeatured ? '0 25px 50px -12px rgba(28, 25, 23, 0.15)' : 'none'}

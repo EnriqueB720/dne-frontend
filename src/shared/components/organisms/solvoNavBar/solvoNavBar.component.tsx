@@ -195,7 +195,8 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
         margin="0 auto"
         align="center"
         justify="space-between"
-        padding="14px 24px"
+        padding={{ base: '10px 12px', sm: '12px 18px', md: '14px 24px' }}
+        gap="8px"
       >
         <Flex align="center" gap="8px">
           {/* Hamburger (below lg) for pages with a collapsible side panel */}

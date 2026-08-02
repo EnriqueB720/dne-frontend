@@ -36,7 +36,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
       borderRadius="lg"
       padding="32px 24px"
       gap="24px"
-      width="400px"
+      width="100%"
+      maxWidth="400px"
       align="center"
       {...containerProps}
     >

@@ -317,7 +317,7 @@ export default function MessagesPage() {
     <Box minHeight="100vh" bg={solvoColors.bg}>
       <SolvoNavBar activePath="/messages" />
 
-      <Box maxWidth="1200px" margin="0 auto" padding="32px 24px">
+      <Box maxWidth="1200px" margin="0 auto" padding={{ base: "24px 16px", md: "32px 24px" }}>
         <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.1em" textTransform="uppercase" marginBottom="8px">
           Hi, {user.name}
         </Text>

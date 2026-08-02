@@ -150,7 +150,7 @@ const RefineFooter: React.FC = () => {
             exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={{ duration: 0.25 }}
             style={{
-              width: 380,
+              width: 'min(380px, calc(100vw - 32px))',
               borderRadius: 24,
               background: 'white',
               overflow: 'hidden',
