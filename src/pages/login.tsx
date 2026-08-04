@@ -2,7 +2,7 @@ import { useState, useContext } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Sparkles } from 'lucide-react';
 import { Box, Flex, Text } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
@@ -30,6 +30,28 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
 };
 
+// Password field: extra right-padding so text doesn't slide under the
+// visibility toggle button.
+const passwordInputStyle: React.CSSProperties = {
+  ...inputStyle,
+  paddingRight: '42px',
+};
+
+const toggleButtonStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '50%',
+  right: '10px',
+  transform: 'translateY(-50%)',
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '4px',
+  color: solvoColors.textSubtle,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading } = useContext(AuthContext);
@@ -37,6 +59,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,15 +156,26 @@ export default function LoginPage() {
                     Forgot your password?
                   </Link>
                 </Flex>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  minLength={4}
-                  style={inputStyle}
-                />
+                <Box position="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    minLength={4}
+                    style={passwordInputStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    style={toggleButtonStyle}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </Box>
               </Box>
 
               {error && (
