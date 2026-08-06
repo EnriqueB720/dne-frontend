@@ -156,7 +156,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
             : solvoColors.border
         }
         borderRadius="24px"
-        padding="24px"
+        padding={{ base: '18px', md: '24px' }}
         boxShadow={
           isInPackage
             ? '0 0 0 3px rgba(16, 185, 129, 0.12)'

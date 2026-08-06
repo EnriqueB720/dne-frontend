@@ -286,7 +286,7 @@ export default function CalendarPage() {
     <Box minHeight="100vh" bg={solvoColors.bg}>
       <SolvoNavBar activePath="/calendar" />
 
-      <Box maxWidth="1200px" margin="0 auto" padding="32px 24px">
+      <Box maxWidth="1200px" margin="0 auto" padding={{ base: "24px 16px", md: "32px 24px" }}>
         <Flex align="center" justify="space-between" marginBottom="24px" wrap="wrap" gap="12px">
           <Box>
             <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.1em" textTransform="uppercase" marginBottom="8px">
@@ -326,8 +326,9 @@ export default function CalendarPage() {
         <Box
           style={sectionStyle}
           padding="14px"
+          overflowX="auto"
         >
-          <div style={{ height: '680px' }}>
+          <div style={{ height: '680px', minWidth: '600px' }}>
             <Calendar<RBEvent>
               localizer={localizer}
               events={events}
