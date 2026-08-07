@@ -466,9 +466,9 @@ export type Mutation = {
   markNotificationAsRead: Notification;
   markQuotesViewed: Scalars['Float']['output'];
   mergeGuestAiConversations: Scalars['Float']['output'];
+  reorderSupplierMedia: Scalars['Boolean']['output'];
   requestPasswordReset: PasswordResetResult;
   resetPassword: PasswordResetResult;
-  reorderSupplierMedia: Scalars['Boolean']['output'];
   restoreConversation: Conversation;
   rollbackLastAiTurn: Scalars['Float']['output'];
   sendAiMessage: SendAiMessageResult;
@@ -654,6 +654,11 @@ export type MutationMergeGuestAiConversationsArgs = {
 };
 
 
+export type MutationReorderSupplierMediaArgs = {
+  data: SupplierMediaReorderInput;
+};
+
+
 export type MutationRequestPasswordResetArgs = {
   data: RequestPasswordResetInput;
 };
@@ -661,11 +666,6 @@ export type MutationRequestPasswordResetArgs = {
 
 export type MutationResetPasswordArgs = {
   data: ResetPasswordInput;
-};
-
-
-export type MutationReorderSupplierMediaArgs = {
-  data: SupplierMediaReorderInput;
 };
 
 
