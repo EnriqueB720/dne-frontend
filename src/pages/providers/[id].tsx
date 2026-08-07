@@ -254,8 +254,8 @@ export default function ProviderProfile() {
             illustrated placeholders until then. */}
         <Box
           display="grid"
-          gridTemplateColumns="repeat(4, 1fr)"
-          gridTemplateRows="repeat(2, 120px)"
+          gridTemplateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }}
+          gridTemplateRows={{ base: 'repeat(3, 100px)', md: 'repeat(2, 120px)' }}
           gap="8px"
           marginBottom="40px"
           borderRadius="24px"

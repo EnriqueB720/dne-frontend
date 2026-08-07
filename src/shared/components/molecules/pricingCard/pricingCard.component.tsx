@@ -28,7 +28,8 @@ const PricingCard: React.FC<PricingCardProps> = ({
       borderRadius="lg"
       padding="32px 24px"
       gap="24px"
-      width="280px"
+      width="100%"
+      maxWidth="280px"
       boxShadow={isHighlighted ? 'lg' : 'sm'}
       {...containerProps}
     >

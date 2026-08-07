@@ -166,9 +166,12 @@ const ChatThread: React.FC<ChatThreadProps> = ({
                   </Flex>
                 ) : (
                   /* ── AI bubble ── */
-                  <Flex gap="10px" align="flex-start">
-                    {/* Avatar */}
+                  <Flex gap={{ base: '0', sm: '10px' }} align="flex-start">
+                    {/* Avatar — hidden on phone view so the AI content
+                        can use the full container width instead of being
+                        offset 42px to the right of the user bubbles. */}
                     <Flex
+                      display={{ base: 'none', sm: 'flex' }}
                       width="32px"
                       height="32px"
                       borderRadius="10px"
@@ -258,8 +261,9 @@ const ChatThread: React.FC<ChatThreadProps> = ({
             animate={{ opacity: 1, y: 0 }}
             style={{ marginBottom: '20px' }}
           >
-            <Flex gap="10px" align="flex-start">
+            <Flex gap={{ base: '0', sm: '10px' }} align="flex-start">
               <Flex
+                display={{ base: 'none', sm: 'flex' }}
                 width="32px"
                 height="32px"
                 borderRadius="10px"
