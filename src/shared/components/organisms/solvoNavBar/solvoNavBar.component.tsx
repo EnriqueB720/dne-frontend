@@ -2,7 +2,15 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, Menu, Shield, User as UserIcon, X } from 'lucide-react';
+import {
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Shield,
+  Store,
+  User as UserIcon,
+  X,
+} from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
 import { Logo, NotificationBell } from '@molecules';
 import { solvoColors, solvoShadows } from '@constants';
@@ -477,7 +485,7 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
                       cursor="pointer"
                       _hover={{ bg: solvoColors.bg }}
                     >
-                      <UserIcon size={14} color={solvoColors.textMuted} />
+                      <LayoutDashboard size={14} color={solvoColors.textMuted} />
                       <Text fontSize="sm" color={solvoColors.text}>
                         {user.isSupplier && !user.isCustomer ? 'Workspace' : 'Dashboard'}
                       </Text>
@@ -497,9 +505,15 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
                       cursor="pointer"
                       _hover={{ bg: solvoColors.bg }}
                     >
-                      <UserIcon size={14} color={solvoColors.textMuted} />
+                      {user.isSupplier && !user.isCustomer ? (
+                        <Store size={14} color={solvoColors.textMuted} />
+                      ) : (
+                        <UserIcon size={14} color={solvoColors.textMuted} />
+                      )}
                       <Text fontSize="sm" color={solvoColors.text}>
-                        Settings
+                        {user.isSupplier && !user.isCustomer
+                          ? 'Edit my public page'
+                          : 'My profile'}
                       </Text>
                     </Flex>
                   </Link>

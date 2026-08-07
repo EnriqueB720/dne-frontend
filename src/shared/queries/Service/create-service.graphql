@@ -1,0 +1,18 @@
+mutation createService($data: ServiceCreateInput!) {
+  createService(data: $data) {
+    serviceId
+    supplierId
+    categoryId
+    name
+    description
+    pricingModel
+    basePrice
+    currency
+    minTotalPrice
+    maxTotalPrice
+    minUnits
+    maxUnits
+    unitLabel
+    active
+  }
+}

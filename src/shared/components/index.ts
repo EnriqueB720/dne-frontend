@@ -43,6 +43,7 @@ import {
   QuoteCreateModal,
   ReviewCreateModal,
   ConfirmModal,
+  StatusModal,
 } from '@molecules';
 export type { ProviderData, PackageData } from '@molecules';
 
@@ -100,6 +101,7 @@ export {
   QuoteCreateModal,
   ReviewCreateModal,
   ConfirmModal,
+  StatusModal,
   SolvoNavBar,
   ChatSidebar,
   ChatThread,

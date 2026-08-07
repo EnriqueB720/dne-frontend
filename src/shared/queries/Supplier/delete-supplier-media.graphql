@@ -1,0 +1,3 @@
+mutation deleteSupplierMedia($data: SupplierMediaDeleteInput!) {
+  deleteSupplierMedia(data: $data)
+}

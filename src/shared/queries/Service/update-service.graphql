@@ -1,0 +1,18 @@
+mutation updateService($data: ServiceUpdateInput!) {
+  updateService(data: $data) {
+    serviceId
+    supplierId
+    categoryId
+    name
+    description
+    pricingModel
+    basePrice
+    currency
+    minTotalPrice
+    maxTotalPrice
+    minUnits
+    maxUnits
+    unitLabel
+    active
+  }
+}

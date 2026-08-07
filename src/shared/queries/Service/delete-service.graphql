@@ -1,0 +1,3 @@
+mutation deleteService($data: ServiceDeleteInput!) {
+  deleteService(data: $data)
+}

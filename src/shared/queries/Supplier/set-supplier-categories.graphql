@@ -1,0 +1,3 @@
+mutation setSupplierCategories($data: SupplierCategoriesInput!) {
+  setSupplierCategories(data: $data)
+}

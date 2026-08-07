@@ -2,7 +2,7 @@ import * as React from 'react';
 import {
   Star, ShieldCheck, Clock, MapPin, Check,
   ArrowRight, Globe, Mail, Phone, PackagePlus, PackageCheck,
-  Database, Sparkles,
+  ChevronDown, ChevronUp, Database, Sparkles,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Box, Flex, Text } from '@atoms';
@@ -28,6 +28,9 @@ export interface ProviderData {
   email?: string;
   /** Optional contact phone — populated when the AI suggests a plausible one. */
   phone?: string;
+  /** Second email/phone a real supplier chose to publish. */
+  emailAlt?: string;
+  phoneAlt?: string;
   /** True when this card represents a real supplier from the DB (vs. AI-invented). */
   isRealSupplier?: boolean;
   /**
@@ -104,6 +107,43 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
   };
 
   const link = resolveProviderLink(provider);
+
+  // Direct channels stay collapsed: requests and quotes are meant to run
+  // through Solvo, so reaching the provider off-platform is possible but
+  // never the first thing on the card.
+  const [showContacts, setShowContacts] = React.useState(false);
+
+  const contactChannels = React.useMemo(() => {
+    const channels: Array<{
+      kind: 'phone' | 'email' | 'website';
+      value: string;
+      href: string;
+    }> = [];
+
+    for (const phone of [provider.phone, provider.phoneAlt]) {
+      if (phone?.trim()) {
+        channels.push({
+          kind: 'phone',
+          value: phone.trim(),
+          href: `tel:${phone.replace(/[^\d+]/g, '')}`,
+        });
+      }
+    }
+    for (const email of [provider.email, provider.emailAlt]) {
+      if (email?.trim()) {
+        channels.push({ kind: 'email', value: email.trim(), href: `mailto:${email.trim()}` });
+      }
+    }
+    if (provider.website?.trim()) {
+      const url = provider.website.trim();
+      channels.push({
+        kind: 'website',
+        value: url.replace(/^https?:\/\//, ''),
+        href: /^https?:\/\//i.test(url) ? url : `https://${url}`,
+      });
+    }
+    return channels;
+  }, [provider.phone, provider.phoneAlt, provider.email, provider.emailAlt, provider.website]);
 
   return (
     <motion.div
@@ -337,46 +377,46 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
 
             {/* Action row */}
             <Flex gap="10px" wrap="wrap" align="center">
-              <a
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                title={link.title}
-                style={linkStyle}
-                onMouseEnter={onLinkEnter}
-                onMouseLeave={onLinkLeave}
-              >
-                <Globe size={13} />
-                {link.label}
-              </a>
-
-              {provider.email && (
+              {/* No website means this is a research link, not a way to
+                  reach the provider — it stays out in the open. Real
+                  contact channels go behind the toggle below. */}
+              {!provider.website && (
                 <a
-                  href={`mailto:${provider.email}`}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  title={provider.email}
+                  title={link.title}
                   style={linkStyle}
                   onMouseEnter={onLinkEnter}
                   onMouseLeave={onLinkLeave}
                 >
-                  <Mail size={13} />
-                  Email
+                  <Globe size={13} />
+                  {link.label}
                 </a>
               )}
 
-              {provider.phone && (
-                <a
-                  href={`tel:${provider.phone.replace(/[^\d+]/g, '')}`}
-                  onClick={(e) => e.stopPropagation()}
-                  title={provider.phone}
-                  style={linkStyle}
-                  onMouseEnter={onLinkEnter}
-                  onMouseLeave={onLinkLeave}
+              {contactChannels.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowContacts((v) => !v);
+                  }}
+                  aria-expanded={showContacts}
+                  style={{
+                    ...linkStyle,
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    color: solvoColors.textSubtle,
+                    fontFamily: 'inherit',
+                    fontSize: '13px',
+                  }}
                 >
-                  <Phone size={13} />
-                  {provider.phone}
-                </a>
+                  {showContacts ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  {showContacts ? 'Hide contact details' : 'Contact details'}
+                </button>
               )}
 
               <Flex flex="1" />
@@ -462,6 +502,43 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                 </Flex>
               </Flex>
             </Flex>
+
+            {showContacts && (
+              <Box
+                marginTop="12px"
+                padding="12px 14px"
+                borderRadius="12px"
+                bg={solvoColors.bg}
+                borderWidth="1px"
+                borderColor={solvoColors.border}
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              >
+                <Text fontSize="11px" color={solvoColors.textSubtle} marginBottom="8px">
+                  Selecting here keeps your quotes, dates and payment in one place —
+                  and {provider.name} replies faster on Solvo.
+                </Text>
+                <Flex gap="14px" wrap="wrap">
+                  {contactChannels.map((c) => (
+                    <a
+                      key={`${c.kind}-${c.value}`}
+                      href={c.href}
+                      target={c.kind === 'website' ? '_blank' : undefined}
+                      rel={c.kind === 'website' ? 'noopener noreferrer' : undefined}
+                      onClick={(e) => e.stopPropagation()}
+                      title={c.value}
+                      style={{ ...linkStyle, fontSize: '13px' }}
+                      onMouseEnter={onLinkEnter}
+                      onMouseLeave={onLinkLeave}
+                    >
+                      {c.kind === 'phone' && <Phone size={13} />}
+                      {c.kind === 'email' && <Mail size={13} />}
+                      {c.kind === 'website' && <Globe size={13} />}
+                      {c.value}
+                    </a>
+                  ))}
+                </Flex>
+              </Box>
+            )}
           </Box>
         </Flex>
       </Box>

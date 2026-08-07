@@ -7,7 +7,8 @@ query supplier($where: SupplierWhereInput!) {
     description
     businessPhone
     businessEmail
-    whatsappNumber
+    businessPhoneAlt
+    businessEmailAlt
     websiteUrl
     city
     rating
@@ -20,6 +21,13 @@ query supplier($where: SupplierWhereInput!) {
     promotionTier
     promotionStartDate
     promotionEndDate
+    media {
+      mediaAssetId
+      url
+      thumbnailUrl
+      altText
+      displayOrder
+    }
     services {
       serviceId
       name

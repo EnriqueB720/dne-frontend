@@ -13,7 +13,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
   accept = ['image/png', 'image/jpeg', 'image/webp'],
   maxFileSize = 1024 * 1024,
   placeholder = 'Drag and drop an image here, or click to select',
+  maxFiles = 1,
+  resetOnChange = false,
+  disabled = false,
   onFileChange,
+  onFilesChange,
+  onFilesRejected,
 }) => {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const previewUrl = React.useMemo(
@@ -27,15 +32,45 @@ const FileUpload: React.FC<FileUploadProps> = ({
     };
   }, [previewUrl]);
 
+  const acceptLabel = accept
+    .map((t) => `.${t.split('/')[1]?.replace('jpeg', 'jpg')}`)
+    .join(', ');
+
+  /**
+   * Bumping this remounts the picker, which is the only reliable way to
+   * empty its internal file list.
+   *
+   * It has to be emptied: `onFileChange` reports the WHOLE accepted list,
+   * not the delta, and the list survives across drops. Without a reset,
+   * drop #2 hands back [first, second] and a `resetOnChange` consumer
+   * re-uploads the first file — one photo in, three rows out.
+   */
+  const [pickerGeneration, setPickerGeneration] = React.useState(0);
+
   return (
     <CKFileUpload.Root
+      key={pickerGeneration}
       accept={accept}
       maxFileSize={maxFileSize}
-      maxFiles={1}
+      maxFiles={maxFiles}
+      disabled={disabled}
       onFileChange={(details) => {
-        const file = details.acceptedFiles[0] || null;
-        setSelectedFile(file);
-        onFileChange?.(file);
+        const files: File[] = details.acceptedFiles ?? [];
+        const rejected = (details.rejectedFiles ?? [])
+          .map((r: any) => r?.file?.name)
+          .filter(Boolean) as string[];
+
+        // Nothing to hand off — this is the remount's own reset event.
+        if (files.length === 0 && rejected.length === 0) return;
+
+        // `resetOnChange` consumers upload straight away and render their
+        // own result, so holding a preview here would just be stale.
+        setSelectedFile(resetOnChange ? null : files[0] || null);
+        onFileChange?.(files[0] || null);
+        if (files.length > 0) onFilesChange?.(files);
+        if (rejected.length > 0) onFilesRejected?.(rejected);
+
+        if (resetOnChange) setPickerGeneration((g) => g + 1);
       }}
     >
       <CKFileUpload.HiddenInput />
@@ -65,7 +100,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           <CKFileUpload.DropzoneContent>
             <div>{placeholder}</div>
             <div style={{ color: 'var(--chakra-colors-fg-muted)', fontSize: '0.8em' }}>
-              .png, .jpg, .webp up to {Math.round(maxFileSize / (1024 * 1024))}MB
+              {acceptLabel} up to {Math.round(maxFileSize / (1024 * 1024))}MB
             </div>
           </CKFileUpload.DropzoneContent>
         </CKFileUpload.Dropzone>

@@ -19,6 +19,7 @@ import NotificationBell from './notificationBell/notificationBell.component';
 import QuoteCreateModal from './quoteCreateModal/quoteCreateModal.component';
 import ReviewCreateModal from './reviewCreateModal/reviewCreateModal.component';
 import ConfirmModal from './confirmModal/confirmModal.component';
+import StatusModal from './statusModal/statusModal.component';
 
 export type { ProviderData } from './providerCard/providerCard.component';
 export type { PackageData } from './packageCard/packageCard.component';
@@ -45,4 +46,5 @@ export {
   QuoteCreateModal,
   ReviewCreateModal,
   ConfirmModal,
+  StatusModal,
 }
