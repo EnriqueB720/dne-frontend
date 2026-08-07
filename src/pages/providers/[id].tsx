@@ -4,9 +4,13 @@ import { useRouter } from 'next/router';
 import {
   ArrowLeft,
   Calendar,
+  ChevronDown,
+  ChevronUp,
+  Globe,
   Heart,
+  Mail,
   MapPin,
-  MessageCircle,
+  Phone,
   ShieldCheck,
   Sparkles,
   Star,
@@ -38,6 +42,10 @@ function isSponsoredActive(
 }
 
 const PHOTO_TILES = ['🍽️', '🥗', '🍰', '🥂', '🌮'];
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+/** Images are streamed through our API, not linked straight to Drive. */
+const mediaSrc = (mediaAssetId: number) => `${API_BASE}/files/media/${mediaAssetId}`;
 
 const formatColones = (value: string | number | null | undefined): string => {
   if (value == null) return '—';
@@ -91,6 +99,71 @@ export default function ProviderProfile() {
   const [toggleFavorite, toggleState] = useToggleFavoriteMutation();
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const showFavorited = optimistic ?? isFavorited;
+
+  // Direct contact details stay collapsed by default. Requests, quotes and
+  // messages are meant to run through Solvo, so the off-platform channels
+  // are available but never the first thing a customer reaches for.
+  const [showContacts, setShowContacts] = useState(false);
+
+  /**
+   * Five gallery tiles: the supplier's uploaded photos first, padded out
+   * with the illustrated placeholders so the grid never collapses.
+   */
+  const galleryTiles = useMemo(() => {
+    const uploaded = (supplier?.media ?? []) as Array<{
+      mediaAssetId: number;
+      url: string;
+      altText?: string | null;
+    }>;
+    return PHOTO_TILES.map((emoji, i) => {
+      const photo = uploaded[i];
+      return {
+        key: photo ? `media-${photo.mediaAssetId}` : `placeholder-${i}`,
+        // Streamed through our API — see GET /files/media/:id.
+        url: photo ? mediaSrc(photo.mediaAssetId) : null,
+        altText: photo?.altText ?? null,
+        emoji,
+      };
+    });
+  }, [supplier]);
+
+  /** Published contact channels, in the order they're revealed. */
+  const contactChannels = useMemo(() => {
+    if (!supplier) return [];
+    const channels: Array<{
+      kind: 'phone' | 'email' | 'website';
+      value: string;
+      href: string;
+    }> = [];
+
+    for (const phone of [supplier.businessPhone, supplier.businessPhoneAlt]) {
+      if (phone?.trim()) {
+        channels.push({
+          kind: 'phone',
+          value: phone.trim(),
+          href: `tel:${phone.replace(/[^\d+]/g, '')}`,
+        });
+      }
+    }
+    for (const email of [supplier.businessEmail, supplier.businessEmailAlt]) {
+      if (email?.trim()) {
+        channels.push({
+          kind: 'email',
+          value: email.trim(),
+          href: `mailto:${email.trim()}`,
+        });
+      }
+    }
+    if (supplier.websiteUrl?.trim()) {
+      const url = supplier.websiteUrl.trim();
+      channels.push({
+        kind: 'website',
+        value: url.replace(/^https?:\/\//, ''),
+        href: /^https?:\/\//i.test(url) ? url : `https://${url}`,
+      });
+    }
+    return channels;
+  }, [supplier]);
 
   // Reset optimistic flag when query catches up
   useEffect(() => {
@@ -177,7 +250,8 @@ export default function ProviderProfile() {
           </Flex>
         </Link>
 
-        {/* Photo gallery — placeholder until real photo uploads exist */}
+        {/* Photo gallery — the supplier's own uploads when they have them,
+            illustrated placeholders until then. */}
         <Box
           display="grid"
           gridTemplateColumns="repeat(4, 1fr)"
@@ -187,19 +261,28 @@ export default function ProviderProfile() {
           borderRadius="24px"
           overflow="hidden"
         >
-          {PHOTO_TILES.map((emoji, i) => (
+          {galleryTiles.map((tile, i) => (
             <Flex
-              key={i}
+              key={tile.key}
               align="center"
               justify="center"
               gridColumn={i === 0 ? 'span 2' : undefined}
               gridRow={i === 0 ? 'span 2' : undefined}
               fontSize={i === 0 ? '64px' : '32px'}
-              style={{
-                background: `linear-gradient(135deg, ${solvoColors.indigoLight}, ${solvoColors.bg})`,
-              }}
+              style={
+                tile.url
+                  ? {
+                      backgroundImage: `url(${tile.url})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }
+                  : {
+                      background: `linear-gradient(135deg, ${solvoColors.indigoLight}, ${solvoColors.bg})`,
+                    }
+              }
+              title={tile.altText ?? undefined}
             >
-              {emoji}
+              {tile.url ? '' : tile.emoji}
             </Flex>
           ))}
         </Box>
@@ -506,30 +589,6 @@ export default function ProviderProfile() {
               </Text>
 
               <Flex direction="column" gap="8px">
-                {supplier.whatsappNumber && (
-                  <a
-                    href={`https://wa.me/${supplier.whatsappNumber.replace(/[^\d+]/g, '')}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: 'block',
-                      padding: '12px 16px',
-                      borderRadius: '12px',
-                      background: solvoColors.emerald,
-                      color: 'white',
-                      fontWeight: 600,
-                      fontSize: '14px',
-                      textAlign: 'center',
-                      textDecoration: 'none',
-                    }}
-                  >
-                    <Flex align="center" justify="center" gap="6px">
-                      <MessageCircle size={14} />
-                      WhatsApp
-                    </Flex>
-                  </a>
-                )}
-
                 <Link href="/" style={{ textDecoration: 'none' }}>
                   <Box
                     padding="12px 16px"
@@ -607,6 +666,76 @@ export default function ProviderProfile() {
                   </Flex>
                 )}
               </Box>
+
+              {/* Direct contact — collapsed, and secondary to the on-site flow */}
+              {contactChannels.length > 0 && (
+                <Box
+                  marginTop="16px"
+                  paddingTop="16px"
+                  borderTopWidth="1px"
+                  borderTopStyle="solid"
+                  borderTopColor={solvoColors.border}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setShowContacts((v) => !v)}
+                    aria-expanded={showContacts}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '10px',
+                      border: `1px solid ${solvoColors.border}`,
+                      background: 'transparent',
+                      color: solvoColors.textSubtle,
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Flex align="center" justify="center" gap="6px">
+                      {showContacts ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      {showContacts ? 'Hide contact details' : 'Show contact details'}
+                    </Flex>
+                  </button>
+
+                  {showContacts && (
+                    <Box marginTop="12px">
+                      <Text fontSize="11px" color={solvoColors.textSubtle} marginBottom="10px" lineHeight={1.5}>
+                        Starting the request here keeps your quotes, dates and payment in one
+                        place — and {supplier.companyName} replies faster on Solvo.
+                      </Text>
+                      <Flex direction="column" gap="6px">
+                        {contactChannels.map((c) => (
+                          <a
+                            key={`${c.kind}-${c.value}`}
+                            href={c.href}
+                            target={c.kind === 'website' ? '_blank' : undefined}
+                            rel={c.kind === 'website' ? 'noreferrer' : undefined}
+                            style={{ textDecoration: 'none' }}
+                          >
+                            <Flex
+                              align="center"
+                              gap="8px"
+                              padding="8px 10px"
+                              borderRadius="10px"
+                              bg={solvoColors.bg}
+                              color={solvoColors.textMuted}
+                              _hover={{ color: solvoColors.text }}
+                            >
+                              {c.kind === 'phone' && <Phone size={13} />}
+                              {c.kind === 'email' && <Mail size={13} />}
+                              {c.kind === 'website' && <Globe size={13} />}
+                              <Text fontSize="12px" style={{ wordBreak: 'break-all' }}>
+                                {c.value}
+                              </Text>
+                            </Flex>
+                          </a>
+                        ))}
+                      </Flex>
+                    </Box>
+                  )}
+                </Box>
+              )}
             </Box>
           </Box>
         </Box>

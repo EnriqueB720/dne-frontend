@@ -7,6 +7,7 @@ import {
   Inbox,
   MessageSquare,
   Sparkles,
+  Store,
   TrendingUp,
   Zap,
 } from 'lucide-react';
@@ -272,17 +273,40 @@ export default function ProviderDashboard() {
               {businessName}
             </Text>
           </Box>
-          <Flex
-            align="center"
-            gap="6px"
-            padding="8px 16px"
-            borderRadius="9999px"
-            style={{ background: `linear-gradient(135deg, ${solvoColors.amberLight}, #FED7AA)` }}
-            color={solvoColors.amberText}
-            fontSize="xs"
-            fontWeight="600"
-          >
-            👑 Pro plan
+          <Flex align="center" gap="10px" wrap="wrap">
+            {/* The storefront editor is otherwise only reachable from the
+                avatar menu — surface it where the provider actually works. */}
+            <Link href="/provider/settings" style={{ textDecoration: 'none' }}>
+              <Flex
+                align="center"
+                gap="7px"
+                padding="9px 16px"
+                borderRadius="10px"
+                bg={solvoColors.surface}
+                borderWidth="1px"
+                borderColor={solvoColors.border}
+                color={solvoColors.text}
+                fontSize="sm"
+                fontWeight="600"
+                cursor="pointer"
+                _hover={{ borderColor: solvoColors.borderHover }}
+              >
+                <Store size={14} />
+                Edit my public page
+              </Flex>
+            </Link>
+            <Flex
+              align="center"
+              gap="6px"
+              padding="8px 16px"
+              borderRadius="9999px"
+              style={{ background: `linear-gradient(135deg, ${solvoColors.amberLight}, #FED7AA)` }}
+              color={solvoColors.amberText}
+              fontSize="xs"
+              fontWeight="600"
+            >
+              👑 Pro plan
+            </Flex>
           </Flex>
         </Flex>
 

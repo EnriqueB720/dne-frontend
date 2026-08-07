@@ -1,0 +1,18 @@
+query servicesBySupplier($supplierId: Int!, $includeInactive: Boolean) {
+  servicesBySupplier(supplierId: $supplierId, includeInactive: $includeInactive) {
+    serviceId
+    supplierId
+    categoryId
+    name
+    description
+    pricingModel
+    basePrice
+    currency
+    minTotalPrice
+    maxTotalPrice
+    minUnits
+    maxUnits
+    unitLabel
+    active
+  }
+}

@@ -200,7 +200,9 @@ function dbSupplierToProviderData(s: any, index: number): ProviderData {
     recommended: index === 0,
     website: s.websiteUrl ?? undefined,
     email: s.businessEmail ?? undefined,
-    phone: s.businessPhone ?? s.whatsappNumber ?? undefined,
+    emailAlt: s.businessEmailAlt ?? undefined,
+    phone: s.businessPhone ?? undefined,
+    phoneAlt: s.businessPhoneAlt ?? undefined,
     isRealSupplier: true,
     sponsored: isSponsoredActive(
       s.promotionTier,

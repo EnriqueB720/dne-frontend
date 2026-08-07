@@ -18,7 +18,8 @@ query searchSuppliers($data: SupplierSearchInput!) {
     promotionEndDate
     businessPhone
     businessEmail
-    whatsappNumber
+    businessPhoneAlt
+    businessEmailAlt
     websiteUrl
     services {
       serviceId

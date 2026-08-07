@@ -16,6 +16,24 @@ import 'react-international-phone/style.css';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 
+/**
+ * Every entity in this API is keyed by `<entity>Id`, not the `id` field
+ * Apollo looks for by default. Without these, nothing normalizes: a
+ * mutation result lands in its own cache entry and the query that rendered
+ * the same record keeps serving pre-mutation data — which is how the
+ * provider settings form ended up re-displaying stale values right after a
+ * successful save.
+ */
+const cacheTypePolicies = {
+  User: { keyFields: ['userId'] as const },
+  Supplier: { keyFields: ['supplierId'] as const },
+  Service: { keyFields: ['serviceId'] as const },
+  MediaAsset: { keyFields: ['mediaAssetId'] as const },
+  Category: { keyFields: ['categoryId'] as const },
+};
+
+const createCache = () => new InMemoryCache({ typePolicies: cacheTypePolicies });
+
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
 
 const HTTP_URI = 'http://localhost:5000/graphql';
@@ -42,7 +60,7 @@ const WS_URI = 'ws://localhost:5000/graphql';
 
     if (typeof window === 'undefined') {
       // SSR: no WebSocket, no auth token — just HTTP.
-      return new ApolloClient({ link: httpLink, cache: new InMemoryCache() });
+      return new ApolloClient({ link: httpLink, cache: createCache() });
     }
 
     const wsLink = new GraphQLWsLink(
@@ -67,7 +85,7 @@ const WS_URI = 'ws://localhost:5000/graphql';
       from([authLink, httpLink]),
     );
 
-    return new ApolloClient({ link, cache: new InMemoryCache() });
+    return new ApolloClient({ link, cache: createCache() });
   }, []);
 
   setApolloClient(client);

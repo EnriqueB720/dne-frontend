@@ -1,0 +1,3 @@
+mutation reorderSupplierMedia($data: SupplierMediaReorderInput!) {
+  reorderSupplierMedia(data: $data)
+}

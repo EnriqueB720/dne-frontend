@@ -7,10 +7,12 @@ mutation updateSupplier($data: SupplierUpdateInput!) {
     description
     businessPhone
     businessEmail
-    whatsappNumber
+    businessPhoneAlt
+    businessEmailAlt
     websiteUrl
     city
     minCapacity
     maxCapacity
+    responseTimeMinutes
   }
 }
