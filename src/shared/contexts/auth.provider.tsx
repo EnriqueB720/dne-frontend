@@ -72,11 +72,14 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       const user = new User(data?.login!.user! as any);
       setUser(user);
 
-      setIsAuthenticated(true);
+      // Claim any chats the user started as a guest on this device BEFORE
+      // flipping isAuthenticated. The flip re-runs the conversation loaders,
+      // and those read ownership as userId-scoped — so a still-unmerged
+      // (userId-null) row would come back "Access denied". Best-effort:
+      // login succeeds even if the merge fails.
+      await mergeGuestConversations().catch(() => {});
 
-      // Best-effort: claim any chats the user started as a guest on this
-      // device. Non-blocking — login succeeds even if this fails.
-      mergeGuestConversations().catch(() => {});
+      setIsAuthenticated(true);
 
       return true;
 
@@ -144,12 +147,14 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
         const user = new User(data?.refreshUser!.user! as any);
         setUser(user);
 
-        setIsAuthenticated(true);
-
         // Also claim guest chats on refresh — covers the case where the
-        // user authenticated in another tab or restored a session via
-        // localStorage without going through the login flow.
-        mergeGuestConversations().catch(() => {});
+        // user authenticated in another tab, restored a session via
+        // localStorage, or just came back from the social-login redirect
+        // (NextAuthBridge lands here). Awaited before the isAuthenticated
+        // flip for the same reason as in `login`.
+        await mergeGuestConversations().catch(() => {});
+
+        setIsAuthenticated(true);
       } else {
         setIsAuthenticated(false);
         setUser(undefined);

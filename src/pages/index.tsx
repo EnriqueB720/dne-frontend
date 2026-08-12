@@ -1334,7 +1334,15 @@ export default function Home() {
       .then((convs) => {
         setConversations(convs);
         if (convs.length > 0) {
-          setCurrentConvId(convs[0].conversationId);
+          // Keep the open chat selected if it survived the identity change —
+          // the list is ownership-scoped server-side, so a conversation that
+          // is missing from it belongs to a different caller (guest vs user)
+          // and must not stay selected, or the next fetch 403s.
+          setCurrentConvId((prev) =>
+            prev && convs.some((c) => c.conversationId === prev)
+              ? prev
+              : convs[0].conversationId,
+          );
           setMode('chat');
         } else {
           setCurrentConvId(null);
@@ -1346,6 +1354,13 @@ export default function Home() {
         console.error('[chat] failed to load conversations:', err);
       });
   }, [isAuthenticated]);
+
+  // True once the selected conversation appears in the ownership-scoped list.
+  // Anything not in there belongs to a different caller than the one we are
+  // right now (guest ↔ user), and fetching it would come back "Access denied".
+  const currentConvIsOwned =
+    currentConvId != null &&
+    conversations.some((c) => c.conversationId === currentConvId);
 
   // ── Load messages when conversation changes ────────────────────────────
   React.useEffect(() => {
@@ -1361,6 +1376,12 @@ export default function Home() {
       skipNextMessageLoadRef.current = null;
       return;
     }
+    // Wait for the conversation list to confirm this chat is ours. On login,
+    // logout and the guest→user merge the caller identity changes while a
+    // conversation from the previous identity is still selected; fetching it
+    // in that window is the "Access denied" the user sees. The list effect
+    // re-runs on every identity flip, so this resolves itself one tick later.
+    if (!currentConvIsOwned) return;
     getConversation(currentConvId)
       .then((conv) => {
         setMessages(
@@ -1385,9 +1406,29 @@ export default function Home() {
         );
       })
       .catch((err) => {
+        // A FORBIDDEN here is not a failure worth shouting about: it means the
+        // caller identity changed while this fetch was in flight (the token
+        // landing, or the guest→user merge claiming the row mid-request). The
+        // list effect re-runs on the same flip and re-selects a conversation
+        // we do own, so this recovers on its own. Logging it as an error is
+        // what puts the red overlay on the screen after a Google login.
+        const denied =
+          err?.graphQLErrors?.some(
+            (e: { extensions?: { code?: string } }) =>
+              e?.extensions?.code === 'FORBIDDEN',
+          ) ?? /access denied/i.test(err?.message ?? '');
+        if (denied) {
+          console.debug(
+            '[chat] conversation not ours (yet) — waiting for the refreshed list',
+          );
+          return;
+        }
         console.error('[chat] failed to load conversation messages:', err);
       });
-  }, [currentConvId]);
+    // `currentConvIsOwned` is a dependency so the fetch that was held back
+    // above fires as soon as the refreshed list vouches for the chat — that
+    // is what keeps the pane from sitting empty after a login.
+  }, [currentConvId, currentConvIsOwned]);
 
   // ── Send message ───────────────────────────────────────────────────────
   const handleSend = React.useCallback(
