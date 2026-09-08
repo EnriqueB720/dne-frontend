@@ -1,6 +1,6 @@
-# 🎨 TULA — UI Handoff Document for Claude Code
+# 🎨 SOLVO — UI Handoff Document for Claude Code
 
-> **Purpose of this document:** This is a complete specification for replicating the Tula web app UI inside an existing project. Read it fully before writing any code. The goal is to produce a UI that is _visually and functionally identical_ to the reference implementation, while integrating cleanly with the existing project's component architecture, styling system, and conventions.
+> **Purpose of this document:** This is a complete specification for replicating the Solvo web app UI inside an existing project. Read it fully before writing any code. The goal is to produce a UI that is _visually and functionally identical_ to the reference implementation, while integrating cleanly with the existing project's component architecture, styling system, and conventions.
 
 ---
 
@@ -21,7 +21,7 @@ Before generating any UI, inspect the existing project:
 
 ## 🎯 Product Context
 
-**Tula** is an AI-powered service marketplace (think Thumbtack + Yelp + AI concierge + WhatsApp simplicity). Users describe what they need in natural language; the system interprets intent and returns curated providers, pricing tiers, and bundled package solutions. Core principle: _"I just ask for what I need, and Tula figures it out for me."_
+**Solvo** is an AI-powered service marketplace (think Thumbtack + Yelp + AI concierge + WhatsApp simplicity). Users describe what they need in natural language; the system interprets intent and returns curated providers, pricing tiers, and bundled package solutions. Core principle: _"I just ask for what I need, and Solvo figures it out for me."_
 
 **Six screens to build:**
 
@@ -36,67 +36,102 @@ Before generating any UI, inspect the existing project:
 
 ## 🎨 Design System
 
+> Rebranded to **Solvo** (branch `solvo-rebrand`). The palette, typography and
+> logo below supersede the original indigo/Fraunces spec. Source of truth is
+> `src/shared/constants/solvo-theme.ts` — read it before styling anything.
+
 ### Aesthetic direction
 
-**Refined editorial** — Stripe Press meets Airbnb. Warm minimalism, not stark white SaaS. Confident typography. Generous whitespace. Single accent color used sparingly. Soft atmospheric depth via blurred gradients, not flat color blocks.
+**Confident, energetic, modern.** Clean geometric sans, generous whitespace,
+and a two-color brand system: kinetic orange against intellectual purple.
+Depth comes from hairline borders and soft shadows, not heavy elevation.
+
+### How theming works
+
+Every token in `solvoColors` is a `var(--solvo-*)` reference, never a literal.
+The hexes are declared once in `solvoThemeCss` under `:root` (light) and
+`[data-theme='dark']`, injected globally from `_document.tsx`. Because
+components only ever hand out variable references, **any component reading
+`solvoColors.x` is automatically theme-reactive** — no `useColorMode` call is
+needed at the consumer, and the browser re-resolves on toggle without a
+re-render.
+
+The mode is resolved before first paint by an inline script in `_document.tsx`
+(localStorage → `prefers-color-scheme` → light), so there is no flash.
 
 ### Color palette
 
-Use stone/neutral as the canvas (not pure white), indigo as the singular accent, emerald reserved exclusively for the WhatsApp CTA.
+Brand colors, per the Solvo brand guidelines:
 
 ```
-Background canvas:  stone-50    (#FAFAF9) — main app background
-Surface:            white       — cards, panels
-Borders:            stone-200   — subtle dividers
-Body text:          stone-900   — primary text
-Muted text:         stone-600   — secondary
-Subtle text:        stone-500   — tertiary, captions
-Accent (primary):   indigo-700  — links, hovers, AI elements
-Accent (CTA dark):  stone-900   — primary buttons
-WhatsApp green:     emerald-500 — ONLY for WhatsApp contact CTAs
-Warning/premium:    amber-100/700 — premium tags, plan badges
-Urgent:             rose-50/700 — urgent flags
-Success:            emerald-50/600 — checkmarks, positive deltas
+Energy Orange   #FF8C00  — primary accent: CTAs, active states, highlights
+Creative Purple #6F42C1  — brand identity: badges, AI moments, structural framing
+Bright White    #FFFFFF  — card surfaces in light mode
+Deep Midnight   #0B0B16  — canvas in dark mode
 ```
+
+Use the semantic token, never the hex:
+
+| Token | Light | Dark | Use |
+| --- | --- | --- | --- |
+| `bg` | `#F4F5F7` | `#0B0B16` | Page canvas, inset rows |
+| `surface` | `#FFFFFF` | `#16162C` | Cards, panels, modals |
+| `surfaceMuted` | `#EDEFF3` | `#1E1E38` | Insets inside a card |
+| `border` | `#E2E8F0` | `#2D3748` | Hairlines, dividers, inputs |
+| `text` | `#1A1A2E` | `#F8F9FA` | Headings and body |
+| `textMuted` | `#4A5568` | `#CBD5E0` | Secondary copy |
+| `textSubtle` | `#626D79` | `#A0AEC0` | Captions, metadata |
+| `accent` | `#FF8C00` | `#FFA533` | Primary CTA fill, active states |
+| `accentFg` | `#1A1A2E` | `#0B0B16` | **Label on an accent fill** |
+| `accentSoft` / `accentBorder` / `accentText` | tints | tints | Accent chips and badges |
+| `brand` | `#6F42C1` | `#9061F9` | Brand fills, AI moments |
+| `brandFg` | `#FFFFFF` | `#0B0B16` | Label on a brand fill |
+| `brandSoft` / `brandBorder` / `brandText` | tints | tints | Brand chips and cards |
+
+`emerald` stays reserved for WhatsApp CTAs and success; `amber` and `rose`
+remain status-only. `solvoTints` carries the five category-tile gradients.
+
+**Contrast rule:** white on Energy Orange is 2.3:1 and fails WCAG AA. Orange
+fills always take `accentFg` (near-black, 7.2:1). The `indigo*` keys still
+exist as aliases onto the purple family so untouched call sites stay on-brand.
 
 ### Typography
 
 **Two-font system. Do not substitute.**
 
-- **Display / headlines:** Fraunces (serif, opsz, italic variants used)
-  - Used for: hero headlines, section titles, prices, profile names
-  - Load via Google Fonts
-- **UI / body:** Inter (sans-serif, weights 400/500/600/700)
-  - Used for: everything else
-  - Load via Google Fonts
+- **Display / headings:** Plus Jakarta Sans (600/700/800), `letter-spacing: -0.02em`
+  - Used for: hero headlines, section titles, prices, profile names, the wordmark
+  - Exposed as `solvoFonts.display` (`solvoFonts.serif` is a back-compat alias)
+- **UI / body:** Inter (400/500/600/700) — everything else, via `solvoFonts.sans`
 
 ```html
 <link
-  href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap"
+  href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
   rel="stylesheet"
 />
 ```
 
-```css
-.font-serif {
-  font-family: "Fraunces", Georgia, serif;
-  font-optical-sizing: auto;
-}
-.font-sans {
-  font-family: "Inter", system-ui, sans-serif;
-}
-```
+Scale is in `solvoType` (H1 36/44 bold, H2 28/36 semibold, H3 22/28 medium,
+body 16/24, caption 12/16). Emphasis phrases use **weight + brand color**, not
+italic — the geometric sans has no true italic and the faux slant reads cheap.
 
-Use `italic` styling on the serif for emphasis phrases (e.g., _"Tula finds"_).
+### Logo
+
+Assets live in `public/assets/brand/`. The `<Logo />` molecule pairs the
+geometric 'S' mark (`logo-192.png`, kept small deliberately — the 1600px
+master is ~700KB) with live "Solvo" text in Plus Jakarta Sans 800.
+
+Guidelines §4: clear space equal to the height of the 'S' emblem on all sides;
+minimum width 120px for the full lockup, 24px for the icon alone.
 
 ### Shape & elevation
 
 - **Border radius:** `rounded-2xl` (16px) for cards, `rounded-3xl` (24px) for hero/feature cards, `rounded-full` for pills and avatars
 - **Shadows:** Avoid generic `shadow-lg`. Use custom soft shadows:
-  - Cards at rest: `border border-stone-200` (no shadow)
-  - Cards hover: `border-stone-300`, optional `-translate-y-0.5`
+  - Cards at rest: `border` token, no shadow
+  - Cards hover: `borderHover` token, optional `-translate-y-0.5`
   - Hero input: `shadow-[0_20px_60px_-15px_rgba(30,27,75,0.15)]`
-  - Floating panels: `shadow-2xl shadow-stone-900/10`
+  - Floating panels: `solvoShadows.floatingPanel`
 
 ### Motion (use Framer Motion / `motion` package)
 
@@ -122,9 +157,9 @@ Build these as **reusable components**, not inline JSX. If similar components al
 
 ### Shared components needed
 
-- `<Logo />` — sparkles icon in indigo gradient square + "Tula" wordmark in serif
+- `<Logo />` — geometric 'S' brand mark + "Solvo" wordmark in Plus Jakarta Sans 800
 - `<NavBar />` — sticky top, blurred backdrop, logo left, nav center, avatar right
-- `<Pill />` — small rounded badge, accepts `tone` prop: `default | indigo | amber | emerald | rose | dark`
+- `<Pill />` — small rounded badge, accepts `tone` prop: `default | indigo | accent | amber | emerald | rose | dark`
 - `<ProviderCard />` — used on results page
 - `<PackageCard />` — used on packages page
 - `<LoadingState />` — used during AI "thinking"
@@ -138,7 +173,7 @@ Build these as **reusable components**, not inline JSX. If similar components al
 
 **Layout structure:**
 
-- Atmospheric background: two blurred radial gradients (indigo top-right, amber bottom-left), absolute positioned, `-z-10`, `pointer-events-none`
+- Atmospheric background: three blurred radial glows from `solvoGlows` (purple top-right, orange bottom-left, orange behind the hero input), absolute positioned, `pointer-events-none`. They carry more alpha in dark mode — see `--solvo-glow-*`.
 - Hero section (centered, max-width 5xl)
 - Conversational input box (centered, max-width 2xl)
 - Suggested prompt chips (wrap, centered)
@@ -149,7 +184,7 @@ Build these as **reusable components**, not inline JSX. If similar components al
 **Hero specifics:**
 
 - Small status badge above headline: pulsing emerald dot + "AI concierge · 12,400+ verified providers"
-- Headline (font-serif, 5xl→7xl, leading-tight): **"Ask for anything."** newline **"_Tula finds_ who solves it."** — italic + indigo on "Tula finds"
+- Headline (display face, 5xl→7xl, leading-tight): **"Ask for anything."** newline **"Solvo finds who solves it."** — `solvoGradients.brand` (orange→purple, background-clip:text) + weight 800 on "Solvo finds"
 - Subhead: "Describe what you need in your own words. We match you with the right people, instantly."
 
 **Input box specifics:**
@@ -157,7 +192,7 @@ Build these as **reusable components**, not inline JSX. If similar components al
 - Rounded-3xl, white, soft shadow, contains:
   - Multiline textarea, placeholder: _"I need catering for 40 people this Saturday..."_
   - Bottom row: paperclip icon, mic icon, "Press ⏎ to send" hint (right-aligned)
-  - "Find options" button on the right: stone-900 bg, rounded-2xl, arrow-right icon, hover:bg-indigo-700
+  - "Find options" button on the right: `accent` bg with `accentFg` label, rounded-2xl, arrow-right icon, hover:`accentHover`
 - Enter key submits (Shift+Enter = newline)
 
 **Suggested prompts (6 chips):**
@@ -171,7 +206,7 @@ Build these as **reusable components**, not inline JSX. If similar components al
 🚚 Need movers this weekend
 ```
 
-Style: white bg, stone-200 border, hover:border-indigo-300 hover:bg-indigo-50/50
+Style: `surface` bg, `border`, hover:`accentBorder` + `accentSoft`
 
 **Trust strip (3 items, hairline-divided grid):**
 
@@ -188,7 +223,7 @@ Style: white bg, stone-200 border, hover:border-indigo-300 hover:bg-indigo-50/50
 | Scissors | Beauty & wellness | 1.2k providers | pink→fuchsia |
 | Car | Auto | 640 providers | amber→yellow |
 
-Each card: white bg, stone-200 border, gradient tinted icon square (12×12, rounded-xl), hover lifts -0.5.
+Each card: `surface` bg, `border`, gradient tinted icon square (12×12, rounded-xl), hover lifts -0.5.
 
 ---
 
@@ -201,10 +236,10 @@ Each card: white bg, stone-200 border, gradient tinted icon square (12×12, roun
 
 **AI interpretation card:**
 
-- Gradient background: `from-indigo-50 via-white to-stone-50`
-- Border: `border-indigo-100`, rounded-2xl, padding 5
+- Gradient background: `brandSoft` → `surface` gradient
+- Border: `brandBorder`, rounded-2xl, padding 5
 - Indigo sparkles icon in rounded square
-- Label: "VINI UNDERSTOOD" → change to **"TULA UNDERSTOOD"** (uppercase, tracking-wider, indigo-700)
+- Label: "VINI UNDERSTOOD" → change to **"SOLVO UNDERSTOOD"** (uppercase, tracking-wider, `brandText`)
 - Parsed summary as a sentence with **bold** keywords (service, # of people, location, budget, when)
 - Three refinement chips below: "+ Add dietary needs", "+ Specify time", "+ Adjust budget"
 
@@ -231,23 +266,23 @@ const parsed = {
 **Loading state (~1.8s):**
 
 - Centered, py-16
-- Rotating square border (indigo-200 with indigo-600 top), Sparkles icon centered
-- Headline: "Tula is finding the best options..."
+- Rotating square border (`brandBorder` with `brand` top), Sparkles icon centered
+- Headline: "Solvo is finding the best options..."
 - Three checkmark items appearing with delay: "Reading your request" → "Matching with 12,400 providers" → "Ranking by fit & response time"
 
 **Results header:**
 
 - Left: "{N} options found" + "Sorted by AI relevance for your request"
-- Right: "Filters" button (SlidersHorizontal icon) + "See packages" button (stone-900, sparkles icon)
+- Right: "Filters" button (SlidersHorizontal icon) + "See packages" button (`accent`, sparkles icon)
 
 **Provider card structure:**
 
 - Rounded-3xl, white, padding 5-6
-- **Recommended card:** indigo-300 border + soft indigo halo: `shadow-[0_0_0_4px_rgba(79,70,229,0.06)]`
-- Recommended ribbon: `-top-3 left-6`, stone-900 bg pill: "✨ AI Recommended · Best match"
+- **Recommended card:** `brandBorder` + `solvoShadows.recommendedHalo` (Creative Purple)
+- Recommended ribbon: `-top-3 left-6`, `accent` pill: "✨ AI Recommended · Best match"
 - Layout: avatar/price column (md:48 wide) + body
 - Body shows: name + ShieldCheck (if verified), rating row (star + reviews + location + response time), checklist of 4 inclusions in 2-col grid, tags as Pills, action row
-- Action row: "View profile" (text), "WhatsApp" button (emerald-500, MessageCircle icon), "Select" button (stone-900, ArrowRight icon)
+- Action row: "View profile" (text), "WhatsApp" button (emerald-500, MessageCircle icon), "Select" button (`accent`, ArrowRight icon)
 
 **Provider mock data (4 providers):**
 
@@ -325,8 +360,8 @@ const parsed = {
 
 **Floating refine assistant (`<RefineFooter />`):**
 
-- Closed state: pill button bottom-right, stone-900 bg, "✨ Refine with AI"
-- Open state: 80-wide panel, rounded-3xl, header (indigo gradient strip with sparkles avatar + "Tula Assistant" + online dot + close X), message list (max-h-72, scrollable), input + send button
+- Closed state: pill button bottom-right, `accent` bg, "✨ Refine with AI"
+- Open state: 80-wide panel, rounded-3xl, header (indigo gradient strip with sparkles avatar + "Solvo Assistant" + online dot + close X), message list (max-h-72, scrollable), input + send button
 - Initial AI message: "Want me to refine these results? I can adjust budget, location, dietary needs, or add more services."
 - User send → fake AI reply after 800ms: "Got it — I'll update the results to focus on that. Anything else to adjust?"
 
@@ -336,16 +371,16 @@ const parsed = {
 
 **Header:**
 
-- Tiny indigo "✨ Curated by Tula AI" label
-- Headline: "Complete solutions, _not just providers._" (italic + indigo on second line)
+- Tiny indigo "✨ Curated by Solvo AI" label
+- Headline: "Complete solutions, not just providers." — `solvoGradients.brand` on the second line
 - Subhead: "Three thoughtfully bundled packages for '[query]'. One contract, one payment, zero coordination."
 
 **Three package cards in 3-column grid:**
 
-- Middle card (Balanced) is featured: stone-900 border, scaled 1.02, deep shadow
+- Middle card (Balanced) is featured: `accent` border, scaled 1.02, deep shadow
 - Each card: emoji header, "BIRTHDAY PACKAGE" eyebrow, serif tier name (Essentials/Balanced/Premium), price (serif 3xl), "save ₡XX,XXX" in emerald
-- Expandable "What's included" section (chevron rotates 180°), revealing line items in stone-50 rows with emoji + label + price
-- Two buttons: "Book this package" (stone-900 if featured, stone-100 otherwise) + "Customize package" (outline)
+- Expandable "What's included" section (chevron rotates 180°), revealing line items in `surfaceMuted` rows with emoji + label + price
+- Two buttons: "Book this package" (`accent` if featured, `surfaceMuted` otherwise) + "Customize package" (outline)
 
 **Package data:**
 
@@ -396,7 +431,7 @@ const parsed = {
 
 **Bottom CTA:**
 
-- Indigo gradient strip: "Want something else entirely? Tell Tula what to add or remove and we'll rebuild your package in seconds." + "Customize" button.
+- Indigo gradient strip: "Want something else entirely? Tell Solvo what to add or remove and we'll rebuild your package in seconds." + "Customize" button.
 
 ---
 
@@ -418,7 +453,7 @@ const parsed = {
     - "35 guests · Standard tier"
     - **Three CTA buttons stacked:**
       1. WhatsApp (emerald-500, full-width, MessageCircle icon)
-      2. "Request booking" (stone-900)
+      2. "Request booking" (`accent`)
       3. "Get custom quote" (outline)
     - Below divider: response time, response rate, identity verified
 
@@ -427,7 +462,7 @@ const parsed = {
 ### 5. User Dashboard (`/dashboard`)
 
 - Welcome header: "WELCOME BACK" eyebrow + "Hello, [Name]." (font-serif 4xl)
-- "+ New request" button top-right (stone-900)
+- "+ New request" button top-right (`accent`)
 - **Tabs row** (border-b, animated underline indicator using `layoutId="dash-tab"`):
   - Active requests (with count pill)
   - Conversations (with count pill)
@@ -436,7 +471,7 @@ const parsed = {
 
 **Active requests tab:** stack of request cards, each with emoji avatar, title, status text, time ago. Show "New" pill or "✓ Booked" pill where applicable.
 
-**Conversations tab:** rounded-2xl container, divided rows. Each row: emoji avatar, name (bold if unread), last message preview (truncated), timestamp, unread dot (indigo-600).
+**Conversations tab:** rounded-2xl container, divided rows. Each row: emoji avatar, name (bold if unread), last message preview (truncated), timestamp, unread dot (`accent`).
 
 **Saved tab:** 3-column grid of provider cards: emoji, name, category, rating row.
 
@@ -539,7 +574,7 @@ Each card: tinted icon square top-left, emerald change pill top-right, serif val
 **Left — Lead inbox:**
 
 - "Incoming leads" header + Filter button
-- Stack of lead cards (each clickable, selected one gets stone-900 border + stone-50 bg)
+- Stack of lead cards (each clickable, selected one gets `accent` border + `surfaceMuted` bg)
 - Card content: customer name + urgent rose pill if applicable, request preview, location + time
 
 **Right — Lead detail panel:**
@@ -547,9 +582,9 @@ Each card: tinted icon square top-left, emerald change pill top-right, serif val
 - Customer name (font-serif 2xl) + urgent badge
 - Lead received timestamp
 - Right-aligned: "Budget" + serif price
-- **Request box** (stone-50): "THE REQUEST" eyebrow, full request text, metadata pills (location, date, guests)
-- **AI suggestion box** (indigo gradient): "Tula suggests: Match to your 'Standard' tier (₡285k for 35 ppl). Customer has 92% likelihood of accepting based on similar past leads."
-- **Action row:** "Accept & send quote" (stone-900, full-width) + "Reject" (outline) + chat icon button
+- **Request box** (`surfaceMuted`): "THE REQUEST" eyebrow, full request text, metadata pills (location, date, guests)
+- **AI suggestion box** (indigo gradient): "Solvo suggests: Match to your 'Standard' tier (₡285k for 35 ppl). Customer has 92% likelihood of accepting based on similar past leads."
+- **Action row:** "Accept & send quote" (`accent`, full-width) + "Reject" (outline) + chat icon button
 
 **Below detail panel — weekly chart:**
 
@@ -615,14 +650,17 @@ Each card: tinted icon square top-left, emerald change pill top-right, serif val
 The integration is done when:
 
 - [ ] All 6 screens render and are reachable via the project's routing system
-- [ ] Fonts load (Fraunces + Inter) and serif headlines render correctly
-- [ ] Indigo accent appears in: AI interpretation card, recommended provider halo, hover states, "Tula" wordmark in italic headlines
+- [ ] Fonts load (Plus Jakarta Sans + Inter) and display headings render correctly
+- [ ] Energy Orange appears on: primary CTAs, active states, the dashboard tab underline, the AI-recommended ribbon
+- [ ] Creative Purple appears on: the AI interpretation card, recommended-card halo, sponsored ribbon, brand gradients
+- [ ] Every screen is legible in BOTH light and dark mode, with no unthemed white panels
+- [ ] The color-mode toggle persists across reloads and does not flash on load
 - [ ] Emerald-500 appears ONLY on WhatsApp CTAs
 - [ ] Loading state plays for ~1.8s when submitting a search
 - [ ] Floating "Refine with AI" button works (opens chat, sends fake reply after 800ms)
 - [ ] Tab underline animates when switching tabs in user dashboard
 - [ ] Provider cards show staggered entrance animations
-- [ ] Recommended provider card has the indigo halo and ribbon
+- [ ] Recommended provider card has the Creative Purple halo and the Energy Orange ribbon
 - [ ] Package middle card is visually elevated (border + scale)
 - [ ] Mobile: all screens are usable at 375px width with no horizontal scroll
 - [ ] No console errors, no TypeScript errors (if TS), no failed imports
@@ -632,8 +670,10 @@ The integration is done when:
 ## 🚫 Things to NOT do
 
 - Don't use generic Tailwind utilities like `shadow-md` or `shadow-lg` — use the custom soft shadows defined above
-- Don't add purple. The accent is **indigo**, not purple. Don't gradient them together.
-- Don't substitute the fonts. Fraunces and Inter are deliberate.
+- Don't hardcode hex values. Every color must come from `solvoColors` / `solvoTints`, or dark mode silently breaks at that call site.
+- Don't put white text on Energy Orange — it is 2.3:1 and fails WCAG AA. Use `solvoColors.accentFg`.
+- Don't use `bg="white"` or `bg={solvoColors.text}` for surfaces and buttons. Those invert badly in dark mode; use `surface` and `accent`.
+- Don't substitute the fonts. Plus Jakarta Sans and Inter are deliberate.
 - Don't add icons that aren't in the spec. The lucide-react set is curated.
 - Don't add bouncy/spring animations. Motion is restrained and editorial.
 - Don't put emerald anywhere except WhatsApp buttons.

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, MoreVertical, RotateCcw, Send, ShieldAlert, Trash2 } from 'lucide-react';
-import { Box, Flex, Text, SolvoNavBar } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -267,11 +267,12 @@ export default function MessagesPage() {
   // ── Gates ───────────────────────────────────────────────────────────
   if (!isAuthenticated || !user) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/messages" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} padding="24px" maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               Sign in to view your messages
             </Text>
             <Link href="/login" style={{ textDecoration: 'none' }}>
@@ -279,8 +280,8 @@ export default function MessagesPage() {
                 display="inline-block"
                 padding="10px 18px"
                 borderRadius="10px"
-                bg={solvoColors.text}
-                color={solvoColors.surface}
+                bg={solvoColors.accent}
+                color={solvoColors.accentFg}
                 fontWeight={600}
                 fontSize="14px"
                 cursor="pointer"
@@ -297,11 +298,12 @@ export default function MessagesPage() {
 
   if (!actorId) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/messages" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} padding="24px" maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               No messages yet
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
@@ -314,14 +316,15 @@ export default function MessagesPage() {
   }
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/messages" />
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: "24px 16px", md: "32px 24px" }}>
         <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.1em" textTransform="uppercase" marginBottom="8px">
           Hi, {user.name}
         </Text>
-        <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text} marginBottom="6px">
+        <Text as="h1" fontFamily={solvoFonts.display} fontSize="36px" color={solvoColors.text} marginBottom="6px">
           Messages
         </Text>
         <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
@@ -349,7 +352,7 @@ export default function MessagesPage() {
           >
             <Box padding="14px 16px" borderBottom={`1px solid ${solvoColors.border}`}>
               <Flex align="center" justify="space-between" marginBottom="10px">
-                <Text fontFamily={solvoFonts.serif} fontSize="18px" color={solvoColors.text}>
+                <Text fontFamily={solvoFonts.display} fontSize="18px" color={solvoColors.text}>
                   Inbox
                 </Text>
                 <Text fontSize="xs" color={solvoColors.textSubtle}>
@@ -478,7 +481,7 @@ export default function MessagesPage() {
                               bg={
                                 c.status === ConversationStatus.Active
                                   ? solvoColors.indigoLight
-                                  : '#F5F5F4'
+                                  : solvoColors.surfaceMuted
                               }
                               color={
                                 c.status === ConversationStatus.Active
@@ -608,7 +611,7 @@ export default function MessagesPage() {
                               )}
                               <Text
                                 fontSize="10px"
-                                color={isMine ? 'rgba(255,255,255,0.6)' : solvoColors.textSubtle}
+                                color={isMine ? solvoColors.surfaceMuted : solvoColors.textSubtle}
                                 marginTop="2px"
                                 textAlign="right"
                               >
@@ -660,8 +663,8 @@ export default function MessagesPage() {
                         padding: '12px 16px',
                         borderRadius: '12px',
                         border: 'none',
-                        background: solvoColors.text,
-                        color: solvoColors.surface,
+                        background: solvoColors.accent,
+                        color: solvoColors.accentFg,
                         fontWeight: 600,
                         fontSize: '14px',
                         fontFamily: solvoFonts.sans,

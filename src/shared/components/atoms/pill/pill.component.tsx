@@ -3,7 +3,14 @@ import _ from 'lodash';
 import { Box } from '@chakra-ui/react';
 import { solvoColors } from '@constants';
 
-export type PillTone = 'default' | 'indigo' | 'amber' | 'emerald' | 'rose' | 'dark';
+export type PillTone =
+  | 'default'
+  | 'indigo'
+  | 'accent'
+  | 'amber'
+  | 'emerald'
+  | 'rose'
+  | 'dark';
 
 export interface PillProps {
   children: React.ReactNode;
@@ -13,12 +20,13 @@ export interface PillProps {
 }
 
 const toneMap: Record<PillTone, { bg: string; color: string; border?: string }> = {
-  default: { bg: '#F5F5F4', color: solvoColors.textMuted, border: solvoColors.border },
-  indigo: { bg: solvoColors.indigoLight, color: solvoColors.indigo },
+  default: { bg: solvoColors.surfaceMuted, color: solvoColors.textMuted, border: solvoColors.border },
+  indigo: { bg: solvoColors.brandSoft, color: solvoColors.brandText },
+  accent: { bg: solvoColors.accentSoft, color: solvoColors.accentText },
   amber: { bg: solvoColors.amberLight, color: solvoColors.amberText },
   emerald: { bg: solvoColors.emeraldLight, color: solvoColors.emeraldText },
   rose: { bg: solvoColors.roseLight, color: solvoColors.roseText },
-  dark: { bg: solvoColors.text, color: '#fff' },
+  dark: { bg: solvoColors.text, color: solvoColors.surface },
 };
 
 const Pill: React.FC<PillProps> = ({ children, tone = 'default', size = 'sm', onClick }) => {

@@ -125,8 +125,8 @@ const RefineFooter: React.FC = () => {
               as="button"
               align="center"
               gap="8px"
-              bg={solvoColors.text}
-              color="white"
+              bg={solvoColors.accent}
+              color={solvoColors.accentFg}
               padding="12px 20px"
               borderRadius="full"
               fontSize="sm"
@@ -134,7 +134,7 @@ const RefineFooter: React.FC = () => {
               cursor="pointer"
               boxShadow={solvoShadows.floatingPanel}
               onClick={() => setOpen(true)}
-              _hover={{ bg: solvoColors.indigo }}
+              _hover={{ bg: solvoColors.accentHover }}
             >
               <Sparkles size={16} />
               Refine with AI
@@ -152,7 +152,7 @@ const RefineFooter: React.FC = () => {
             style={{
               width: 'min(380px, calc(100vw - 32px))',
               borderRadius: 24,
-              background: 'white',
+              background: solvoColors.surface,
               overflow: 'hidden',
               boxShadow: solvoShadows.floatingPanel,
               border: `1px solid ${solvoColors.border}`,
@@ -176,9 +176,9 @@ const RefineFooter: React.FC = () => {
                   align="center"
                   justify="center"
                   style={{
-                    background: `linear-gradient(135deg, ${solvoColors.indigo}, #6366F1)`,
+                    background: `linear-gradient(135deg, ${solvoColors.indigo}, ${solvoColors.brandMid})`,
                   }}
-                  color="white"
+                  color={solvoColors.brandFg}
                 >
                   <Sparkles size={16} />
                 </Flex>
@@ -215,7 +215,7 @@ const RefineFooter: React.FC = () => {
               gap="6px"
               borderBottom="1px solid"
               borderColor={solvoColors.border}
-              bg="white"
+              bg={solvoColors.surface}
             >
               {MODEL_LIST.map((opt) => {
                 const active = opt.key === model;
@@ -293,7 +293,7 @@ const RefineFooter: React.FC = () => {
                         borderRadius="14px"
                         fontSize="sm"
                         bg={m.from === 'ai' ? solvoColors.indigoLight : solvoColors.text}
-                        color={m.from === 'ai' ? solvoColors.text : 'white'}
+                        color={m.from === 'ai' ? solvoColors.text : solvoColors.surface}
                       >
                         {m.text}
                       </Box>
@@ -365,8 +365,8 @@ const RefineFooter: React.FC = () => {
                 width="36px"
                 height="36px"
                 borderRadius="10px"
-                bg={isThinking ? solvoColors.borderHover : solvoColors.text}
-                color="white"
+                bg={isThinking ? solvoColors.borderHover : solvoColors.accent}
+                color={solvoColors.accentFg}
                 cursor={isThinking ? 'not-allowed' : 'pointer'}
                 onClick={handleSend}
               >

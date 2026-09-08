@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Box, Flex, Text } from '@atoms';
 import { Pill } from '@atoms';
-import { solvoColors, solvoFonts } from '@constants';
+import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 
 export interface PackageItem {
   icon: string;
@@ -44,14 +44,14 @@ const PackageCard: React.FC<PackageCardProps> = ({ pkg, index = 0, onBook, onCus
     >
       <Flex
         direction="column"
-        bg="white"
+        bg={solvoColors.surface}
         borderWidth={isFeatured ? '2px' : '1px'}
         borderColor={isFeatured ? solvoColors.text : solvoColors.border}
         borderRadius="24px"
         padding={{ base: '20px', md: '28px' }}
         gap="20px"
         height="100%"
-        boxShadow={isFeatured ? '0 25px 50px -12px rgba(28, 25, 23, 0.15)' : 'none'}
+        boxShadow={isFeatured ? solvoShadows.floatingPanel : 'none'}
       >
         <Flex justify="space-between" align="flex-start">
           <Text fontSize="44px">{pkg.emoji}</Text>
@@ -70,7 +70,7 @@ const PackageCard: React.FC<PackageCardProps> = ({ pkg, index = 0, onBook, onCus
             BIRTHDAY PACKAGE
           </Text>
           <Text
-            fontFamily={solvoFonts.serif}
+            fontFamily={solvoFonts.display}
             fontSize="3xl"
             fontWeight="500"
             color={solvoColors.text}
@@ -81,7 +81,7 @@ const PackageCard: React.FC<PackageCardProps> = ({ pkg, index = 0, onBook, onCus
 
         <Box>
           <Text
-            fontFamily={solvoFonts.serif}
+            fontFamily={solvoFonts.display}
             fontSize="3xl"
             fontWeight="500"
             color={solvoColors.text}
@@ -122,7 +122,7 @@ const PackageCard: React.FC<PackageCardProps> = ({ pkg, index = 0, onBook, onCus
                   key={it.label}
                   align="center"
                   justify="space-between"
-                  bg="#FAFAF9"
+                  bg={solvoColors.bg}
                   padding="10px 12px"
                   borderRadius="10px"
                 >
@@ -150,7 +150,7 @@ const PackageCard: React.FC<PackageCardProps> = ({ pkg, index = 0, onBook, onCus
             fontSize="sm"
             fontWeight="500"
             cursor="pointer"
-            bg={isFeatured ? solvoColors.text : '#F5F5F4'}
+            bg={isFeatured ? solvoColors.text : solvoColors.surfaceMuted}
             color={isFeatured ? 'white' : solvoColors.text}
             onClick={() => onBook?.(pkg)}
             _hover={{ opacity: 0.9 }}

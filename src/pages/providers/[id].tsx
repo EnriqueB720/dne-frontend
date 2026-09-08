@@ -15,7 +15,7 @@ import {
   Sparkles,
   Star,
 } from 'lucide-react';
-import { Box, Flex, Text, SolvoNavBar, Pill } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, Pill } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -190,7 +190,8 @@ export default function ProviderProfile() {
   // ── Gates ───────────────────────────────────────────────────────────
   if (!supplierId) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar />
         <Flex minHeight="60vh" align="center" justify="center">
           <Text color={solvoColors.textSubtle}>Invalid provider link.</Text>
@@ -201,7 +202,8 @@ export default function ProviderProfile() {
 
   if (supplierQuery.loading && !supplier) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar />
         <Flex minHeight="60vh" align="center" justify="center">
           <Text color={solvoColors.textSubtle}>Loading…</Text>
@@ -212,10 +214,11 @@ export default function ProviderProfile() {
 
   if (!supplier) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar />
         <Flex minHeight="60vh" align="center" justify="center" direction="column" gap="8px">
-          <Text fontFamily={solvoFonts.serif} fontSize="22px" color={solvoColors.text}>
+          <Text fontFamily={solvoFonts.display} fontSize="22px" color={solvoColors.text}>
             Provider not found
           </Text>
           <Link href="/" style={{ color: solvoColors.indigo }}>
@@ -232,7 +235,8 @@ export default function ProviderProfile() {
     .filter(Boolean) as string[];
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar />
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: '24px 16px', md: '32px 24px' }}>
@@ -297,7 +301,7 @@ export default function ProviderProfile() {
           <Box>
             <Flex align="center" gap="10px" marginBottom="6px">
               <Text
-                fontFamily={solvoFonts.serif}
+                fontFamily={solvoFonts.display}
                 fontSize="4xl"
                 fontWeight="500"
                 color={solvoColors.text}
@@ -386,7 +390,7 @@ export default function ProviderProfile() {
             {supplier.services && supplier.services.length > 0 && (
               <>
                 <Text
-                  fontFamily={solvoFonts.serif}
+                  fontFamily={solvoFonts.display}
                   fontSize="2xl"
                   fontWeight="500"
                   color={solvoColors.text}
@@ -404,7 +408,7 @@ export default function ProviderProfile() {
                     <Box
                       key={s.serviceId}
                       padding="14px 16px"
-                      bg="white"
+                      bg={solvoColors.surface}
                       borderWidth="1px"
                       borderColor={solvoColors.border}
                       borderRadius="14px"
@@ -430,7 +434,7 @@ export default function ProviderProfile() {
 
             {/* Reviews */}
             <Text
-              fontFamily={solvoFonts.serif}
+              fontFamily={solvoFonts.display}
               fontSize="2xl"
               fontWeight="500"
               color={solvoColors.text}
@@ -441,7 +445,7 @@ export default function ProviderProfile() {
             {reviews.length === 0 ? (
               <Box
                 padding="24px"
-                bg="white"
+                bg={solvoColors.surface}
                 borderWidth="1px"
                 borderColor={solvoColors.border}
                 borderRadius="14px"
@@ -459,7 +463,7 @@ export default function ProviderProfile() {
                     direction="column"
                     gap="8px"
                     padding="16px 18px"
-                    bg="white"
+                    bg={solvoColors.surface}
                     borderWidth="1px"
                     borderColor={solvoColors.border}
                     borderRadius="14px"
@@ -560,7 +564,7 @@ export default function ProviderProfile() {
           <Box>
             <Box
               padding="20px"
-              bg="white"
+              bg={solvoColors.surface}
               borderWidth="1px"
               borderColor={solvoColors.border}
               borderRadius="20px"
@@ -577,7 +581,7 @@ export default function ProviderProfile() {
                 INTERESTED?
               </Text>
               <Text
-                fontFamily={solvoFonts.serif}
+                fontFamily={solvoFonts.display}
                 fontSize="22px"
                 color={solvoColors.text}
                 marginBottom="14px"
@@ -593,8 +597,8 @@ export default function ProviderProfile() {
                   <Box
                     padding="12px 16px"
                     borderRadius="12px"
-                    bg={solvoColors.text}
-                    color="white"
+                    bg={solvoColors.accent}
+                    color={solvoColors.accentFg}
                     fontWeight={600}
                     fontSize="14px"
                     textAlign="center"
@@ -614,7 +618,7 @@ export default function ProviderProfile() {
                       padding: '12px 16px',
                       borderRadius: '12px',
                       border: `1px solid ${showFavorited ? solvoColors.roseText : solvoColors.border}`,
-                      background: showFavorited ? solvoColors.roseLight : 'white',
+                      background: showFavorited ? solvoColors.roseLight : solvoColors.surface,
                       color: showFavorited ? solvoColors.roseText : solvoColors.text,
                       fontWeight: 600,
                       fontSize: '14px',

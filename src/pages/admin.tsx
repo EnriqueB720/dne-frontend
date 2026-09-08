@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 import AuthContext from '@/shared/contexts/auth.context';
-import { Box, Flex, Text, SolvoNavBar } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import {
   PromotionTier,
@@ -108,7 +108,8 @@ export default function AdminPage() {
   // ── Gates ───────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/admin" />
       </Box>
     );
@@ -161,7 +162,8 @@ export default function AdminPage() {
 
   // ── Render ──────────────────────────────────────────────────────────
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/admin" />
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: '24px 16px', md: '40px 24px' }}>
@@ -178,7 +180,7 @@ export default function AdminPage() {
               Admin console
             </Text>
             <Text
-              fontFamily={solvoFonts.serif}
+              fontFamily={solvoFonts.display}
               fontSize={{ base: '32px', md: '40px' }}
               color={solvoColors.text}
               lineHeight="1.1"
@@ -274,7 +276,7 @@ export default function AdminPage() {
                 >
                   Platform fees · last {revenueWindow}d
                 </Text>
-                <Text fontFamily={solvoFonts.serif} fontSize="28px" color={solvoColors.text}>
+                <Text fontFamily={solvoFonts.display} fontSize="28px" color={solvoColors.text}>
                   {formatMoney(revenueTotals.total, stats?.currency ?? 'CRC')}
                 </Text>
               </Box>
@@ -404,7 +406,7 @@ export default function AdminPage() {
                 <Text fontSize="xs" color={solvoColors.textSubtle} textTransform="uppercase" letterSpacing="0.1em">
                   Total spend
                 </Text>
-                <Text fontFamily={solvoFonts.serif} fontSize="28px" color={solvoColors.text}>
+                <Text fontFamily={solvoFonts.display} fontSize="28px" color={solvoColors.text}>
                   {formatMoney(aiTotals.costUsd, 'USD')}
                 </Text>
               </Box>
@@ -614,10 +616,10 @@ export default function AdminPage() {
 type Tone = 'indigo' | 'emerald' | 'amber' | 'rose';
 
 const toneStyles: Record<Tone, { bg: string; color: string }> = {
-  indigo: { bg: '#EEF2FF', color: '#4338CA' },
-  emerald: { bg: '#ECFDF5', color: '#047857' },
-  amber: { bg: '#FEF3C7', color: '#B45309' },
-  rose: { bg: '#FFF1F2', color: '#BE123C' },
+  indigo: { bg: solvoColors.brandSoft, color: solvoColors.brandText },
+  emerald: { bg: solvoColors.emeraldLight, color: solvoColors.emeraldText },
+  amber: { bg: solvoColors.amberLight, color: solvoColors.amberText },
+  rose: { bg: solvoColors.roseLight, color: solvoColors.roseText },
 };
 
 function StatCard({
@@ -663,7 +665,7 @@ function StatCard({
           <Activity size={14} color={solvoColors.textSubtle} />
         </Flex>
         <Text
-          fontFamily={solvoFonts.serif}
+          fontFamily={solvoFonts.display}
           fontSize="28px"
           color={solvoColors.text}
           marginTop="10px"
@@ -819,7 +821,8 @@ function GateCard({
   ctaLabel: string;
 }) {
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/admin" />
       <Flex minHeight="60vh" align="center" justify="center" padding="24px">
         <Box
@@ -832,7 +835,7 @@ function GateCard({
           maxWidth="440px"
           textAlign="center"
         >
-          <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+          <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
             {title}
           </Text>
           <Text color={solvoColors.textMuted} fontSize="sm" marginBottom="18px">
@@ -843,8 +846,8 @@ function GateCard({
               display="inline-block"
               padding="10px 18px"
               borderRadius="10px"
-              bg={solvoColors.text}
-              color={solvoColors.surface}
+              bg={solvoColors.accent}
+              color={solvoColors.accentFg}
               fontWeight={600}
               fontSize="14px"
               cursor="pointer"

@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ExternalLink, Pencil, Star, Trash2 } from 'lucide-react';
-import { Box, Flex, Text, SolvoNavBar, ReviewCreateModal, ConfirmModal } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, ReviewCreateModal, ConfirmModal } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -254,11 +254,12 @@ export default function BookingsPage() {
   // ── Gating: not signed in / no roles ───────────────────────────────────
   if (!isAuthenticated || !user) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/bookings" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               Sign in to view your bookings
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="20px">
@@ -269,8 +270,8 @@ export default function BookingsPage() {
                 display="inline-block"
                 padding="10px 18px"
                 borderRadius="10px"
-                bg={solvoColors.text}
-                color={solvoColors.surface}
+                bg={solvoColors.accent}
+                color={solvoColors.accentFg}
                 fontWeight={600}
                 fontSize="14px"
                 cursor="pointer"
@@ -286,11 +287,12 @@ export default function BookingsPage() {
 
   if (availableModes.length === 0) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/bookings" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               No bookings to show
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
@@ -303,14 +305,15 @@ export default function BookingsPage() {
   }
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/bookings" />
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: "24px 16px", md: "32px 24px" }}>
         <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.1em" textTransform="uppercase" marginBottom="8px">
           Hi, {user.name}
         </Text>
-        <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text} marginBottom="6px">
+        <Text as="h1" fontFamily={solvoFonts.display} fontSize="36px" color={solvoColors.text} marginBottom="6px">
           Bookings
         </Text>
         <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
@@ -384,7 +387,7 @@ export default function BookingsPage() {
           <Box flex="1" minWidth="0" width="100%">
             <Box style={sectionStyle}>
               <Flex justify="space-between" align="center" marginBottom="14px">
-                <Text fontFamily={solvoFonts.serif} fontSize="20px">
+                <Text fontFamily={solvoFonts.display} fontSize="20px">
                   Bookings
                 </Text>
                 <Text fontSize="xs" color={solvoColors.textSubtle}>
@@ -408,7 +411,7 @@ export default function BookingsPage() {
                         padding="12px 14px"
                         borderRadius="10px"
                         border={`1px solid ${isSelected ? solvoColors.text : solvoColors.border}`}
-                        bg={isSelected ? '#FAFAF9' : solvoColors.surface}
+                        bg={isSelected ? solvoColors.bg : solvoColors.surface}
                         cursor="pointer"
                       >
                         <Flex justify="space-between" align="center" gap="10px">
@@ -460,7 +463,7 @@ export default function BookingsPage() {
 
           <Box width={{ base: '100%', md: '380px' }} flexShrink={0}>
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="20px" marginBottom="12px">
+              <Text fontFamily={solvoFonts.display} fontSize="20px" marginBottom="12px">
                 Booking detail
               </Text>
 

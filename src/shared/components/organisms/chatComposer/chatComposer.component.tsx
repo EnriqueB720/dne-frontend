@@ -160,7 +160,7 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
       padding={{ base: '12px 16px', md: '16px 24px' }}
       borderTop="1px solid"
       borderColor={solvoColors.border}
-      bg="white"
+      bg={solvoColors.surface}
       flexShrink={0}
     >
       <Box maxWidth="760px" margin="0 auto">
@@ -288,8 +288,8 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
                 height: '32px',
                 borderRadius: '10px',
                 border: 'none',
-                background: solvoColors.text,
-                color: 'white',
+                background: solvoColors.accent,
+                color: solvoColors.accentFg,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -313,8 +313,8 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
                 background:
                   disabled || !value.trim()
                     ? solvoColors.border
-                    : solvoColors.text,
-                color: 'white',
+                    : solvoColors.accent,
+                color: solvoColors.accentFg,
                 cursor: disabled || !value.trim() ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',

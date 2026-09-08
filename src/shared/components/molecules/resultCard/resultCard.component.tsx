@@ -2,6 +2,7 @@ import * as React from 'react';
 import _ from 'lodash';
 import { Button, Flex, Image, Text } from '@atoms';
 import { ResultCardProps } from '@types';
+import { solvoColors } from '@constants';
 
 const ResultCard: React.FC<ResultCardProps> = ({
   title,
@@ -29,7 +30,7 @@ const ResultCard: React.FC<ResultCardProps> = ({
       direction="row"
       align="center"
       gap="20px"
-      bg="white"
+      bg={solvoColors.surface}
       borderWidth="1px"
       borderColor="gray.200"
       borderRadius="md"

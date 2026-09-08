@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, X } from 'lucide-react';
-import { Box, Flex, Text, SolvoNavBar } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -31,8 +31,8 @@ const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   VIEWED:    { bg: solvoColors.indigoLight, fg: solvoColors.indigo },
   ACCEPTED:  { bg: solvoColors.successLight, fg: solvoColors.successText },
   REJECTED:  { bg: solvoColors.roseLight, fg: solvoColors.roseText },
-  EXPIRED:   { bg: '#F5F5F4', fg: solvoColors.textSubtle },
-  WITHDRAWN: { bg: '#F5F5F4', fg: solvoColors.textSubtle },
+  EXPIRED:   { bg: solvoColors.surfaceMuted, fg: solvoColors.textSubtle },
+  WITHDRAWN: { bg: solvoColors.surfaceMuted, fg: solvoColors.textSubtle },
 };
 
 const inputBaseStyle: React.CSSProperties = {
@@ -296,11 +296,12 @@ export default function QuotesPage() {
   // ── Gating: not signed in / not a supplier ─────────────────────────────
   if (!isAuthenticated || !user) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/quotes" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               Sign in to manage quotes
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="20px">
@@ -311,8 +312,8 @@ export default function QuotesPage() {
                 display="inline-block"
                 padding="10px 18px"
                 borderRadius="10px"
-                bg={solvoColors.text}
-                color={solvoColors.surface}
+                bg={solvoColors.accent}
+                color={solvoColors.accentFg}
                 fontWeight={600}
                 fontSize="14px"
                 cursor="pointer"
@@ -328,11 +329,12 @@ export default function QuotesPage() {
 
   if (!supplierId) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/quotes" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               This page is for suppliers
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
@@ -345,7 +347,8 @@ export default function QuotesPage() {
   }
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/quotes" />
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: "24px 16px", md: "32px 24px" }}>
@@ -354,7 +357,7 @@ export default function QuotesPage() {
             <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.1em" textTransform="uppercase" marginBottom="8px">
               Hi, {user.name}
             </Text>
-            <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text} marginBottom="6px">
+            <Text as="h1" fontFamily={solvoFonts.display} fontSize="36px" color={solvoColors.text} marginBottom="6px">
               Quotes
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
@@ -366,8 +369,8 @@ export default function QuotesPage() {
             onClick={() => setShowCreateModal(true)}
             style={{
               ...buttonBaseStyle,
-              background: solvoColors.text,
-              color: solvoColors.surface,
+              background: solvoColors.accent,
+              color: solvoColors.accentFg,
               whiteSpace: 'nowrap',
             }}
           >
@@ -431,7 +434,7 @@ export default function QuotesPage() {
                   style={{
                     position: 'fixed',
                     inset: 0,
-                    background: 'rgba(28, 25, 23, 0.5)',
+                    background: solvoColors.overlay,
                     backdropFilter: 'blur(4px)',
                     zIndex: 200,
                     display: 'flex',
@@ -464,7 +467,7 @@ export default function QuotesPage() {
                       padding="18px 22px"
                       borderBottom={`1px solid ${solvoColors.border}`}
                     >
-                      <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+                      <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                         New quote
                       </Text>
                       <Box
@@ -734,7 +737,7 @@ export default function QuotesPage() {
 
             <Box style={sectionStyle}>
               <Flex justify="space-between" align="center" marginBottom="14px">
-                <Text fontFamily={solvoFonts.serif} fontSize="20px">
+                <Text fontFamily={solvoFonts.display} fontSize="20px">
                   My quotes
                 </Text>
                 <Text fontSize="xs" color={solvoColors.textSubtle}>
@@ -758,7 +761,7 @@ export default function QuotesPage() {
                         padding="12px 14px"
                         borderRadius="10px"
                         border={`1px solid ${isSelected ? solvoColors.text : solvoColors.border}`}
-                        bg={isSelected ? '#FAFAF9' : solvoColors.surface}
+                        bg={isSelected ? solvoColors.bg : solvoColors.surface}
                         cursor="pointer"
                       >
                         <Flex justify="space-between" align="center" gap="10px">
@@ -796,7 +799,7 @@ export default function QuotesPage() {
 
           <Box width={{ base: '100%', md: '380px' }} flexShrink={0}>
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="20px" marginBottom="12px">
+              <Text fontFamily={solvoFonts.display} fontSize="20px" marginBottom="12px">
                 Quote detail
               </Text>
 
@@ -810,7 +813,7 @@ export default function QuotesPage() {
                     Quote #{detail.quoteId}
                   </Text>
                   {(detail as any).request?.rawQuery && (
-                    <Text fontFamily={solvoFonts.serif} fontSize="18px" color={solvoColors.text} marginTop="4px" marginBottom="8px">
+                    <Text fontFamily={solvoFonts.display} fontSize="18px" color={solvoColors.text} marginTop="4px" marginBottom="8px">
                       {(detail as any).request.rawQuery}
                     </Text>
                   )}

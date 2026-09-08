@@ -15,7 +15,7 @@ import {
 } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 
-import { Box, Flex, Text, SolvoNavBar } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -216,7 +216,7 @@ export default function CalendarPage() {
       border = solvoColors.roseText;
     }
     if (event.resource.status === 'CANCELLED' || event.resource.status === 'COMPLETED') {
-      bg = '#F5F5F4';
+      bg = solvoColors.surfaceMuted;
       color = solvoColors.textSubtle;
       border = solvoColors.border;
     }
@@ -236,11 +236,12 @@ export default function CalendarPage() {
   // ── Gates ───────────────────────────────────────────────────────────
   if (!isAuthenticated || !user) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/calendar" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               Sign in to view your calendar
             </Text>
             <Link href="/login" style={{ textDecoration: 'none' }}>
@@ -248,8 +249,8 @@ export default function CalendarPage() {
                 display="inline-block"
                 padding="10px 18px"
                 borderRadius="10px"
-                bg={solvoColors.text}
-                color={solvoColors.surface}
+                bg={solvoColors.accent}
+                color={solvoColors.accentFg}
                 fontWeight={600}
                 fontSize="14px"
                 cursor="pointer"
@@ -266,11 +267,12 @@ export default function CalendarPage() {
 
   if (!supplierId) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/calendar" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               This page is for suppliers
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
@@ -283,7 +285,8 @@ export default function CalendarPage() {
   }
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/calendar" />
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: "24px 16px", md: "32px 24px" }}>
@@ -292,7 +295,7 @@ export default function CalendarPage() {
             <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.1em" textTransform="uppercase" marginBottom="8px">
               Hi, {user.name}
             </Text>
-            <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text}>
+            <Text as="h1" fontFamily={solvoFonts.display} fontSize="36px" color={solvoColors.text}>
               Your calendar
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted} marginTop="4px">
@@ -367,7 +370,7 @@ export default function CalendarPage() {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(28, 25, 23, 0.5)',
+              background: solvoColors.overlay,
               backdropFilter: 'blur(4px)',
               zIndex: 100,
               display: 'flex',
@@ -405,7 +408,7 @@ export default function CalendarPage() {
                   ) : (
                     <Lock size={18} color={solvoColors.roseText} />
                   )}
-                  <Text fontFamily={solvoFonts.serif} fontSize="18px" color={solvoColors.text}>
+                  <Text fontFamily={solvoFonts.display} fontSize="18px" color={solvoColors.text}>
                     {modal.mode === 'create' ? 'Block time' : modal.event?.title}
                   </Text>
                 </Flex>
@@ -476,8 +479,8 @@ export default function CalendarPage() {
                         padding: '11px 16px',
                         borderRadius: '12px',
                         border: 'none',
-                        background: solvoColors.text,
-                        color: solvoColors.surface,
+                        background: solvoColors.accent,
+                        color: solvoColors.accentFg,
                         fontWeight: 600,
                         fontSize: '14px',
                         fontFamily: solvoFonts.sans,

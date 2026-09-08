@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, MoreVertical, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { MessageSquare, MoreVertical, Plus, Trash2, X } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
+import { Logo } from '@molecules';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import type { ConversationSummary } from '@/shared/services/conversation.service';
 
@@ -139,7 +140,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         right={0}
         bottom={0}
         left={0}
-        bg="rgba(28, 25, 23, 0.45)"
+        bg={solvoColors.overlay}
         zIndex={1050}
         onClick={onClose}
         style={{
@@ -156,7 +157,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       flexDirection="column"
       borderRight="1px solid"
       borderColor={solvoColors.border}
-      bg="white"
+      bg={solvoColors.surface}
       overflow="hidden"
       position={{ base: 'fixed', lg: 'relative' }}
       top={{ base: 0, lg: 'auto' }}
@@ -189,26 +190,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             borderRadius: '8px',
           }}
         >
-          <Box
-            width="28px"
-            height="28px"
-            borderRadius="8px"
-            bg={solvoColors.indigoLight}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            color={solvoColors.indigo}
-          >
-            <Sparkles size={14} />
-          </Box>
-          <Text
-            fontFamily={solvoFonts.serif}
-            fontSize="md"
-            fontWeight="500"
-            color={solvoColors.text}
-          >
-            Solvo
-          </Text>
+          <Logo size="sm" />
         </button>
 
         <Flex align="center" gap="4px">

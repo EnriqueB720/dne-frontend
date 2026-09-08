@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import AuthContext from '@/shared/contexts/auth.context';
 import { motion } from 'framer-motion';
 import { Inbox, Plus, Sparkles } from 'lucide-react';
-import { Box, Flex, Text, SolvoNavBar, Pill } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, Pill } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import {
   BookingStatus,
@@ -160,11 +160,12 @@ export default function Dashboard() {
   // ── Gates ───────────────────────────────────────────────────────────
   if (!isAuthenticated || !user) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/dashboard" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box
-            bg="white"
+            bg={solvoColors.surface}
             borderWidth="1px"
             borderColor={solvoColors.border}
             borderRadius="16px"
@@ -172,7 +173,7 @@ export default function Dashboard() {
             maxWidth="420px"
             textAlign="center"
           >
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               Sign in to see your dashboard
             </Text>
             <Link href="/login" style={{ textDecoration: 'none' }}>
@@ -180,8 +181,8 @@ export default function Dashboard() {
                 display="inline-block"
                 padding="10px 18px"
                 borderRadius="10px"
-                bg={solvoColors.text}
-                color={solvoColors.surface}
+                bg={solvoColors.accent}
+                color={solvoColors.accentFg}
                 fontWeight={600}
                 fontSize="14px"
                 cursor="pointer"
@@ -197,11 +198,12 @@ export default function Dashboard() {
 
   if (!customerId) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/dashboard" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box
-            bg="white"
+            bg={solvoColors.surface}
             borderWidth="1px"
             borderColor={solvoColors.border}
             borderRadius="16px"
@@ -209,7 +211,7 @@ export default function Dashboard() {
             maxWidth="460px"
             textAlign="center"
           >
-            <Text fontFamily={solvoFonts.serif} fontSize="22px" color={solvoColors.text} marginBottom="6px">
+            <Text fontFamily={solvoFonts.display} fontSize="22px" color={solvoColors.text} marginBottom="6px">
               This dashboard is for customers
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
@@ -227,7 +229,8 @@ export default function Dashboard() {
   }
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/dashboard" />
 
       <Box maxWidth="1100px" margin="0 auto" padding={{ base: '32px 16px', md: '48px 24px' }}>
@@ -250,7 +253,7 @@ export default function Dashboard() {
               WELCOME BACK
             </Text>
             <Text
-              fontFamily={solvoFonts.serif}
+              fontFamily={solvoFonts.display}
               fontSize={{ base: '32px', md: '44px' }}
               fontWeight="500"
               color={solvoColors.text}
@@ -264,14 +267,14 @@ export default function Dashboard() {
             align="center"
             gap="6px"
             padding="10px 18px"
-            bg={solvoColors.text}
-            color="white"
+            bg={solvoColors.accent}
+            color={solvoColors.accentFg}
             borderRadius="12px"
             fontSize="sm"
             fontWeight="500"
             cursor="pointer"
             onClick={() => router.push('/')}
-            _hover={{ bg: solvoColors.indigo }}
+            _hover={{ bg: solvoColors.accentHover }}
           >
             <Plus size={14} /> New request
           </Flex>
@@ -307,7 +310,7 @@ export default function Dashboard() {
                   </Text>
                   {t.showCount && t.count > 0 && (
                     <Box
-                      bg={active ? solvoColors.text : '#F5F5F4'}
+                      bg={active ? solvoColors.text : solvoColors.surfaceMuted}
                       color={active ? 'white' : solvoColors.textMuted}
                       fontSize="11px"
                       fontWeight="500"
@@ -353,8 +356,8 @@ export default function Dashboard() {
                   <Box
                     padding="8px 16px"
                     borderRadius="10px"
-                    bg={solvoColors.text}
-                    color="white"
+                    bg={solvoColors.accent}
+                    color={solvoColors.accentFg}
                     fontSize="13px"
                     fontWeight={600}
                     cursor="pointer"
@@ -375,7 +378,7 @@ export default function Dashboard() {
                       align="center"
                       gap="14px"
                       padding="16px 20px"
-                      bg="white"
+                      bg={solvoColors.surface}
                       borderWidth="1px"
                       borderColor={solvoColors.border}
                       borderRadius="14px"
@@ -431,7 +434,7 @@ export default function Dashboard() {
               </Flex>
             ) : (
               <Box
-                bg="white"
+                bg={solvoColors.surface}
                 borderWidth="1px"
                 borderColor={solvoColors.border}
                 borderRadius="14px"
@@ -519,7 +522,7 @@ export default function Dashboard() {
                         align="center"
                         gap="10px"
                         padding="24px"
-                        bg="white"
+                        bg={solvoColors.surface}
                         borderWidth="1px"
                         borderColor={solvoColors.border}
                         borderRadius="16px"
@@ -593,7 +596,7 @@ export default function Dashboard() {
                       align="center"
                       gap="14px"
                       padding="16px 20px"
-                      bg="white"
+                      bg={solvoColors.surface}
                       borderWidth="1px"
                       borderColor={solvoColors.border}
                       borderRadius="14px"

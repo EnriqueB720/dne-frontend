@@ -4,13 +4,13 @@ import { Flex, Image, Text } from '@atoms';
 import { FooterProps } from '@types';
 
 const logoVariantMap = {
-  dark: '/assets/logos/logo.png',
-  light: '/assets/logos/logo-light.png',
+  dark: '/assets/brand/logo-full.png',
+  light: '/assets/brand/icon.png',
 };
 
 const Footer: React.FC<FooterProps> = ({
   logoVariant = 'dark',
-  logoAlt = 'D&E Logo',
+  logoAlt = 'Solvo',
   logoHeight = '100px',
   copyrightText = `© ${new Date().getFullYear()}`,
   links = [],

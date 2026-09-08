@@ -10,8 +10,9 @@ import {
   SolvoNavBar,
   PackageCard,
   type PackageData,
+  AtmosphericGlow,
 } from '@components';
-import { solvoColors, solvoFonts, solvoShadows, SOLVO_PACKAGES } from '@constants';
+import { solvoColors, solvoFonts, solvoGradients, solvoShadows, SOLVO_PACKAGES } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
   useSuppliersQuery,
@@ -214,7 +215,8 @@ export default function Packages() {
   };
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/packages" />
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: '24px 16px', md: '56px 24px' }}>
@@ -229,7 +231,7 @@ export default function Packages() {
             ✨ CURATED BY SOLVO AI
           </Text>
           <Text
-            fontFamily={solvoFonts.serif}
+            fontFamily={solvoFonts.display}
             fontSize={{ base: '36px', md: '56px' }}
             lineHeight="1.05"
             fontWeight="500"
@@ -238,7 +240,17 @@ export default function Packages() {
             letterSpacing="-0.02em"
           >
             Complete solutions,{' '}
-            <Text as="span" fontStyle="italic" color={solvoColors.indigo}>
+            <Text
+              as="span"
+              fontWeight="800"
+              style={{
+                background: solvoGradients.brand,
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                color: 'transparent',
+              }}
+            >
               not just providers.
             </Text>
           </Text>
@@ -291,13 +303,13 @@ export default function Packages() {
           <Flex
             as="button"
             padding="10px 20px"
-            bg={solvoColors.text}
-            color="white"
+            bg={solvoColors.accent}
+            color={solvoColors.accentFg}
             borderRadius="12px"
             fontSize="sm"
             fontWeight="500"
             cursor="pointer"
-            _hover={{ bg: solvoColors.indigo }}
+            _hover={{ bg: solvoColors.accentHover }}
           >
             Customize
           </Flex>
@@ -316,7 +328,7 @@ export default function Packages() {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(28, 25, 23, 0.5)',
+              background: solvoColors.overlay,
               backdropFilter: 'blur(4px)',
               zIndex: 100,
               display: 'flex',
@@ -357,7 +369,7 @@ export default function Packages() {
                   >
                     <CheckCircle2 size={22} />
                   </Flex>
-                  <Text fontFamily={solvoFonts.serif} fontSize="26px" color={solvoColors.text} marginBottom="8px">
+                  <Text fontFamily={solvoFonts.display} fontSize="26px" color={solvoColors.text} marginBottom="8px">
                     Request sent to {result.supplierName}
                   </Text>
                   <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="20px">
@@ -405,7 +417,7 @@ export default function Packages() {
                     <Flex align="center" gap="10px">
                       <Box fontSize="22px">{activePkg.emoji}</Box>
                       <Box>
-                        <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+                        <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                           {activePkg.tier} package
                         </Text>
                         <Text fontSize="xs" color={solvoColors.textSubtle}>
@@ -584,7 +596,7 @@ export default function Packages() {
                         <Text fontSize="13px" fontWeight={600} color={solvoColors.text}>
                           Total
                         </Text>
-                        <Text fontFamily={solvoFonts.serif} fontSize="18px" color={solvoColors.text}>
+                        <Text fontFamily={solvoFonts.display} fontSize="18px" color={solvoColors.text}>
                           {activePkg.price}
                         </Text>
                       </Flex>
@@ -611,8 +623,8 @@ export default function Packages() {
                         padding: '12px 16px',
                         borderRadius: '12px',
                         border: 'none',
-                        background: solvoColors.text,
-                        color: solvoColors.surface,
+                        background: solvoColors.accent,
+                        color: solvoColors.accentFg,
                         fontWeight: 600,
                         fontSize: '15px',
                         fontFamily: solvoFonts.sans,

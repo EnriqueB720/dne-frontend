@@ -118,7 +118,7 @@ const MultiQuoteModal: React.FC<MultiQuoteModalProps> = ({
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(28, 25, 23, 0.5)',
+          background: solvoColors.overlay,
           backdropFilter: 'blur(4px)',
           zIndex: 200,
           display: 'flex',
@@ -166,7 +166,7 @@ const MultiQuoteModal: React.FC<MultiQuoteModalProps> = ({
                 <Sparkles size={16} />
               </Box>
               <Box>
-                <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+                <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                   Request quotes
                 </Text>
                 <Text fontSize="xs" color={solvoColors.textSubtle}>
@@ -377,8 +377,8 @@ const MultiQuoteModal: React.FC<MultiQuoteModalProps> = ({
                 padding: '11px 18px',
                 borderRadius: '12px',
                 border: 'none',
-                background: solvoColors.text,
-                color: solvoColors.surface,
+                background: solvoColors.accent,
+                color: solvoColors.accentFg,
                 fontWeight: 600,
                 fontSize: '14px',
                 fontFamily: solvoFonts.sans,

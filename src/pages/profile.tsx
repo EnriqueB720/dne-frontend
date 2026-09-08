@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Box, Flex, Text, SolvoNavBar } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -113,11 +113,12 @@ export default function ProfilePage() {
   // ── Gates ───────────────────────────────────────────────────────────
   if (!isAuthenticated || !user) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/profile" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="22px" color={solvoColors.text} marginBottom="6px">
+            <Text fontFamily={solvoFonts.display} fontSize="22px" color={solvoColors.text} marginBottom="6px">
               Sign in to edit your profile
             </Text>
             <Link href="/login" style={{ color: solvoColors.indigo }}>
@@ -137,11 +138,12 @@ export default function ProfilePage() {
 
   if (!customerId) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/profile" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="460px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+            <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
               No customer profile on your account.
             </Text>
           </Box>
@@ -151,7 +153,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/profile" />
 
       <Box maxWidth="780px" margin="0 auto" padding={{ base: '32px 16px', md: '48px 24px' }}>
@@ -159,7 +162,7 @@ export default function ProfilePage() {
           ACCOUNT
         </Text>
         <Text
-          fontFamily={solvoFonts.serif}
+          fontFamily={solvoFonts.display}
           fontSize={{ base: '28px', md: '36px' }}
           color={solvoColors.text}
           marginBottom="6px"
@@ -188,7 +191,7 @@ export default function ProfilePage() {
           <Flex direction="column" gap="20px">
             {/* Identity */}
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="18px" marginBottom="16px">
+              <Text fontFamily={solvoFonts.display} fontSize="18px" marginBottom="16px">
                 Identity
               </Text>
 
@@ -245,7 +248,7 @@ export default function ProfilePage() {
 
             {/* Default location */}
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="18px" marginBottom="4px">
+              <Text fontFamily={solvoFonts.display} fontSize="18px" marginBottom="4px">
                 Default location
               </Text>
               <Text fontSize="xs" color={solvoColors.textSubtle} marginBottom="16px">
@@ -299,8 +302,8 @@ export default function ProfilePage() {
                   padding: '10px 20px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: solvoColors.text,
-                  color: 'white',
+                  background: solvoColors.accent,
+                  color: solvoColors.accentFg,
                   fontWeight: 600,
                   fontSize: '14px',
                   cursor: busy ? 'wait' : 'pointer',

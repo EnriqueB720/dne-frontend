@@ -2,8 +2,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Sparkles } from 'lucide-react';
-import { Box, Flex, Text } from '@components';
+import { Eye, EyeOff } from 'lucide-react';
+import { AtmosphericGlow, Box, Flex, Logo, Text } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import { useResetPasswordMutation } from '@generated';
 
@@ -102,7 +102,8 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow intensity="full" />
       <Flex minHeight="100vh" align="center" justify="center" padding="24px">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -120,20 +121,9 @@ export default function ResetPasswordPage() {
             style={{ boxShadow: solvoShadows.floatingPanel }}
           >
             <Flex align="center" gap="10px" marginBottom="24px">
-              <Box
-                width="36px"
-                height="36px"
-                borderRadius="10px"
-                bg={solvoColors.indigoLight}
-                color={solvoColors.indigo}
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Sparkles size={18} />
-              </Box>
+              <Logo size="md" showText={false} />
               <Text
-                fontFamily={solvoFonts.serif}
+                fontFamily={solvoFonts.display}
                 fontSize="22px"
                 color={solvoColors.text}
               >
@@ -228,8 +218,8 @@ export default function ResetPasswordPage() {
                     width: '100%',
                     padding: '12px 14px',
                     borderRadius: '10px',
-                    background: solvoColors.text,
-                    color: solvoColors.surface,
+                    background: solvoColors.accent,
+                    color: solvoColors.accentFg,
                     fontWeight: 600,
                     fontSize: '15px',
                     border: 'none',

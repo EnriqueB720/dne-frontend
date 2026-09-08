@@ -157,8 +157,8 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
           position="absolute"
           top="-12px"
           left="24px"
-          bg={solvoColors.text}
-          color="white"
+          bg={solvoColors.accent}
+          color={solvoColors.accentFg}
           padding="4px 12px"
           borderRadius="full"
           fontSize="11px"
@@ -173,8 +173,8 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
           position="absolute"
           top="-12px"
           left="24px"
-          bg={solvoColors.indigo}
-          color="white"
+          bg={solvoColors.brand}
+          color={solvoColors.brandFg}
           padding="4px 12px"
           borderRadius="full"
           fontSize="11px"
@@ -186,7 +186,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
       )}
 
       <Box
-        bg="white"
+        bg={solvoColors.surface}
         borderWidth="1px"
         borderColor={
           isInPackage
@@ -228,7 +228,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
               {provider.avatar}
             </Flex>
             <Text
-              fontFamily={solvoFonts.serif}
+              fontFamily={solvoFonts.display}
               fontSize="xl"
               fontWeight="500"
               color={solvoColors.text}
@@ -312,7 +312,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                   gap="4px"
                   padding="2px 8px"
                   borderRadius="full"
-                  bg="#D1FAE5"
+                  bg={solvoColors.emeraldLight}
                   color={solvoColors.emeraldText}
                   fontSize="11px"
                   fontWeight="600"
@@ -439,7 +439,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
                       border: `1px solid ${isInPackage ? solvoColors.emeraldText : solvoColors.border}`,
-                      background: isInPackage ? '#D1FAE5' : 'white',
+                      background: isInPackage ? solvoColors.emeraldLight : solvoColors.surface,
                       color: isInPackage ? solvoColors.emeraldText : solvoColors.textMuted,
                       transition: 'all 0.15s',
                     }}
@@ -467,7 +467,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                     gap="6px"
                     padding="8px 14px"
                     borderRadius="10px"
-                    bg="white"
+                    bg={solvoColors.surface}
                     borderWidth="1px"
                     borderColor={solvoColors.text}
                     color={solvoColors.text}
@@ -488,14 +488,14 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                   gap="6px"
                   padding="8px 14px"
                   borderRadius="10px"
-                  bg={solvoColors.text}
-                  color="white"
+                  bg={solvoColors.accent}
+                  color={solvoColors.accentFg}
                   fontSize="sm"
                   fontWeight="500"
                   cursor="pointer"
                   onClick={() => onSelect?.(provider)}
                   style={{ whiteSpace: 'nowrap' }}
-                  _hover={{ bg: solvoColors.indigo }}
+                  _hover={{ bg: solvoColors.accentHover }}
                 >
                   Select
                   <ArrowRight size={14} />

@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  AtmosphericGlow,
   Box,
   FileUpload,
   Flex,
@@ -101,8 +102,8 @@ const ghostButtonStyle: React.CSSProperties = {
 const darkButtonStyle: React.CSSProperties = {
   ...ghostButtonStyle,
   border: 'none',
-  background: solvoColors.text,
-  color: 'white',
+  background: solvoColors.accent,
+  color: solvoColors.accentFg,
 };
 
 const PRICING_MODEL_LABELS: Array<{ value: PricingModel; label: string }> = [
@@ -571,11 +572,12 @@ export default function ProviderSettingsPage() {
   // ── Gates ───────────────────────────────────────────────────────────
   if (!isAuthenticated || !user) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/provider" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="22px" color={solvoColors.text} marginBottom="6px">
+            <Text fontFamily={solvoFonts.display} fontSize="22px" color={solvoColors.text} marginBottom="6px">
               Sign in to edit your business profile
             </Text>
             <Link href="/login" style={{ color: solvoColors.indigo }}>
@@ -595,11 +597,12 @@ export default function ProviderSettingsPage() {
 
   if (!supplierId) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/provider" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="460px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+            <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
               No supplier profile on your account.
             </Text>
           </Box>
@@ -611,7 +614,8 @@ export default function ProviderSettingsPage() {
   const savingService = createServiceState.loading || updateServiceState.loading;
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/provider" />
 
       <Box maxWidth="900px" margin="0 auto" padding={{ base: '32px 16px', md: '48px 24px' }}>
@@ -619,7 +623,7 @@ export default function ProviderSettingsPage() {
           PROVIDER WORKSPACE · SETTINGS
         </Text>
         <Text
-          fontFamily={solvoFonts.serif}
+          fontFamily={solvoFonts.display}
           fontSize={{ base: '28px', md: '36px' }}
           color={solvoColors.text}
           marginBottom="6px"
@@ -640,7 +644,7 @@ export default function ProviderSettingsPage() {
           <Flex direction="column" gap="20px">
             {/* Account */}
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="18px" marginBottom="16px">
+              <Text fontFamily={solvoFonts.display} fontSize="18px" marginBottom="16px">
                 Account contact
               </Text>
               <Box>
@@ -657,7 +661,7 @@ export default function ProviderSettingsPage() {
 
             {/* Business identity */}
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="18px" marginBottom="16px">
+              <Text fontFamily={solvoFonts.display} fontSize="18px" marginBottom="16px">
                 Business identity
               </Text>
 
@@ -697,7 +701,7 @@ export default function ProviderSettingsPage() {
             {/* Gallery */}
             <Box style={sectionStyle}>
               <Flex align="center" gap="8px" marginBottom="6px">
-                <Text fontFamily={solvoFonts.serif} fontSize="18px">
+                <Text fontFamily={solvoFonts.display} fontSize="18px">
                   Photos
                 </Text>
                 {uploading && (
@@ -813,7 +817,7 @@ export default function ProviderSettingsPage() {
             {/* Services */}
             <Box style={sectionStyle}>
               <Flex justify="space-between" align="center" marginBottom="6px" wrap="wrap" gap="10px">
-                <Text fontFamily={solvoFonts.serif} fontSize="18px">
+                <Text fontFamily={solvoFonts.display} fontSize="18px">
                   Services
                 </Text>
                 {!serviceDraft && (
@@ -1108,7 +1112,7 @@ export default function ProviderSettingsPage() {
 
             {/* Location + capacity */}
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="18px" marginBottom="16px">
+              <Text fontFamily={solvoFonts.display} fontSize="18px" marginBottom="16px">
                 Location & capacity
               </Text>
 
@@ -1152,7 +1156,7 @@ export default function ProviderSettingsPage() {
 
             {/* Categories + reputation signals */}
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="18px" marginBottom="6px">
+              <Text fontFamily={solvoFonts.display} fontSize="18px" marginBottom="6px">
                 Categories
               </Text>
               <Text fontSize="xs" color={solvoColors.textSubtle} marginBottom="16px">
@@ -1273,7 +1277,7 @@ export default function ProviderSettingsPage() {
 
             {/* Contacts */}
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="18px" marginBottom="6px">
+              <Text fontFamily={solvoFonts.display} fontSize="18px" marginBottom="6px">
                 Contact channels
               </Text>
               <Text fontSize="xs" color={solvoColors.textSubtle} marginBottom="16px">
@@ -1367,8 +1371,8 @@ export default function ProviderSettingsPage() {
                   padding: '10px 20px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: solvoColors.text,
-                  color: 'white',
+                  background: solvoColors.accent,
+                  color: solvoColors.accentFg,
                   fontWeight: 600,
                   fontSize: '14px',
                   cursor: busy ? 'wait' : 'pointer',

@@ -2,6 +2,7 @@ import * as React from 'react';
 import _ from 'lodash';
 import { Button, Flex, Stack, Text } from '@atoms';
 import { PricingCardProps } from '@types';
+import { solvoColors } from '@constants';
 
 const PricingCard: React.FC<PricingCardProps> = ({
   planName,
@@ -22,7 +23,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
   return (
     <Flex
       direction="column"
-      bg="white"
+      bg={solvoColors.surface}
       borderWidth="1px"
       borderColor={isHighlighted ? 'blue.500' : 'gray.200'}
       borderRadius="lg"

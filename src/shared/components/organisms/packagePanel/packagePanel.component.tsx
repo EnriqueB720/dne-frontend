@@ -75,7 +75,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
         right={0}
         bottom={0}
         left={0}
-        bg="rgba(28, 25, 23, 0.45)"
+        bg={solvoColors.overlay}
         zIndex={1050}
         onClick={onClose}
         style={{
@@ -92,7 +92,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
       flexDirection="column"
       borderLeft="1px solid"
       borderColor={solvoColors.border}
-      bg="white"
+      bg={solvoColors.surface}
       overflow="hidden"
       position={{ base: 'fixed', lg: 'relative' }}
       top={{ base: 0, lg: 'auto' }}
@@ -116,7 +116,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
             width="28px"
             height="28px"
             borderRadius="8px"
-            bg="#D1FAE5"
+            bg={solvoColors.emeraldLight}
             display="flex"
             alignItems="center"
             justifyContent="center"
@@ -135,7 +135,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
               height="20px"
               borderRadius="full"
               bg={solvoColors.emeraldText}
-              color="white"
+              color={solvoColors.surface}
               fontSize="11px"
               fontWeight="700"
             >
@@ -245,7 +245,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
                         width="36px"
                         height="36px"
                         borderRadius="10px"
-                        bg="white"
+                        bg={solvoColors.surface}
                         align="center"
                         justify="center"
                         fontSize="18px"
@@ -281,7 +281,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
                           {item.name}
                         </Text>
                         <Text
-                          fontFamily={solvoFonts.serif}
+                          fontFamily={solvoFonts.display}
                           fontSize="sm"
                           fontWeight="500"
                           color={solvoColors.text}
@@ -321,7 +321,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
                           key={inc}
                           padding="2px 6px"
                           borderRadius="full"
-                          bg="white"
+                          bg={solvoColors.surface}
                           borderWidth="1px"
                           borderColor={solvoColors.border}
                           fontSize="10px"
@@ -381,7 +381,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
                     padding="8px 10px"
                     borderRadius="8px"
                     bg={solvoColors.text}
-                    color="white"
+                    color={solvoColors.surface}
                     zIndex={1200}
                     style={{
                       transform: 'translateX(-50%)',
@@ -389,7 +389,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
                       pointerEvents: 'none',
                     }}
                   >
-                    <Text fontSize="11px" lineHeight="1.5" color="white">
+                    <Text fontSize="11px" lineHeight="1.5" color={solvoColors.surface}>
                       Prices shown are estimates from each provider&apos;s listing and
                       may vary. The final price is confirmed in the quote each
                       supplier sends you.
@@ -399,7 +399,7 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
               </Box>
             </Flex>
             <Text
-              fontFamily={solvoFonts.serif}
+              fontFamily={solvoFonts.display}
               fontSize="lg"
               fontWeight="500"
               color={solvoColors.text}
@@ -445,8 +445,8 @@ const PackagePanel: React.FC<PackagePanelProps> = ({
               padding: '10px 16px',
               borderRadius: '12px',
               border: 'none',
-              background: solvoColors.text,
-              color: 'white',
+              background: solvoColors.accent,
+              color: solvoColors.accentFg,
               fontSize: '13px',
               fontWeight: 600,
               cursor: canRequest ? 'pointer' : 'not-allowed',
