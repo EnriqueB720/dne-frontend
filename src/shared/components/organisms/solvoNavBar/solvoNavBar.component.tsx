@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
-import { Logo, NotificationBell } from '@molecules';
+import { ColorModeToggle, Logo, NotificationBell } from '@molecules';
 import { solvoColors, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 
@@ -193,7 +193,7 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
       style={{
         backdropFilter: 'saturate(180%) blur(12px)',
         WebkitBackdropFilter: 'saturate(180%) blur(12px)',
-        background: 'rgba(250, 250, 249, 0.85)',
+        background: solvoColors.surfaceTranslucent,
       }}
       borderBottom="1px solid"
       borderColor={solvoColors.border}
@@ -387,6 +387,9 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
               )}
             </AnimatePresence>
           </Box>
+
+          {/* Light / dark switch — available signed in or out */}
+          <ColorModeToggle />
 
           {/* Notification bell — only when signed in */}
           {isAuthenticated && user && <NotificationBell userId={user.userId} />}
@@ -585,8 +588,8 @@ const SolvoNavBar: React.FC<SolvoNavBarProps> = ({
                 <Box
                   padding="8px 14px"
                   borderRadius="10px"
-                  bg={solvoColors.text}
-                  color={solvoColors.surface}
+                  bg={solvoColors.accent}
+                  color={solvoColors.accentFg}
                   fontSize="sm"
                   fontWeight={600}
                   cursor="pointer"

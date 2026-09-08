@@ -23,13 +23,13 @@ const defaultRightLinks: NavBarLink[] = [
 ];
 
 const logoVariantMap = {
-  dark: '/assets/logos/logo.png',
-  light: '/assets/logos/logo-light.png',
+  dark: '/assets/brand/logo-full.png',
+  light: '/assets/brand/icon.png',
 };
 
 const NavBar: React.FC<NavBarProps> = ({
   logoVariant = 'dark',
-  logoAlt = 'D&E Logo',
+  logoAlt = 'Solvo',
   logoHeight = '40px',
   isLoggedIn = false,
   onLogout,

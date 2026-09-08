@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, MessageSquare, Package } from 'lucide-react';
-import { Box, Flex, Text, Pill, SolvoNavBar, QuoteCreateModal } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, Pill, SolvoNavBar, QuoteCreateModal } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -40,7 +40,7 @@ const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   AWAITING_QUOTES:  { bg: solvoColors.indigoLight, fg: solvoColors.indigo },
   QUOTES_RECEIVED:  { bg: solvoColors.emeraldLight, fg: solvoColors.emeraldText },
   BOOKED:           { bg: solvoColors.successLight, fg: solvoColors.successText },
-  CLOSED:           { bg: '#F5F5F4', fg: solvoColors.textSubtle },
+  CLOSED:           { bg: solvoColors.surfaceMuted, fg: solvoColors.textSubtle },
 };
 
 const inputBaseStyle: React.CSSProperties = {
@@ -107,11 +107,11 @@ function packageGroupKey(r: any): string {
 }
 
 // Rotating tints for adjacent package batches so they read as distinct groups.
-// Limited to two non-status blues — emerald/amber/rose all map to status pills
+// Limited to the two brand hues — emerald/amber/rose all map to status pills
 // on this page, so using them as a package highlight would be misleading.
 const PKG_PALETTE: { bg: string; border: string; accent: string }[] = [
   { bg: solvoColors.indigoLight, border: solvoColors.indigoBorder, accent: solvoColors.indigo },
-  { bg: '#F0F9FF', border: '#BAE6FD', accent: '#0369A1' }, // sky
+  { bg: solvoColors.accentSoft, border: solvoColors.accentBorder, accent: solvoColors.accentText },
 ];
 
 /** Bucket requests into ordered groups by package signature (first-seen order). */
@@ -425,7 +425,7 @@ export default function RequestsTestPage() {
         padding="12px 14px"
         borderRadius="10px"
         border={`1px solid ${isSelected ? solvoColors.text : unread > 0 ? solvoColors.indigoBorder : solvoColors.border}`}
-        bg={isSelected ? '#FAFAF9' : solvoColors.surface}
+        bg={isSelected ? solvoColors.bg : solvoColors.surface}
         cursor="pointer"
       >
         {unread > 0 && (
@@ -520,8 +520,8 @@ export default function RequestsTestPage() {
                   ...buttonBaseStyle,
                   padding: '6px 12px',
                   fontSize: '12px',
-                  background: solvoColors.text,
-                  color: solvoColors.surface,
+                  background: solvoColors.accent,
+                  color: solvoColors.accentFg,
                 }}
               >
                 Send quote
@@ -536,11 +536,12 @@ export default function RequestsTestPage() {
   // ── Gating: not signed in / not a customer ────────────────────────────
   if (!isAuthenticated || !user) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/requests" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               Sign in to view your requests
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="20px">
@@ -551,8 +552,8 @@ export default function RequestsTestPage() {
                 display="inline-block"
                 padding="10px 18px"
                 borderRadius="10px"
-                bg={solvoColors.text}
-                color={solvoColors.surface}
+                bg={solvoColors.accent}
+                color={solvoColors.accentFg}
                 fontWeight={600}
                 fontSize="14px"
                 cursor="pointer"
@@ -568,11 +569,12 @@ export default function RequestsTestPage() {
 
   if (!role) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/requests" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               No requests to show
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
@@ -585,14 +587,15 @@ export default function RequestsTestPage() {
   }
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/requests" />
 
       <Box maxWidth="1200px" margin="0 auto" padding={{ base: "24px 16px", md: "32px 24px" }}>
         <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.1em" textTransform="uppercase" marginBottom="8px">
           Hi, {user.name}
         </Text>
-        <Text as="h1" fontFamily={solvoFonts.serif} fontSize="36px" color={solvoColors.text} marginBottom="6px">
+        <Text as="h1" fontFamily={solvoFonts.display} fontSize="36px" color={solvoColors.text} marginBottom="6px">
           {role === 'supplier'
             ? supplierTab === 'open'
               ? 'Open leads'
@@ -685,7 +688,7 @@ export default function RequestsTestPage() {
             {/* List */}
             <Box style={sectionStyle}>
               <Flex justify="space-between" align="center" marginBottom="14px">
-                <Text fontFamily={solvoFonts.serif} fontSize="20px">
+                <Text fontFamily={solvoFonts.display} fontSize="20px">
                   Requests
                 </Text>
                 <Text fontSize="xs" color={solvoColors.textSubtle}>
@@ -782,7 +785,7 @@ export default function RequestsTestPage() {
           {/* RIGHT: detail */}
           <Box width={{ base: '100%', md: '380px' }} flexShrink={0}>
             <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.serif} fontSize="20px" marginBottom="12px">
+              <Text fontFamily={solvoFonts.display} fontSize="20px" marginBottom="12px">
                 Request detail
               </Text>
 
@@ -880,7 +883,7 @@ export default function RequestsTestPage() {
             {detail && (
               <Box style={sectionStyle} marginTop="20px">
                 <Flex justify="space-between" align="center" marginBottom="12px">
-                  <Text fontFamily={solvoFonts.serif} fontSize="20px">
+                  <Text fontFamily={solvoFonts.display} fontSize="20px">
                     {role === 'supplier' ? 'Your quote' : 'Quotes received'}
                   </Text>
                   <Text fontSize="xs" color={solvoColors.textSubtle}>

@@ -66,7 +66,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(28, 25, 23, 0.5)',
+          background: solvoColors.overlay,
           backdropFilter: 'blur(4px)',
           // Above the review modal (z 200) so edit→delete stacking works.
           zIndex: 210,
@@ -114,7 +114,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
               >
                 <AlertTriangle size={16} />
               </Box>
-              <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+              <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                 {title}
               </Text>
             </Flex>

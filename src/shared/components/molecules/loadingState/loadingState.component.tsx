@@ -46,7 +46,7 @@ const LoadingState: React.FC<LoadingStateProps> = ({
       </Box>
 
       <Text
-        fontFamily={solvoFonts.serif}
+        fontFamily={solvoFonts.display}
         fontSize="2xl"
         fontWeight="500"
         color={solvoColors.text}

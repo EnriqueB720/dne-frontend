@@ -2,6 +2,7 @@ import * as React from 'react';
 import _ from 'lodash';
 import { Flex, Image, Text } from '@atoms';
 import { PostItemProps } from '@types';
+import { solvoColors } from '@constants';
 
 const PostItem: React.FC<PostItemProps> = ({
   title,
@@ -23,7 +24,7 @@ const PostItem: React.FC<PostItemProps> = ({
       direction={isRow ? 'row' : 'column'}
       align={isRow ? 'center' : 'stretch'}
       gap={isRow ? '20px' : '12px'}
-      bg="white"
+      bg={solvoColors.surface}
       borderWidth="1px"
       borderColor="gray.200"
       borderRadius="md"

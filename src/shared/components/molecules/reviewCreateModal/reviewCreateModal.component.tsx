@@ -219,7 +219,7 @@ const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(28, 25, 23, 0.5)',
+          background: solvoColors.overlay,
           backdropFilter: 'blur(4px)',
           zIndex: 200,
           display: 'flex',
@@ -257,7 +257,7 @@ const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
               >
                 <CheckCircle2 size={44} />
               </motion.div>
-              <Text fontFamily={solvoFonts.serif} fontSize="22px" color={solvoColors.text}>
+              <Text fontFamily={solvoFonts.display} fontSize="22px" color={solvoColors.text}>
                 {isEdit ? 'Review updated' : 'Review saved'}
               </Text>
               <Text fontSize="sm" color={solvoColors.textMuted}>
@@ -287,7 +287,7 @@ const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
                     <Star size={16} />
                   </Box>
                   <Box>
-                    <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+                    <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                       {isEdit ? 'Edit your review' : 'Leave a review'}
                     </Text>
                     <Text fontSize="xs" color={solvoColors.textSubtle}>
@@ -335,7 +335,7 @@ const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
                   >
                     You&apos;re reviewing
                   </Text>
-                  <Text fontFamily={solvoFonts.serif} fontSize="17px" color={solvoColors.text}>
+                  <Text fontFamily={solvoFonts.display} fontSize="17px" color={solvoColors.text}>
                     {supplierName ?? `Supplier on booking #${bookingId}`}
                   </Text>
                   {bookingSummary && (
@@ -429,8 +429,8 @@ const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
                   disabled={submitting}
                   style={{
                     ...buttonBase,
-                    background: solvoColors.text,
-                    color: solvoColors.surface,
+                    background: solvoColors.accent,
+                    color: solvoColors.accentFg,
                     opacity: submitting ? 0.6 : 1,
                     display: 'inline-flex',
                     alignItems: 'center',

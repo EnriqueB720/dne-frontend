@@ -20,6 +20,8 @@ import QuoteCreateModal from './quoteCreateModal/quoteCreateModal.component';
 import ReviewCreateModal from './reviewCreateModal/reviewCreateModal.component';
 import ConfirmModal from './confirmModal/confirmModal.component';
 import StatusModal from './statusModal/statusModal.component';
+import ColorModeToggle from './colorModeToggle/colorModeToggle.component';
+import AtmosphericGlow from './atmosphericGlow/atmosphericGlow.component';
 
 export type { ProviderData } from './providerCard/providerCard.component';
 export type { PackageData } from './packageCard/packageCard.component';
@@ -46,5 +48,7 @@ export {
   QuoteCreateModal,
   ReviewCreateModal,
   ConfirmModal,
+  AtmosphericGlow,
+  ColorModeToggle,
   StatusModal,
 }

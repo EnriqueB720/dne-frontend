@@ -11,7 +11,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react';
-import { Box, Flex, Text, SolvoNavBar, Pill, QuoteCreateModal } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, Pill, QuoteCreateModal } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -172,11 +172,12 @@ export default function ProviderDashboard() {
   // ── Gates ───────────────────────────────────────────────────────────
   if (!isAuthenticated || !user) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/provider" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box
-            bg="white"
+            bg={solvoColors.surface}
             borderWidth="1px"
             borderColor={solvoColors.border}
             borderRadius="16px"
@@ -184,7 +185,7 @@ export default function ProviderDashboard() {
             maxWidth="420px"
             textAlign="center"
           >
-            <Text fontFamily={solvoFonts.serif} fontSize="24px" color={solvoColors.text} marginBottom="8px">
+            <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
               Sign in to open your workspace
             </Text>
             <Link href="/login" style={{ textDecoration: 'none' }}>
@@ -192,8 +193,8 @@ export default function ProviderDashboard() {
                 display="inline-block"
                 padding="10px 18px"
                 borderRadius="10px"
-                bg={solvoColors.text}
-                color="white"
+                bg={solvoColors.accent}
+                color={solvoColors.accentFg}
                 fontWeight={600}
                 fontSize="14px"
                 cursor="pointer"
@@ -209,11 +210,12 @@ export default function ProviderDashboard() {
 
   if (!supplierId) {
     return (
-      <Box minHeight="100vh" bg={solvoColors.bg}>
+      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+        <AtmosphericGlow />
         <SolvoNavBar activePath="/provider" />
         <Flex minHeight="60vh" align="center" justify="center" padding="24px">
           <Box
-            bg="white"
+            bg={solvoColors.surface}
             borderWidth="1px"
             borderColor={solvoColors.border}
             borderRadius="16px"
@@ -221,7 +223,7 @@ export default function ProviderDashboard() {
             maxWidth="460px"
             textAlign="center"
           >
-            <Text fontFamily={solvoFonts.serif} fontSize="22px" color={solvoColors.text} marginBottom="6px">
+            <Text fontFamily={solvoFonts.display} fontSize="22px" color={solvoColors.text} marginBottom="6px">
               This workspace is for suppliers
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted}>
@@ -241,7 +243,8 @@ export default function ProviderDashboard() {
   const businessName = user.name ?? 'Workspace';
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg}>
+    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
+      <AtmosphericGlow />
       <SolvoNavBar activePath="/provider" />
 
       <Box maxWidth="1300px" margin="0 auto" padding={{ base: '32px 16px', md: '48px 24px' }}>
@@ -264,7 +267,7 @@ export default function ProviderDashboard() {
               PROVIDER WORKSPACE
             </Text>
             <Text
-              fontFamily={solvoFonts.serif}
+              fontFamily={solvoFonts.display}
               fontSize={{ base: '32px', md: '44px' }}
               fontWeight="500"
               color={solvoColors.text}
@@ -300,7 +303,7 @@ export default function ProviderDashboard() {
               gap="6px"
               padding="8px 16px"
               borderRadius="9999px"
-              style={{ background: `linear-gradient(135deg, ${solvoColors.amberLight}, #FED7AA)` }}
+              style={{ background: `linear-gradient(135deg, ${solvoColors.amberLight}, ${solvoColors.accentBorder})` }}
               color={solvoColors.amberText}
               fontSize="xs"
               fontWeight="600"
@@ -323,7 +326,7 @@ export default function ProviderDashboard() {
                 <Box
                   key={i}
                   padding="20px"
-                  bg="white"
+                  bg={solvoColors.surface}
                   borderWidth="1px"
                   borderColor={solvoColors.border}
                   borderRadius="16px"
@@ -338,7 +341,7 @@ export default function ProviderDashboard() {
                 direction="column"
                 gap="10px"
                 padding="20px"
-                bg="white"
+                bg={solvoColors.surface}
                 borderWidth="1px"
                 borderColor={solvoColors.border}
                 borderRadius="16px"
@@ -356,7 +359,7 @@ export default function ProviderDashboard() {
                 </Flex>
                 <Box>
                   <Text
-                    fontFamily={solvoFonts.serif}
+                    fontFamily={solvoFonts.display}
                     fontSize="28px"
                     fontWeight="500"
                     color={solvoColors.text}
@@ -382,14 +385,14 @@ export default function ProviderDashboard() {
           <Box
             width={{ base: '100%', lg: '420px' }}
             flexShrink={0}
-            bg="white"
+            bg={solvoColors.surface}
             borderWidth="1px"
             borderColor={solvoColors.border}
             borderRadius="16px"
             padding="20px"
           >
             <Flex justify="space-between" align="center" marginBottom="14px">
-              <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+              <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                 Incoming leads
               </Text>
               <Text fontSize="xs" color={solvoColors.textSubtle}>
@@ -471,7 +474,7 @@ export default function ProviderDashboard() {
           <Box
             flex="1"
             width="100%"
-            bg="white"
+            bg={solvoColors.surface}
             borderWidth="1px"
             borderColor={solvoColors.border}
             borderRadius="16px"
@@ -491,7 +494,7 @@ export default function ProviderDashboard() {
                 <Flex justify="space-between" align="flex-start" marginBottom="16px">
                   <Box>
                     <Text
-                      fontFamily={solvoFonts.serif}
+                      fontFamily={solvoFonts.display}
                       fontSize="24px"
                       color={solvoColors.text}
                       lineHeight={1.2}
@@ -508,7 +511,7 @@ export default function ProviderDashboard() {
                         BUDGET
                       </Text>
                       <Text
-                        fontFamily={solvoFonts.serif}
+                        fontFamily={solvoFonts.display}
                         fontSize="20px"
                         color={solvoColors.text}
                       >
@@ -562,8 +565,8 @@ export default function ProviderDashboard() {
                     minWidth="180px"
                     padding="12px 18px"
                     borderRadius="12px"
-                    bg={solvoColors.text}
-                    color="white"
+                    bg={solvoColors.accent}
+                    color={solvoColors.accentFg}
                     fontWeight={600}
                     fontSize="14px"
                     cursor="pointer"
@@ -618,7 +621,7 @@ export default function ProviderDashboard() {
 
         {/* Weekly chart */}
         <Box
-          bg="white"
+          bg={solvoColors.surface}
           borderWidth="1px"
           borderColor={solvoColors.border}
           borderRadius="16px"
@@ -626,7 +629,7 @@ export default function ProviderDashboard() {
         >
           <Flex justify="space-between" align="baseline" marginBottom="20px">
             <Box>
-              <Text fontFamily={solvoFonts.serif} fontSize="18px" color={solvoColors.text}>
+              <Text fontFamily={solvoFonts.display} fontSize="18px" color={solvoColors.text}>
                 Lead flow this week
               </Text>
               <Text fontSize="xs" color={solvoColors.textSubtle}>

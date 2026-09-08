@@ -54,7 +54,7 @@ const StatusModal: React.FC<StatusModalProps> = ({
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(28, 25, 23, 0.5)',
+          background: solvoColors.overlay,
           backdropFilter: 'blur(4px)',
           zIndex: 220,
           display: 'flex',
@@ -100,7 +100,7 @@ const StatusModal: React.FC<StatusModalProps> = ({
               >
                 {isSuccess ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
               </Box>
-              <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+              <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                 {title}
               </Text>
             </Flex>
@@ -147,8 +147,8 @@ const StatusModal: React.FC<StatusModalProps> = ({
                 fontSize: '14px',
                 cursor: 'pointer',
                 fontFamily: solvoFonts.sans,
-                background: solvoColors.text,
-                color: solvoColors.surface,
+                background: solvoColors.accent,
+                color: solvoColors.accentFg,
               }}
             >
               {closeLabel}

@@ -2,9 +2,9 @@ import { useState, useContext, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import { gql, useMutation } from '@apollo/client';
-import { Sparkles, User as UserIcon, Briefcase } from 'lucide-react';
+import { User as UserIcon, Briefcase } from 'lucide-react';
 import { PhoneInput } from 'react-international-phone';
-import { Box, Flex, Text } from '@components';
+import { AtmosphericGlow, Box, Flex, Logo, Text } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 
@@ -101,20 +101,8 @@ export default function CompleteProfilePage() {
   };
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg} position="relative" overflow="hidden">
-      <Box
-        position="absolute"
-        top="-200px"
-        right="-200px"
-        width="500px"
-        height="500px"
-        borderRadius="full"
-        style={{
-          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15), transparent 70%)',
-          filter: 'blur(40px)',
-          pointerEvents: 'none',
-        }}
-      />
+    <Box minHeight="100vh" bg={solvoColors.bg} position="relative">
+      <AtmosphericGlow intensity="full" />
 
       <Flex minHeight="100vh" align="center" justify="center" padding="24px 16px">
         <motion.div
@@ -130,20 +118,11 @@ export default function CompleteProfilePage() {
             padding="36px 32px"
             style={{ boxShadow: solvoShadows.heroInput }}
           >
-            <Flex
-              width="44px"
-              height="44px"
-              borderRadius="12px"
-              bg={solvoColors.indigoLight}
-              color={solvoColors.indigo}
-              align="center"
-              justify="center"
-              marginBottom="18px"
-            >
-              <Sparkles size={20} />
-            </Flex>
+            <Box marginBottom="18px">
+              <Logo size="lg" showText={false} />
+            </Box>
 
-            <Text fontFamily={solvoFonts.serif} fontSize="32px" color={solvoColors.text} marginBottom="6px">
+            <Text fontFamily={solvoFonts.display} fontSize="32px" color={solvoColors.text} marginBottom="6px">
               Almost there{user?.name ? `, ${user.name.split(' ')[0]}` : ''}.
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
@@ -274,8 +253,8 @@ export default function CompleteProfilePage() {
                   padding: '12px 16px',
                   borderRadius: '12px',
                   border: 'none',
-                  background: solvoColors.text,
-                  color: solvoColors.surface,
+                  background: solvoColors.accent,
+                  color: solvoColors.accentFg,
                   fontWeight: 600,
                   fontSize: '15px',
                   cursor: 'pointer',

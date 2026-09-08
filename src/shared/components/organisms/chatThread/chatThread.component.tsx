@@ -156,8 +156,10 @@ const ChatThread: React.FC<ChatThreadProps> = ({
                       maxWidth="75%"
                       padding="12px 16px"
                       borderRadius="18px 18px 4px 18px"
-                      bg={solvoColors.text}
-                      color="white"
+                      bg={solvoColors.accentSoft}
+                      color={solvoColors.text}
+                      border="1px solid"
+                      borderColor={solvoColors.accentBorder}
                     >
                       <Text fontSize="sm" lineHeight="1.6">
                         {msg.content}
@@ -208,7 +210,7 @@ const ChatThread: React.FC<ChatThreadProps> = ({
                           ref={i === lastAiIdx ? latestAiMsgRef : undefined}
                           padding="12px 16px"
                           borderRadius="4px 18px 18px 18px"
-                          bg="white"
+                          bg={solvoColors.surface}
                           borderWidth="1px"
                           borderColor={solvoColors.border}
                           marginBottom={msg.providers && msg.providers.length > 0 ? '14px' : '0'}
@@ -278,7 +280,7 @@ const ChatThread: React.FC<ChatThreadProps> = ({
               <Box
                 padding="14px 18px"
                 borderRadius="4px 18px 18px 18px"
-                bg="white"
+                bg={solvoColors.surface}
                 borderWidth="1px"
                 borderColor={solvoColors.border}
               >

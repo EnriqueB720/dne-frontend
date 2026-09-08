@@ -28,7 +28,14 @@ import {
   type MultiQuoteFormData,
   type ProviderData,
 } from '@components';
-import { solvoColors, solvoFonts, solvoShadows } from '@constants';
+import {
+  solvoColors,
+  solvoFonts,
+  solvoGlows,
+  solvoGradients,
+  solvoShadows,
+  solvoTints,
+} from '@constants';
 import { useAtom } from 'jotai';
 import type { ModelKey } from '@/shared/jotai/ai-usage.atom';
 import type { UiMessage } from '@/shared/jotai/conversation.atom';
@@ -142,11 +149,11 @@ const TRUST_ITEMS = [
 ];
 
 const CATEGORIES = [
-  { icon: Calendar, label: 'Events', count: '2.4k providers', from: '#FFE4E6', to: '#FED7AA' },
-  { icon: HomeIcon, label: 'Home services', count: '1.8k providers', from: '#E0F2FE', to: '#C7D2FE' },
-  { icon: Briefcase, label: 'Business', count: '920 providers', from: '#D1FAE5', to: '#CCFBF1' },
-  { icon: Scissors, label: 'Beauty & wellness', count: '1.2k providers', from: '#FCE7F3', to: '#FAE8FF' },
-  { icon: Car, label: 'Auto', count: '640 providers', from: '#FEF3C7', to: '#FEF9C3' },
+  { icon: Calendar, label: 'Events', count: '2.4k providers', ...solvoTints.events },
+  { icon: HomeIcon, label: 'Home services', count: '1.8k providers', ...solvoTints.home },
+  { icon: Briefcase, label: 'Business', count: '920 providers', ...solvoTints.business },
+  { icon: Scissors, label: 'Beauty & wellness', count: '1.2k providers', ...solvoTints.beauty },
+  { icon: Car, label: 'Auto', count: '640 providers', ...solvoTints.auto },
 ];
 
 // ── DB Supplier → ProviderCard mapping ────────────────────────────────────
@@ -432,12 +439,12 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
         position="absolute"
         top="-200px"
         right="-200px"
-        width="600px"
-        height="600px"
+        width="980px"
+        height="980px"
         borderRadius="full"
         style={{
-          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15), transparent 70%)',
-          filter: 'blur(40px)',
+          background: `radial-gradient(circle, ${solvoGlows.brand}, transparent 70%)`,
+          filter: 'blur(70px)',
           pointerEvents: 'none',
           zIndex: 0,
         }}
@@ -446,12 +453,32 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
         position="absolute"
         bottom="-200px"
         left="-200px"
-        width="600px"
-        height="600px"
+        width="980px"
+        height="980px"
         borderRadius="full"
         style={{
-          background: 'radial-gradient(circle, rgba(251, 191, 36, 0.12), transparent 70%)',
-          filter: 'blur(40px)',
+          background: `radial-gradient(circle, ${solvoGlows.accent}, transparent 70%)`,
+          filter: 'blur(70px)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+      {/*
+        Third orb sits behind the hero input rather than at a corner, so the
+        centre of the page carries brand color too instead of fading to a flat
+        canvas between the two corner glows.
+      */}
+      <Box
+        position="absolute"
+        top="180px"
+        left="50%"
+        width="900px"
+        height="620px"
+        borderRadius="full"
+        style={{
+          transform: 'translateX(-50%)',
+          background: `radial-gradient(ellipse, ${solvoGlows.accent}, transparent 70%)`,
+          filter: 'blur(90px)',
           pointerEvents: 'none',
           zIndex: 0,
         }}
@@ -477,7 +504,7 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
               align="center"
               gap="8px"
               padding="6px 14px"
-              bg="white"
+              bg={solvoColors.surface}
               borderRadius="full"
               borderWidth="1px"
               borderColor={solvoColors.border}
@@ -498,7 +525,7 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
             </Flex>
 
             <Text
-              fontFamily={solvoFonts.serif}
+              fontFamily={solvoFonts.display}
               fontSize={{ base: '40px', md: '72px' }}
               lineHeight="1.05"
               fontWeight="500"
@@ -510,9 +537,17 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
               <br />
               <Text
                 as="span"
-                fontStyle="italic"
-                color={solvoColors.indigo}
-                fontFamily={solvoFonts.serif}
+                fontWeight="800"
+                fontFamily={solvoFonts.display}
+                style={{
+                  // The logo's own orange-to-purple sweep. Clipped to the
+                  // glyphs so the wordmark and the headline share one gesture.
+                  background: solvoGradients.brand,
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  color: 'transparent',
+                }}
               >
                 Solvo finds
               </Text>{' '}
@@ -538,7 +573,7 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
           <Box
             maxWidth="720px"
             margin="0 auto"
-            bg="white"
+            bg={solvoColors.surface}
             borderRadius="24px"
             padding="20px"
             boxShadow={solvoShadows.heroInput}
@@ -581,15 +616,15 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
                 as="button"
                 align="center"
                 gap="8px"
-                bg={solvoColors.text}
-                color="white"
+                bg={solvoColors.accent}
+                color={solvoColors.accentFg}
                 padding="10px 18px"
                 borderRadius="14px"
                 fontSize="sm"
                 fontWeight="500"
                 cursor="pointer"
                 onClick={handleSubmit}
-                _hover={{ bg: solvoColors.indigo }}
+                _hover={{ bg: solvoColors.accentHover }}
               >
                 Find options
                 <ArrowRight size={14} />
@@ -616,7 +651,7 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
               <Flex
                 as="button"
                 padding="8px 14px"
-                bg="white"
+                bg={solvoColors.surface}
                 borderWidth="1px"
                 borderColor={solvoColors.border}
                 borderRadius="full"
@@ -627,7 +662,7 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
                   const text = prompt.replace(/^[^\s]+\s/, '');
                   setQuery(text);
                 }}
-                _hover={{ borderColor: solvoColors.indigoBorder, bg: '#F5F3FF' }}
+                _hover={{ borderColor: solvoColors.indigoBorder, bg: solvoColors.brandSoft }}
               >
                 {prompt}
               </Flex>
@@ -672,7 +707,7 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
         {/* Categories */}
         <Box marginBottom="80px">
           <Text
-            fontFamily={solvoFonts.serif}
+            fontFamily={solvoFonts.display}
             fontSize="3xl"
             fontWeight="500"
             color={solvoColors.text}
@@ -699,7 +734,7 @@ function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
                     direction="column"
                     gap="14px"
                     padding="20px"
-                    bg="white"
+                    bg={solvoColors.surface}
                     borderWidth="1px"
                     borderColor={solvoColors.border}
                     borderRadius="20px"
@@ -818,7 +853,7 @@ function ChatEmptyState({ onSend, onGoHome }: ChatEmptyStateProps) {
           <Sparkles size={24} />
         </Flex>
         <Text
-          fontFamily={solvoFonts.serif}
+          fontFamily={solvoFonts.display}
           fontSize={{ base: '2xl', md: '3xl' }}
           fontWeight="500"
           color={solvoColors.text}
@@ -846,7 +881,7 @@ function ChatEmptyState({ onSend, onGoHome }: ChatEmptyStateProps) {
               padding: '9px 16px',
               borderRadius: '999px',
               border: `1px solid ${solvoColors.border}`,
-              background: 'white',
+              background: solvoColors.surface,
               fontSize: '13px',
               color: solvoColors.textMuted,
               cursor: 'pointer',
@@ -893,7 +928,7 @@ function ChatEmptyState({ onSend, onGoHome }: ChatEmptyStateProps) {
                   key={s.supplierId}
                   onClick={() => router.push(`/providers/${s.supplierId}`)}
                   padding="14px 16px"
-                  bg="white"
+                  bg={solvoColors.surface}
                   borderWidth="1px"
                   borderColor={solvoColors.border}
                   borderRadius="14px"
@@ -2111,7 +2146,7 @@ export default function Home() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(28, 25, 23, 0.5)',
+            background: solvoColors.overlay,
             backdropFilter: 'blur(4px)',
             zIndex: 200,
             display: 'flex',
@@ -2142,7 +2177,7 @@ export default function Home() {
               <Flex align="center" gap="10px">
                 <Box fontSize="22px">{selectModal.provider.avatar}</Box>
                 <Box>
-                  <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+                  <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                     {selectModal.provider.name}
                   </Text>
                   <Text fontSize="xs" color={selectModal.isRealSupplier ? solvoColors.emeraldText : solvoColors.amberText}>
@@ -2346,8 +2381,8 @@ export default function Home() {
                     padding: '11px 18px',
                     borderRadius: '12px',
                     border: 'none',
-                    background: solvoColors.text,
-                    color: solvoColors.surface,
+                    background: solvoColors.accent,
+                    color: solvoColors.accentFg,
                     fontWeight: 600,
                     fontSize: '14px',
                     fontFamily: solvoFonts.sans,
@@ -2374,8 +2409,8 @@ export default function Home() {
           right="24px"
           padding="10px 16px"
           borderRadius="10px"
-          bg={solvoColors.text}
-          color={solvoColors.surface}
+          bg={solvoColors.accent}
+          color={solvoColors.accentFg}
           fontSize="sm"
           zIndex={1000}
           style={{ boxShadow: solvoShadows.floatingPanel }}
@@ -2626,8 +2661,8 @@ export default function Home() {
           gap="6px"
           padding="10px 14px"
           borderRadius="9999px"
-          bg={solvoColors.text}
-          color={solvoColors.surface}
+          bg={solvoColors.accent}
+          color={solvoColors.accentFg}
           cursor="pointer"
           style={{
             border: 'none',

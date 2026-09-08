@@ -2,6 +2,7 @@ import * as React from 'react';
 import _ from 'lodash';
 import { Flex, Image, Stack, Text, Textarea } from '@atoms';
 import { ItemDetailProps } from '@types';
+import { solvoColors } from '@constants';
 
 const ItemDetail: React.FC<ItemDetailProps> = ({
   itemNumber,
@@ -16,8 +17,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({
   emailLabel = 'Email',
   phoneLabel = 'Phone',
   addressLabel = 'Address',
-  logoSrc = '/assets/logos/logo.png',
-  logoAlt = 'D&E Logo',
+  logoSrc = '/assets/brand/logo-full.png',
+  logoAlt = 'Solvo',
   logoHeight = '60px',
   containerProps,
   galleryProps,
@@ -37,7 +38,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({
   return (
     <Flex
       direction="column"
-      bg="white"
+      bg={solvoColors.surface}
       borderWidth="1px"
       borderColor="gray.200"
       borderRadius="lg"

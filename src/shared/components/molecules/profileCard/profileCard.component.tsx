@@ -2,6 +2,7 @@ import * as React from 'react';
 import _ from 'lodash';
 import { Avatar, Button, Flex, Input, Stack, Text } from '@atoms';
 import { ProfileCardField, ProfileCardProps } from '@types';
+import { solvoColors } from '@constants';
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
   name,
@@ -30,7 +31,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   return (
     <Flex
       direction="column"
-      bg="white"
+      bg={solvoColors.surface}
       borderWidth="1px"
       borderColor="gray.200"
       borderRadius="lg"

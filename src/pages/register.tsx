@@ -2,9 +2,9 @@ import { useState, useContext } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Sparkles, User as UserIcon, Briefcase } from 'lucide-react';
+import { User as UserIcon, Briefcase } from 'lucide-react';
 import { PhoneInput } from 'react-international-phone';
-import { Box, Flex, Text } from '@components';
+import { AtmosphericGlow, Box, Flex, Logo, Text } from '@components';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import { useSignupMutation } from '@generated';
@@ -90,21 +90,8 @@ export default function RegisterPage() {
   };
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg} position="relative" overflow="hidden">
-      {/* Atmospheric gradients */}
-      <Box
-        position="absolute"
-        top="-200px"
-        left="-200px"
-        width="500px"
-        height="500px"
-        borderRadius="full"
-        style={{
-          background: 'radial-gradient(circle, rgba(251, 191, 36, 0.12), transparent 70%)',
-          filter: 'blur(40px)',
-          pointerEvents: 'none',
-        }}
-      />
+    <Box minHeight="100vh" bg={solvoColors.bg} position="relative">
+      <AtmosphericGlow intensity="full" />
 
       <Flex minHeight="100vh" align="center" justify="center" padding="24px 16px">
         <motion.div
@@ -120,20 +107,11 @@ export default function RegisterPage() {
             padding="36px 32px"
             style={{ boxShadow: solvoShadows.heroInput }}
           >
-            <Flex
-              width="44px"
-              height="44px"
-              borderRadius="12px"
-              bg={solvoColors.indigoLight}
-              color={solvoColors.indigo}
-              align="center"
-              justify="center"
-              marginBottom="18px"
-            >
-              <Sparkles size={20} />
-            </Flex>
+            <Box marginBottom="18px">
+              <Logo size="lg" showText={false} />
+            </Box>
 
-            <Text fontFamily={solvoFonts.serif} fontSize="32px" color={solvoColors.text} marginBottom="6px">
+            <Text fontFamily={solvoFonts.display} fontSize="32px" color={solvoColors.text} marginBottom="6px">
               Create your account.
             </Text>
             <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
@@ -304,8 +282,8 @@ export default function RegisterPage() {
                   padding: '12px 16px',
                   borderRadius: '12px',
                   border: 'none',
-                  background: solvoColors.text,
-                  color: solvoColors.surface,
+                  background: solvoColors.accent,
+                  color: solvoColors.accentFg,
                   fontWeight: 600,
                   fontSize: '15px',
                   cursor: 'pointer',

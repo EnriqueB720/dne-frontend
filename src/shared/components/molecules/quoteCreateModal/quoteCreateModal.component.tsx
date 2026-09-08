@@ -160,7 +160,7 @@ const QuoteCreateModal: React.FC<QuoteCreateModalProps> = ({
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(28, 25, 23, 0.5)',
+          background: solvoColors.overlay,
           backdropFilter: 'blur(4px)',
           zIndex: 200,
           display: 'flex',
@@ -208,7 +208,7 @@ const QuoteCreateModal: React.FC<QuoteCreateModalProps> = ({
                 <Sparkles size={16} />
               </Box>
               <Box>
-                <Text fontFamily={solvoFonts.serif} fontSize="20px" color={solvoColors.text}>
+                <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                   Send a quote
                 </Text>
                 <Text fontSize="xs" color={solvoColors.textSubtle}>
@@ -526,8 +526,8 @@ const QuoteCreateModal: React.FC<QuoteCreateModalProps> = ({
               disabled={submitting}
               style={{
                 ...buttonBase,
-                background: solvoColors.text,
-                color: solvoColors.surface,
+                background: solvoColors.accent,
+                color: solvoColors.accentFg,
                 opacity: submitting ? 0.6 : 1,
               }}
             >

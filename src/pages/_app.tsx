@@ -93,22 +93,32 @@ const WS_URI = 'ws://localhost:5000/graphql';
   return <ChakraProvider value={defaultSystem}>
       <Head>
         <title>Solvo</title>
-        <link rel="icon" href="/favicon.png" type="image/png" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
+        <meta name="description" content="Ask for anything. Solvo finds who solves it." />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/assets/brand/favicon-32.png" type="image/png" sizes="32x32" />
+        <link rel="apple-touch-icon" href="/assets/brand/logo-192.png" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        {/*
+          Two theme-color entries so the mobile browser chrome tracks the
+          canvas in both modes instead of staying stuck on the light value.
+        */}
+        <meta name="theme-color" content="#F4F5F7" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#0B0B16" media="(prefers-color-scheme: dark)" />
         <style>{`
           body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background-color: #FAFAF9;
-            color: #1C1917;
+            background-color: var(--solvo-bg);
+            color: var(--solvo-text);
+            transition: background-color 0.2s ease, color 0.2s ease;
           }
+          /*
+            Legacy class name from the pre-rebrand Fraunces pairing. It now
+            resolves to the Plus Jakarta Sans display face so existing markup
+            picks up the new brand type without a sweep.
+          */
           .font-serif {
-            font-family: 'Fraunces', Georgia, serif;
-            font-optical-sizing: auto;
+            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            letter-spacing: -0.02em;
           }
         `}</style>
       </Head>
