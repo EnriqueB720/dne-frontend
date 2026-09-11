@@ -36,8 +36,17 @@ const createCache = () => new InMemoryCache({ typePolicies: cacheTypePolicies })
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
 
-const HTTP_URI = 'http://localhost:5000/graphql';
-const WS_URI = 'ws://localhost:5000/graphql';
+// NEXT_PUBLIC_API_URL is the backend's base origin (e.g.
+// "https://api.solvocr.com"), no path suffix — matching the convention
+// every other call site in this codebase already uses (provider/settings,
+// providers/[id], refineFooter, [...nextauth]). Falls back to the local
+// backend for dev.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+const HTTP_URI = `${API_BASE}/graphql`;
+// Subscriptions need the ws(s):// scheme — swap whatever http(s) scheme
+// API_BASE has rather than hardcoding one, so this also works correctly
+// against a plain http:// base in local dev.
+const WS_URI = `${API_BASE.replace(/^http/, 'ws')}/graphql`;
 
   // Memo'd so the client doesn't get re-created on every render. The WebSocket
   // link is only built on the browser — SSR/Node can't open a WS connection.
