@@ -2,7 +2,7 @@ import * as React from 'react';
 import {
   Star, ShieldCheck, Clock, MapPin, Check,
   ArrowRight, Globe, Mail, Phone, PackagePlus, PackageCheck,
-  ChevronDown, ChevronUp, Database, Sparkles,
+  Database, Sparkles,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Box, Flex, Text } from '@atoms';
@@ -107,11 +107,6 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
   };
 
   const link = resolveProviderLink(provider);
-
-  // Direct channels stay collapsed: requests and quotes are meant to run
-  // through Solvo, so reaching the provider off-platform is possible but
-  // never the first thing on the card.
-  const [showContacts, setShowContacts] = React.useState(false);
 
   const contactChannels = React.useMemo(() => {
     const channels: Array<{
@@ -378,8 +373,8 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
             {/* Action row */}
             <Flex gap="10px" wrap="wrap" align="center">
               {/* No website means this is a research link, not a way to
-                  reach the provider — it stays out in the open. Real
-                  contact channels go behind the toggle below. */}
+                  reach the provider directly — contact channels render
+                  below unconditionally. */}
               {!provider.website && (
                 <a
                   href={link.href}
@@ -394,29 +389,6 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                   <Globe size={13} />
                   {link.label}
                 </a>
-              )}
-
-              {contactChannels.length > 0 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowContacts((v) => !v);
-                  }}
-                  aria-expanded={showContacts}
-                  style={{
-                    ...linkStyle,
-                    background: 'transparent',
-                    border: 'none',
-                    padding: 0,
-                    color: solvoColors.textSubtle,
-                    fontFamily: 'inherit',
-                    fontSize: '13px',
-                  }}
-                >
-                  {showContacts ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                  {showContacts ? 'Hide contact details' : 'Contact details'}
-                </button>
               )}
 
               <Flex flex="1" />
@@ -497,13 +469,13 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                   style={{ whiteSpace: 'nowrap' }}
                   _hover={{ bg: solvoColors.accentHover }}
                 >
-                  Select
+                  Contact
                   <ArrowRight size={14} />
                 </Flex>
               </Flex>
             </Flex>
 
-            {showContacts && (
+            {contactChannels.length > 0 && (
               <Box
                 marginTop="12px"
                 padding="12px 14px"
@@ -513,10 +485,6 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                 borderColor={solvoColors.border}
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
               >
-                <Text fontSize="11px" color={solvoColors.textSubtle} marginBottom="8px">
-                  Selecting here keeps your quotes, dates and payment in one place —
-                  and {provider.name} replies faster on Solvo.
-                </Text>
                 <Flex gap="14px" wrap="wrap">
                   {contactChannels.map((c) => (
                     <a
