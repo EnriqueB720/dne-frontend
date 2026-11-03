@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, User } from 'lucide-react';
+import { Sparkles, User, Phone, Mail, MessageCircle, Globe } from 'lucide-react';
 import { Box, Flex, Text } from '@atoms';
 import { ProviderCard } from '@molecules';
 import type { ProviderData } from '@molecules';
@@ -70,6 +70,114 @@ function ParsedQueryCard({ parsed }: { parsed: NonNullable<UiMessage['parsedQuer
       <Text fontSize="sm" color={solvoColors.text} lineHeight="1.55">
         {parts}.
       </Text>
+    </Box>
+  );
+}
+
+/** WhatsApp has no separate number field yet — it rides on the primary phone. */
+function whatsAppHref(phone: string): string {
+  return `https://wa.me/${phone.replace(/[^\d]/g, '')}`;
+}
+
+/**
+ * Clickable contact card shown after "Contact" is clicked — tapping an
+ * option opens the matching app (dialer, mail client, WhatsApp, browser)
+ * directly, so the user can reach the supplier however they prefer.
+ */
+function ContactRevealCard({ provider }: { provider: ProviderData }) {
+  const channels: Array<{
+    key: string;
+    label: string;
+    value: string;
+    href: string;
+    icon: React.ReactNode;
+  }> = [];
+
+  if (provider.phone) {
+    channels.push({
+      key: 'phone',
+      label: 'Call',
+      value: provider.phone,
+      href: `tel:${provider.phone.replace(/[^\d+]/g, '')}`,
+      icon: <Phone size={14} />,
+    });
+    channels.push({
+      key: 'whatsapp',
+      label: 'WhatsApp',
+      value: provider.phone,
+      href: whatsAppHref(provider.phone),
+      icon: <MessageCircle size={14} />,
+    });
+  }
+  if (provider.email) {
+    channels.push({
+      key: 'email',
+      label: 'Email',
+      value: provider.email,
+      href: `mailto:${provider.email}`,
+      icon: <Mail size={14} />,
+    });
+  }
+  if (provider.website) {
+    const url = provider.website.trim();
+    channels.push({
+      key: 'website',
+      label: 'Website',
+      value: url.replace(/^https?:\/\//, ''),
+      href: /^https?:\/\//i.test(url) ? url : `https://${url}`,
+      icon: <Globe size={14} />,
+    });
+  }
+
+  if (channels.length === 0) return null;
+
+  return (
+    <Box
+      padding="12px 14px"
+      borderRadius="14px"
+      bg={solvoColors.surface}
+      borderWidth="1px"
+      borderColor={solvoColors.border}
+      marginBottom="14px"
+    >
+      <Text
+        fontSize="10px"
+        color={solvoColors.textSubtle}
+        fontWeight="600"
+        letterSpacing="0.08em"
+        marginBottom="8px"
+      >
+        {provider.name.toUpperCase()}
+      </Text>
+      <Flex direction="column" gap="6px">
+        {channels.map((c) => (
+          <a
+            key={c.key}
+            href={c.href}
+            target={c.key === 'website' ? '_blank' : undefined}
+            rel={c.key === 'website' ? 'noopener noreferrer' : undefined}
+            style={{ textDecoration: 'none' }}
+          >
+            <Flex
+              align="center"
+              gap="8px"
+              padding="8px 10px"
+              borderRadius="10px"
+              bg={solvoColors.bg}
+              color={solvoColors.text}
+              _hover={{ bg: solvoColors.accentSoft }}
+            >
+              <Box color={solvoColors.accent}>{c.icon}</Box>
+              <Text fontSize="xs" fontWeight="600" color={solvoColors.textSubtle}>
+                {c.label}
+              </Text>
+              <Text fontSize="sm" style={{ wordBreak: 'break-all' }}>
+                {c.value}
+              </Text>
+            </Flex>
+          </a>
+        ))}
+      </Flex>
     </Box>
   );
 }
@@ -213,7 +321,11 @@ const ChatThread: React.FC<ChatThreadProps> = ({
                           bg={solvoColors.surface}
                           borderWidth="1px"
                           borderColor={solvoColors.border}
-                          marginBottom={msg.providers && msg.providers.length > 0 ? '14px' : '0'}
+                          marginBottom={
+                            (msg.providers && msg.providers.length > 0) || msg.contactReveal
+                              ? '14px'
+                              : '0'
+                          }
                         >
                           <Text
                             fontSize="sm"
@@ -224,6 +336,9 @@ const ChatThread: React.FC<ChatThreadProps> = ({
                           </Text>
                         </Box>
                       )}
+
+                      {/* Clickable contact card — shown after "Contact" is clicked */}
+                      {msg.contactReveal && <ContactRevealCard provider={msg.contactReveal} />}
 
                       {/* Provider cards */}
                       {msg.providers && msg.providers.length > 0 && (

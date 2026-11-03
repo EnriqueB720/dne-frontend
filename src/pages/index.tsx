@@ -1062,13 +1062,18 @@ export default function Home() {
   // customer and supplier from here on.
   const handleSelectProvider = React.useCallback(
     (provider: ProviderData) => {
-      const confirmationMsg: UiMessage = {
-        role: 'assistant',
-        content: provider.isRealSupplier
-          ? `Great choice! Reach out to **${provider.name}** directly using the contact details on their card — phone, email, or WhatsApp. Let them know Solvo sent you.`
-          : `**${provider.name}** is an AI-generated suggestion, not a verified Solvo supplier, so there's no real contact info for them yet. Try one of the verified "In our network" results instead.`,
-        createdAt: new Date().toISOString(),
-      };
+      const confirmationMsg: UiMessage = provider.isRealSupplier
+        ? {
+            role: 'assistant',
+            content: `Here's how to reach **${provider.name}** directly — tap any option below. Let them know Solvo sent you.`,
+            contactReveal: provider,
+            createdAt: new Date().toISOString(),
+          }
+        : {
+            role: 'assistant',
+            content: `**${provider.name}** is an AI-generated suggestion, not a verified Solvo supplier, so there's no real contact info for them yet. Try one of the verified "In our network" results instead.`,
+            createdAt: new Date().toISOString(),
+          };
       setMessages((prev) => [...prev, confirmationMsg]);
     },
     [setMessages],
