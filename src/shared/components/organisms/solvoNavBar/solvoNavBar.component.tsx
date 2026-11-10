@@ -56,14 +56,14 @@ function buildNavItems(
     : supplierOnly
       ? { label: 'Workspace', href: '/provider' }
       : { label: 'Dashboard', href: '/dashboard' };
+  // /requests, /quotes and /calendar are legacy booking-flow routes: still
+  // reachable by URL, but no longer surfaced now that customers contact
+  // suppliers directly.
   return [
     { label: 'Chat', href: '/' },
     { label: 'Packages', href: '/packages' },
-    { label: 'Requests', href: '/requests' },
-    { label: 'Quotes', href: '/quotes' },
     { label: 'Bookings', href: '/bookings' },
     { label: 'Messages', href: '/messages' },
-    { label: 'Calendar', href: '/calendar' },
     dashboardSlot,
   ];
 }
