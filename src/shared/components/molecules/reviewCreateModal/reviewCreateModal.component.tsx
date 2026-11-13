@@ -16,7 +16,10 @@ export interface ExistingReview {
 }
 
 export interface ReviewCreateModalProps {
-  bookingId: number;
+  /** Storefront review — any signed-in customer, no booking needed. */
+  supplierId?: number;
+  /** Legacy booking review, opened from /bookings. */
+  bookingId?: number;
   customerId: number;
   /** Supplier being reviewed — shown prominently so there's no doubt who
    *  the review is for. */
@@ -114,12 +117,14 @@ const StarPicker: React.FC<{
 };
 
 /**
- * Pop-up a customer uses to rate and comment on a completed booking — opened
- * from the `/bookings` detail panel once the service is done. Also handles
- * editing an existing review (pass `existingReview`). Style mirrors the
- * supplier's quote modal so both sides of the flow feel symmetric.
+ * Pop-up a customer uses to rate and comment on a supplier — opened from the
+ * storefront (pass `supplierId`) or from a completed booking in `/bookings`
+ * (pass `bookingId`). Also handles editing an existing review (pass
+ * `existingReview`). Style mirrors the supplier's quote modal so both sides
+ * of the flow feel symmetric.
  */
 const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
+  supplierId,
   bookingId,
   customerId,
   supplierName,
@@ -192,7 +197,7 @@ const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
         setSavedReviewId(data?.updateReview.reviewId ?? existingReview.reviewId);
       } else {
         const { data } = await createReview({
-          variables: { data: { bookingId, customerId, ...fields } },
+          variables: { data: { supplierId, bookingId, customerId, ...fields } },
         });
         if (data?.createReview.reviewId) setSavedReviewId(data.createReview.reviewId);
       }
@@ -290,9 +295,11 @@ const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
                     <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
                       {isEdit ? 'Edit your review' : 'Leave a review'}
                     </Text>
-                    <Text fontSize="xs" color={solvoColors.textSubtle}>
-                      Booking #{bookingId}
-                    </Text>
+                    {bookingId != null && (
+                      <Text fontSize="xs" color={solvoColors.textSubtle}>
+                        Booking #{bookingId}
+                      </Text>
+                    )}
                   </Box>
                 </Flex>
                 <Box
@@ -336,7 +343,8 @@ const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
                     You&apos;re reviewing
                   </Text>
                   <Text fontFamily={solvoFonts.display} fontSize="17px" color={solvoColors.text}>
-                    {supplierName ?? `Supplier on booking #${bookingId}`}
+                    {supplierName ??
+                      (bookingId != null ? `Supplier on booking #${bookingId}` : 'This supplier')}
                   </Text>
                   {bookingSummary && (
                     <Text fontSize="13px" color={solvoColors.textMuted} marginTop="4px">

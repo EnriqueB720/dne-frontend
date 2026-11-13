@@ -1367,7 +1367,7 @@ export type RevenueByDayRow = {
 
 export type Review = {
   __typename?: 'Review';
-  bookingId: Scalars['Int']['output'];
+  bookingId?: Maybe<Scalars['Int']['output']>;
   createdAt: Scalars['DateTime']['output'];
   customer?: Maybe<Customer>;
   customerId: Scalars['Int']['output'];
@@ -1383,13 +1383,14 @@ export type Review = {
 };
 
 export type ReviewCreateInput = {
-  bookingId: Scalars['Int']['input'];
-  customerId: Scalars['Int']['input'];
+  bookingId?: InputMaybe<Scalars['Int']['input']>;
+  customerId?: InputMaybe<Scalars['Int']['input']>;
   rating: Scalars['Int']['input'];
   ratingCommunication?: InputMaybe<Scalars['Int']['input']>;
   ratingPunctuality?: InputMaybe<Scalars['Int']['input']>;
   ratingQuality?: InputMaybe<Scalars['Int']['input']>;
   ratingValue?: InputMaybe<Scalars['Int']['input']>;
+  supplierId?: InputMaybe<Scalars['Int']['input']>;
   text?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -2286,7 +2287,7 @@ export type CreateReviewMutationVariables = Exact<{
 }>;
 
 
-export type CreateReviewMutation = { __typename?: 'Mutation', createReview: { __typename?: 'Review', reviewId: number, bookingId: number, customerId: number, supplierId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, createdAt: any } };
+export type CreateReviewMutation = { __typename?: 'Mutation', createReview: { __typename?: 'Review', reviewId: number, bookingId?: number | null, customerId: number, supplierId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, createdAt: any } };
 
 export type DeleteReviewMutationVariables = Exact<{
   data: ReviewDeleteInput;
@@ -2300,7 +2301,7 @@ export type UpdateReviewMutationVariables = Exact<{
 }>;
 
 
-export type UpdateReviewMutation = { __typename?: 'Mutation', updateReview: { __typename?: 'Review', reviewId: number, bookingId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, createdAt: any } };
+export type UpdateReviewMutation = { __typename?: 'Mutation', updateReview: { __typename?: 'Review', reviewId: number, bookingId?: number | null, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, createdAt: any } };
 
 export type CreateServiceMutationVariables = Exact<{
   data: ServiceCreateInput;

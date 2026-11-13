@@ -13,7 +13,15 @@ import {
   Sparkles,
   Star,
 } from 'lucide-react';
-import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, Pill } from '@components';
+import {
+  AtmosphericGlow,
+  Box,
+  Flex,
+  Text,
+  SolvoNavBar,
+  Pill,
+  ReviewCreateModal,
+} from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
@@ -96,6 +104,7 @@ export default function ProviderProfile() {
 
   const [toggleFavorite, toggleState] = useToggleFavoriteMutation();
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const showFavorited = optimistic ?? isFavorited;
 
   /**
@@ -223,6 +232,14 @@ export default function ProviderProfile() {
   }
 
   const reviews = (supplier.reviewsReceived ?? []).slice(0, 6);
+  // Any signed-in customer can review once (no booking needed) — after that
+  // the same button edits their review. Not offered on your own storefront.
+  const myReview =
+    customerId != null
+      ? (supplier.reviewsReceived ?? []).find((r: any) => r.customer?.customerId === customerId)
+      : undefined;
+  const isOwnStorefront = user?.supplierId != null && user.supplierId === supplier.supplierId;
+  const canReview = isAuthenticated && customerId != null && !isOwnStorefront;
   const categories = (supplier.categories ?? [])
     .map((sc: any) => sc.category?.categoryName)
     .filter(Boolean) as string[];
@@ -426,15 +443,48 @@ export default function ProviderProfile() {
             )}
 
             {/* Reviews */}
-            <Text
-              fontFamily={solvoFonts.display}
-              fontSize="2xl"
-              fontWeight="500"
-              color={solvoColors.text}
-              marginBottom="16px"
-            >
-              Reviews
-            </Text>
+            <Flex align="center" justify="space-between" gap="12px" marginBottom="16px" wrap="wrap">
+              <Text
+                fontFamily={solvoFonts.display}
+                fontSize="2xl"
+                fontWeight="500"
+                color={solvoColors.text}
+              >
+                Reviews
+              </Text>
+              {canReview ? (
+                <button
+                  type="button"
+                  onClick={() => setReviewModalOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    border: myReview ? `1px solid ${solvoColors.border}` : 'none',
+                    background: myReview ? solvoColors.surface : solvoColors.accent,
+                    color: myReview ? solvoColors.text : solvoColors.accentFg,
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    fontFamily: solvoFonts.sans,
+                  }}
+                >
+                  <Star size={14} />
+                  {myReview ? 'Edit your review' : 'Write a review'}
+                </button>
+              ) : (
+                !isAuthenticated && (
+                  <Link
+                    href="/login"
+                    style={{ fontSize: '13px', fontWeight: 600, color: solvoColors.brandText }}
+                  >
+                    Sign in to leave a review
+                  </Link>
+                )
+              )}
+            </Flex>
             {reviews.length === 0 ? (
               <Box
                 padding="24px"
@@ -445,7 +495,7 @@ export default function ProviderProfile() {
                 textAlign="center"
               >
                 <Text fontSize="sm" color={solvoColors.textSubtle}>
-                  No reviews yet — be the first to book and review.
+                  No reviews yet — worked with {supplier.companyName}? Be the first to review.
                 </Text>
               </Box>
             ) : (
@@ -710,6 +760,20 @@ export default function ProviderProfile() {
           </Box>
         </Box>
       </Box>
+
+      {reviewModalOpen && canReview && customerId != null && (
+        <ReviewCreateModal
+          supplierId={supplier.supplierId}
+          customerId={customerId}
+          supplierName={supplier.companyName}
+          existingReview={myReview ?? null}
+          onSaved={() => {
+            // Pull the new review and the recomputed rating back in.
+            supplierQuery.refetch();
+          }}
+          onClose={() => setReviewModalOpen(false)}
+        />
+      )}
     </Box>
   );
 }
