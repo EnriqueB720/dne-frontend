@@ -218,6 +218,7 @@ function dbSupplierToProviderData(s: any, index: number): ProviderData {
     phone: s.businessPhone ?? undefined,
     phoneAlt: s.businessPhoneAlt ?? undefined,
     isRealSupplier: true,
+    skills: s.skills ?? [],
     sponsored: isSponsoredActive(
       s.promotionTier,
       s.promotionStartDate,
@@ -265,6 +266,7 @@ function formatProvidersForGrounding(providers: ProviderData[]): string {
         parts.push(`includes: ${p.includes.join(', ')}`);
       }
       if (p.tags.length > 0) parts.push(`tags: ${p.tags.join(', ')}`);
+      if (p.skills && p.skills.length > 0) parts.push(`skills: ${p.skills.join(', ')}`);
       if (p.phone) parts.push(`phone: ${p.phone}`);
       if (p.email) parts.push(`email: ${p.email}`);
       if (p.website) parts.push(`website: ${p.website}`);

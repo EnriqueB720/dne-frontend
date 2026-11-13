@@ -5,6 +5,7 @@ query searchSuppliers($data: SupplierSearchInput!) {
     slug
     tagline
     description
+    skills
     city
     rating
     reviewCount

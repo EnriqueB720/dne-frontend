@@ -5,6 +5,7 @@ query supplier($where: SupplierWhereInput!) {
     slug
     tagline
     description
+    skills
     businessPhone
     businessEmail
     businessPhoneAlt

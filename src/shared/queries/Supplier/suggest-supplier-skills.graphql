@@ -1,0 +1,3 @@
+query suggestSupplierSkills($supplierId: Int!) {
+  suggestSupplierSkills(supplierId: $supplierId)
+}

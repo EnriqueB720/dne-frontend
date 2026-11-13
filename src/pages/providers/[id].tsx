@@ -226,6 +226,7 @@ export default function ProviderProfile() {
   const categories = (supplier.categories ?? [])
     .map((sc: any) => sc.category?.categoryName)
     .filter(Boolean) as string[];
+  const skills: string[] = supplier.skills ?? [];
 
   return (
     <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
@@ -377,6 +378,30 @@ export default function ProviderProfile() {
               >
                 {supplier.description}
               </Text>
+            )}
+
+            {/* Specialties — the supplier's skills, the same list the AI
+                matches customer requests against. */}
+            {skills.length > 0 && (
+              <Box marginBottom="40px">
+                <Text
+                  fontSize="xs"
+                  fontWeight={600}
+                  color={solvoColors.textSubtle}
+                  textTransform="uppercase"
+                  letterSpacing="0.06em"
+                  marginBottom="10px"
+                >
+                  Specialties
+                </Text>
+                <Flex gap="8px" wrap="wrap">
+                  {skills.map((skill) => (
+                    <Pill key={skill} tone="indigo" size="md">
+                      {skill}
+                    </Pill>
+                  ))}
+                </Flex>
+              </Box>
             )}
 
             {/* Services */}

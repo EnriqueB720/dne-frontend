@@ -33,6 +33,8 @@ export interface ProviderData {
   phoneAlt?: string;
   /** True when this card represents a real supplier from the DB (vs. AI-invented). */
   isRealSupplier?: boolean;
+  /** A real supplier's skills — fed to the chat AI so it can explain the match. */
+  skills?: string[];
   /**
    * True when the supplier is currently a paid FEATURED placement (within
    * its active date window). Adds a "Sponsored" badge so users can tell

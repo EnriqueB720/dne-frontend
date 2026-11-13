@@ -1,0 +1,3 @@
+mutation setSupplierSkills($data: SupplierSkillsInput!) {
+  setSupplierSkills(data: $data)
+}

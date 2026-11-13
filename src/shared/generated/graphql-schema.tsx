@@ -446,7 +446,6 @@ export type Mutation = {
   createCalendarEvent: CalendarEvent;
   createCategory: Category;
   createConversation: Conversation;
-  createPost: Post;
   createPricing: Pricing;
   createQuote: Quote;
   createRequest: Request;
@@ -456,7 +455,6 @@ export type Mutation = {
   createSupplier: Supplier;
   createUser: User;
   deleteAiConversation: Scalars['Boolean']['output'];
-  deletePost: Scalars['Boolean']['output'];
   deleteReview: Scalars['Boolean']['output'];
   deleteService: Scalars['Boolean']['output'];
   deleteSupplierMedia: Scalars['Boolean']['output'];
@@ -475,6 +473,7 @@ export type Mutation = {
   sendMessage: Message;
   setSupplierCategories: Scalars['Boolean']['output'];
   setSupplierPromotion: SupplierPromotionResult;
+  setSupplierSkills: Array<Scalars['String']['output']>;
   signup: User;
   socialLogin: LoginOutput;
   toggleFavorite: FavoriteToggleResult;
@@ -482,7 +481,6 @@ export type Mutation = {
   updateAiMessageProviders: AiMessage;
   updateCalendarEvent: CalendarEvent;
   updateCustomer: Customer;
-  updatePost: Post;
   updateRequestStatus: Request;
   updateReview: Review;
   updateService: Service;
@@ -552,11 +550,6 @@ export type MutationCreateConversationArgs = {
 };
 
 
-export type MutationCreatePostArgs = {
-  data: PostCreateInput;
-};
-
-
 export type MutationCreatePricingArgs = {
   data: PricingCreateInput;
 };
@@ -600,11 +593,6 @@ export type MutationCreateUserArgs = {
 export type MutationDeleteAiConversationArgs = {
   conversationId: Scalars['String']['input'];
   deviceId?: InputMaybe<Scalars['String']['input']>;
-};
-
-
-export type MutationDeletePostArgs = {
-  whereUnique: PostWhereUniqueInput;
 };
 
 
@@ -701,6 +689,11 @@ export type MutationSetSupplierPromotionArgs = {
 };
 
 
+export type MutationSetSupplierSkillsArgs = {
+  data: SupplierSkillsInput;
+};
+
+
 export type MutationSignupArgs = {
   data: SignUpInput;
 };
@@ -735,13 +728,6 @@ export type MutationUpdateCalendarEventArgs = {
 
 export type MutationUpdateCustomerArgs = {
   data: CustomerUpdateInput;
-};
-
-
-export type MutationUpdatePostArgs = {
-  data: PostUpdateInput;
-  where?: InputMaybe<PostWhereInput>;
-  whereUnique?: InputMaybe<PostWhereUniqueInput>;
 };
 
 
@@ -844,44 +830,6 @@ export type PlanSubscription = {
   userId: Scalars['Float']['output'];
 };
 
-export type Post = {
-  __typename?: 'Post';
-  category: Category;
-  createdAt: Scalars['DateTime']['output'];
-  description: Scalars['String']['output'];
-  media_url: Scalars['String']['output'];
-  postId: Scalars['Float']['output'];
-  price: Scalars['String']['output'];
-  supplier: Supplier;
-  title: Scalars['String']['output'];
-};
-
-export type PostCreateInput = {
-  categoryId: Scalars['Int']['input'];
-  description: Scalars['String']['input'];
-  mediaUrl: Scalars['String']['input'];
-  price: Scalars['Int']['input'];
-  supplierId: Scalars['Int']['input'];
-  title: Scalars['String']['input'];
-};
-
-export type PostUpdateInput = {
-  description?: InputMaybe<Scalars['String']['input']>;
-  mediaUrl?: InputMaybe<Scalars['String']['input']>;
-  price?: InputMaybe<Scalars['Int']['input']>;
-  title?: InputMaybe<Scalars['String']['input']>;
-};
-
-export type PostWhereInput = {
-  categoryId?: InputMaybe<Scalars['Int']['input']>;
-  postId?: InputMaybe<Scalars['Int']['input']>;
-  supplierId?: InputMaybe<Scalars['Int']['input']>;
-};
-
-export type PostWhereUniqueInput = {
-  postId: Scalars['Int']['input'];
-};
-
 export type Pricing = {
   __typename?: 'Pricing';
   features: Scalars['String']['output'];
@@ -937,8 +885,6 @@ export type Query = {
   messagesByConversation: Array<Message>;
   notificationsByUser: Array<Notification>;
   openRequestsForSupplier: Array<Request>;
-  post: Post;
-  postsBySupplier: Array<Post>;
   pricing: Pricing;
   quote: Quote;
   quotesByRequest: Array<Quote>;
@@ -948,10 +894,10 @@ export type Query = {
   requestsByCustomer: Array<Request>;
   requestsBySupplier: Array<Request>;
   revenueByDay: Array<RevenueByDayRow>;
-  search: Search;
   searchSuppliers: Array<Supplier>;
   servicesBySupplier: Array<Service>;
   subscription: PlanSubscription;
+  suggestSupplierSkills: Array<Scalars['String']['output']>;
   supplier: Supplier;
   supplierDashboardStats: SupplierDashboardStats;
   suppliers: Array<Supplier>;
@@ -1076,18 +1022,6 @@ export type QueryOpenRequestsForSupplierArgs = {
 };
 
 
-export type QueryPostArgs = {
-  where?: InputMaybe<PostWhereInput>;
-  whereUnique?: InputMaybe<PostWhereUniqueInput>;
-};
-
-
-export type QueryPostsBySupplierArgs = {
-  where?: InputMaybe<PostWhereInput>;
-  whereUnique?: InputMaybe<PostWhereUniqueInput>;
-};
-
-
 export type QueryPricingArgs = {
   where: PricingWhereInput;
 };
@@ -1138,13 +1072,6 @@ export type QueryRevenueByDayArgs = {
 };
 
 
-export type QuerySearchArgs = {
-  query?: InputMaybe<Scalars['String']['input']>;
-  skip?: InputMaybe<Scalars['Float']['input']>;
-  take?: InputMaybe<Scalars['Float']['input']>;
-};
-
-
 export type QuerySearchSuppliersArgs = {
   data: SupplierSearchInput;
 };
@@ -1158,6 +1085,11 @@ export type QueryServicesBySupplierArgs = {
 
 export type QuerySubscriptionArgs = {
   where: SubscriptionWhereInput;
+};
+
+
+export type QuerySuggestSupplierSkillsArgs = {
+  supplierId: Scalars['Int']['input'];
 };
 
 
@@ -1415,11 +1347,6 @@ export enum Role {
   Supplier = 'SUPPLIER'
 }
 
-export type Search = {
-  __typename?: 'Search';
-  post?: Maybe<Array<Post>>;
-};
-
 export type SendAiMessageResult = {
   __typename?: 'SendAiMessageResult';
   content: Scalars['String']['output'];
@@ -1602,7 +1529,6 @@ export type Supplier = {
   maxCapacity?: Maybe<Scalars['Float']['output']>;
   media?: Maybe<Array<MediaAsset>>;
   minCapacity?: Maybe<Scalars['Float']['output']>;
-  posts?: Maybe<Array<Post>>;
   premium?: Maybe<Scalars['Boolean']['output']>;
   promotionEndDate?: Maybe<Scalars['DateTime']['output']>;
   promotionStartDate?: Maybe<Scalars['DateTime']['output']>;
@@ -1612,6 +1538,7 @@ export type Supplier = {
   reviewCount?: Maybe<Scalars['Float']['output']>;
   reviewsReceived?: Maybe<Array<Review>>;
   services?: Maybe<Array<Service>>;
+  skills?: Maybe<Array<Scalars['String']['output']>>;
   slug?: Maybe<Scalars['String']['output']>;
   supplierId: Scalars['Float']['output'];
   tagline?: Maybe<Scalars['String']['output']>;
@@ -1676,6 +1603,11 @@ export type SupplierSearchInput = {
   guestCount?: InputMaybe<Scalars['Int']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   serviceQuery?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SupplierSkillsInput = {
+  skills: Array<Scalars['String']['input']>;
+  supplierId: Scalars['Int']['input'];
 };
 
 export type SupplierUpdateInput = {
@@ -2350,7 +2282,7 @@ export type SearchSuppliersQueryVariables = Exact<{
 }>;
 
 
-export type SearchSuppliersQuery = { __typename?: 'Query', searchSuppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null, businessPhone?: string | null, businessEmail?: string | null, businessPhoneAlt?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, basePrice: string, currency: string, pricingModel: PricingModel }> | null }> };
+export type SearchSuppliersQuery = { __typename?: 'Query', searchSuppliers: Array<{ __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null, businessPhone?: string | null, businessEmail?: string | null, businessPhoneAlt?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, basePrice: string, currency: string, pricingModel: PricingModel }> | null }> };
 
 export type SetSupplierCategoriesMutationVariables = Exact<{
   data: SupplierCategoriesInput;
@@ -2358,6 +2290,20 @@ export type SetSupplierCategoriesMutationVariables = Exact<{
 
 
 export type SetSupplierCategoriesMutation = { __typename?: 'Mutation', setSupplierCategories: boolean };
+
+export type SetSupplierSkillsMutationVariables = Exact<{
+  data: SupplierSkillsInput;
+}>;
+
+
+export type SetSupplierSkillsMutation = { __typename?: 'Mutation', setSupplierSkills: Array<string> };
+
+export type SuggestSupplierSkillsQueryVariables = Exact<{
+  supplierId: Scalars['Int']['input'];
+}>;
+
+
+export type SuggestSupplierSkillsQuery = { __typename?: 'Query', suggestSupplierSkills: Array<string> };
 
 export type SupplierDashboardStatsQueryVariables = Exact<{
   supplierId: Scalars['Int']['input'];
@@ -2371,7 +2317,7 @@ export type SupplierQueryVariables = Exact<{
 }>;
 
 
-export type SupplierQuery = { __typename?: 'Query', supplier: { __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, businessPhone?: string | null, businessEmail?: string | null, businessPhoneAlt?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null, media?: Array<{ __typename?: 'MediaAsset', mediaAssetId: number, url: string, thumbnailUrl?: string | null, altText?: string | null, displayOrder: number }> | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, pricingModel: PricingModel, basePrice: string, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', categoryId: number, isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null, reviewsReceived?: Array<{ __typename?: 'Review', reviewId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, supplierResponse?: string | null, createdAt: any, customer?: { __typename?: 'Customer', customerId: number, user?: { __typename?: 'User', userId: number, name: string } | null } | null }> | null } };
+export type SupplierQuery = { __typename?: 'Query', supplier: { __typename?: 'Supplier', supplierId: number, companyName: string, slug?: string | null, tagline?: string | null, description?: string | null, skills?: Array<string> | null, businessPhone?: string | null, businessEmail?: string | null, businessPhoneAlt?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, city?: string | null, rating?: string | null, reviewCount?: number | null, responseTimeMinutes?: number | null, minCapacity?: number | null, maxCapacity?: number | null, verified?: boolean | null, premium?: boolean | null, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null, media?: Array<{ __typename?: 'MediaAsset', mediaAssetId: number, url: string, thumbnailUrl?: string | null, altText?: string | null, displayOrder: number }> | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description: string, pricingModel: PricingModel, basePrice: string, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', categoryId: number, isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, categoryName: string } | null }> | null, reviewsReceived?: Array<{ __typename?: 'Review', reviewId: number, rating: number, text?: string | null, ratingQuality?: number | null, ratingCommunication?: number | null, ratingValue?: number | null, ratingPunctuality?: number | null, supplierResponse?: string | null, createdAt: any, customer?: { __typename?: 'Customer', customerId: number, user?: { __typename?: 'User', userId: number, name: string } | null } | null }> | null } };
 
 export type SuppliersQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -6044,6 +5990,7 @@ export const SearchSuppliersDocument = gql`
     slug
     tagline
     description
+    skills
     city
     rating
     reviewCount
@@ -6138,6 +6085,78 @@ export function useSetSupplierCategoriesMutation(baseOptions?: Apollo.MutationHo
 export type SetSupplierCategoriesMutationHookResult = ReturnType<typeof useSetSupplierCategoriesMutation>;
 export type SetSupplierCategoriesMutationResult = Apollo.MutationResult<SetSupplierCategoriesMutation>;
 export type SetSupplierCategoriesMutationOptions = Apollo.BaseMutationOptions<SetSupplierCategoriesMutation, SetSupplierCategoriesMutationVariables>;
+export const SetSupplierSkillsDocument = gql`
+    mutation setSupplierSkills($data: SupplierSkillsInput!) {
+  setSupplierSkills(data: $data)
+}
+    `;
+export type SetSupplierSkillsMutationFn = Apollo.MutationFunction<SetSupplierSkillsMutation, SetSupplierSkillsMutationVariables>;
+
+/**
+ * __useSetSupplierSkillsMutation__
+ *
+ * To run a mutation, you first call `useSetSupplierSkillsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetSupplierSkillsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setSupplierSkillsMutation, { data, loading, error }] = useSetSupplierSkillsMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useSetSupplierSkillsMutation(baseOptions?: Apollo.MutationHookOptions<SetSupplierSkillsMutation, SetSupplierSkillsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SetSupplierSkillsMutation, SetSupplierSkillsMutationVariables>(SetSupplierSkillsDocument, options);
+      }
+export type SetSupplierSkillsMutationHookResult = ReturnType<typeof useSetSupplierSkillsMutation>;
+export type SetSupplierSkillsMutationResult = Apollo.MutationResult<SetSupplierSkillsMutation>;
+export type SetSupplierSkillsMutationOptions = Apollo.BaseMutationOptions<SetSupplierSkillsMutation, SetSupplierSkillsMutationVariables>;
+export const SuggestSupplierSkillsDocument = gql`
+    query suggestSupplierSkills($supplierId: Int!) {
+  suggestSupplierSkills(supplierId: $supplierId)
+}
+    `;
+
+/**
+ * __useSuggestSupplierSkillsQuery__
+ *
+ * To run a query within a React component, call `useSuggestSupplierSkillsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useSuggestSupplierSkillsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useSuggestSupplierSkillsQuery({
+ *   variables: {
+ *      supplierId: // value for 'supplierId'
+ *   },
+ * });
+ */
+export function useSuggestSupplierSkillsQuery(baseOptions: Apollo.QueryHookOptions<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables> & ({ variables: SuggestSupplierSkillsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables>(SuggestSupplierSkillsDocument, options);
+      }
+export function useSuggestSupplierSkillsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables>(SuggestSupplierSkillsDocument, options);
+        }
+// @ts-ignore
+export function useSuggestSupplierSkillsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables>): Apollo.UseSuspenseQueryResult<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables>;
+export function useSuggestSupplierSkillsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables>): Apollo.UseSuspenseQueryResult<SuggestSupplierSkillsQuery | undefined, SuggestSupplierSkillsQueryVariables>;
+export function useSuggestSupplierSkillsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables>(SuggestSupplierSkillsDocument, options);
+        }
+export type SuggestSupplierSkillsQueryHookResult = ReturnType<typeof useSuggestSupplierSkillsQuery>;
+export type SuggestSupplierSkillsLazyQueryHookResult = ReturnType<typeof useSuggestSupplierSkillsLazyQuery>;
+export type SuggestSupplierSkillsSuspenseQueryHookResult = ReturnType<typeof useSuggestSupplierSkillsSuspenseQuery>;
+export type SuggestSupplierSkillsQueryResult = Apollo.QueryResult<SuggestSupplierSkillsQuery, SuggestSupplierSkillsQueryVariables>;
 export const SupplierDashboardStatsDocument = gql`
     query supplierDashboardStats($supplierId: Int!) {
   supplierDashboardStats(supplierId: $supplierId) {
@@ -6196,6 +6215,7 @@ export const SupplierDocument = gql`
     slug
     tagline
     description
+    skills
     businessPhone
     businessEmail
     businessPhoneAlt

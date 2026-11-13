@@ -7,6 +7,7 @@ import {
   ImagePlus,
   Pencil,
   Plus,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -36,6 +37,8 @@ import {
   useReorderSupplierMediaMutation,
   useServicesBySupplierQuery,
   useSetSupplierCategoriesMutation,
+  useSetSupplierSkillsMutation,
+  useSuggestSupplierSkillsLazyQuery,
   useSupplierQuery,
   useUpdateServiceMutation,
   useUpdateSupplierMutation,
@@ -54,6 +57,12 @@ const mediaSrc = (mediaAssetId: number) => `${API_BASE}/files/media/${mediaAsset
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 /** Mirrors MAX_SUPPLIER_CATEGORIES on the API — keep the two in step. */
 const MAX_CATEGORIES = 5;
+/** Mirror MAX_SUPPLIER_SKILLS / MAX_SKILL_LENGTH on the API. */
+const MAX_SKILLS = 20;
+const MAX_SKILL_LENGTH = 40;
+
+/** Same normalization the API applies, so the chips show what will be saved. */
+const normalizeSkill = (raw: string): string => raw.replace(/\s+/g, ' ').trim().toLowerCase();
 
 const inputBaseStyle: React.CSSProperties = {
   width: '100%',
@@ -169,6 +178,10 @@ export default function ProviderSettingsPage() {
   const [updateUser, updateUserState] = useUpdateUserMutation();
   const [setSupplierCategories, setCategoriesState] =
     useSetSupplierCategoriesMutation();
+  const [setSupplierSkills, setSkillsState] = useSetSupplierSkillsMutation();
+  const [suggestSkills, suggestSkillsState] = useSuggestSupplierSkillsLazyQuery({
+    fetchPolicy: 'network-only',
+  });
 
   const supplier = supplierQuery.data?.supplier;
 
@@ -193,6 +206,13 @@ export default function ProviderSettingsPage() {
   // a separate mutation alongside the profile fields.
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [primaryCategoryId, setPrimaryCategoryId] = useState<number | null>(null);
+
+  // Skills — drafted by the AI from the profile, tweaked here. Saved through
+  // their own mutation alongside the profile fields, like categories.
+  const [skills, setSkills] = useState<string[]>([]);
+  const [skillInput, setSkillInput] = useState('');
+  const [skillSuggestions, setSkillSuggestions] = useState<string[]>([]);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
 
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(
     null,
@@ -228,6 +248,7 @@ export default function ProviderSettingsPage() {
     setPrimaryCategoryId(
       linked.find((c) => c.isPrimary)?.categoryId ?? linked[0]?.categoryId ?? null,
     );
+    setSkills(record.skills ?? []);
   }, []);
 
   useEffect(() => {
@@ -251,6 +272,50 @@ export default function ProviderSettingsPage() {
       setPrimaryCategoryId((p) => p ?? categoryId);
       return next;
     });
+  };
+
+  /** Add skills (typed or suggested), skipping duplicates and anything past the cap. */
+  const addSkills = (raw: string[]) => {
+    setSkillsError(null);
+    setSkills((current) => {
+      const next = [...current];
+      for (const value of raw) {
+        const skill = normalizeSkill(value);
+        if (!skill || next.includes(skill)) continue;
+        if (skill.length > MAX_SKILL_LENGTH) {
+          setSkillsError(`Keep each skill under ${MAX_SKILL_LENGTH} characters.`);
+          continue;
+        }
+        if (next.length >= MAX_SKILLS) {
+          setSkillsError(`You can list up to ${MAX_SKILLS} skills.`);
+          break;
+        }
+        next.push(skill);
+      }
+      return next;
+    });
+  };
+
+  /** Commas split one entry into several, so a pasted list works too. */
+  const commitSkillInput = () => {
+    if (!skillInput.trim()) return;
+    addSkills(skillInput.split(','));
+    setSkillInput('');
+  };
+
+  const handleSuggestSkills = async () => {
+    if (!supplierId) return;
+    setSkillsError(null);
+    const { data, error } = await suggestSkills({ variables: { supplierId } });
+    if (error) {
+      setSkillsError(error.message);
+      return;
+    }
+    const fresh = (data?.suggestSupplierSkills ?? []).filter((s) => !skills.includes(s));
+    setSkillSuggestions(fresh);
+    if (fresh.length === 0) {
+      setSkillsError('No new suggestions — your list already covers your profile.');
+    }
   };
 
   const handleSave = async () => {
@@ -291,6 +356,7 @@ export default function ProviderSettingsPage() {
             },
           },
         }),
+        setSupplierSkills({ variables: { data: { supplierId, skills } } }),
         updateUser({
           variables: {
             data: { userId, name: contactName.trim() || undefined },
@@ -334,7 +400,10 @@ export default function ProviderSettingsPage() {
   };
 
   const busy =
-    updateSupplierState.loading || updateUserState.loading || setCategoriesState.loading;
+    updateSupplierState.loading ||
+    updateUserState.loading ||
+    setCategoriesState.loading ||
+    setSkillsState.loading;
 
   // ── Services ────────────────────────────────────────────────────────
   const servicesQuery = useServicesBySupplierQuery({
@@ -1271,6 +1340,172 @@ export default function ProviderSettingsPage() {
                   color={supplier?.verified ? solvoColors.emeraldText : solvoColors.textSubtle}
                 >
                   {supplier?.verified ? '✓ Verified' : 'Not verified'}
+                </Text>
+              </Flex>
+            </Box>
+
+            {/* Skills */}
+            <Box style={sectionStyle}>
+              <Flex align="center" justify="space-between" gap="10px" marginBottom="6px" wrap="wrap">
+                <Text fontFamily={solvoFonts.display} fontSize="18px">
+                  Skills
+                </Text>
+                <button
+                  type="button"
+                  onClick={handleSuggestSkills}
+                  disabled={suggestSkillsState.loading}
+                  style={{
+                    ...ghostButtonStyle,
+                    borderColor: solvoColors.brandBorder,
+                    color: solvoColors.brandText,
+                    opacity: suggestSkillsState.loading ? 0.6 : 1,
+                  }}
+                >
+                  <Sparkles size={14} />
+                  {suggestSkillsState.loading ? 'Thinking…' : 'Suggest with AI'}
+                </button>
+              </Flex>
+              <Text fontSize="xs" color={solvoColors.textSubtle} marginBottom="16px">
+                Specific things you do, like “vegan menus” or “same-day AC repair”. Solvo&apos;s AI
+                uses them to match you to what customers ask for. We draft them from your profile —
+                remove anything that&apos;s off and add what&apos;s missing. Up to {MAX_SKILLS}.
+              </Text>
+
+              {skills.length === 0 ? (
+                <Text fontSize="sm" color={solvoColors.textSubtle} marginBottom="14px">
+                  No skills yet. Add your own, or let the AI suggest some.
+                </Text>
+              ) : (
+                <Flex gap="8px" wrap="wrap" marginBottom="14px">
+                  {skills.map((skill) => (
+                    <Flex
+                      key={skill}
+                      align="center"
+                      gap="6px"
+                      padding="5px 6px 5px 12px"
+                      borderRadius="9999px"
+                      borderWidth="1px"
+                      borderColor={solvoColors.brandBorder}
+                      bg={solvoColors.brandSoft}
+                    >
+                      <Text fontSize="13px" color={solvoColors.brandText}>
+                        {skill}
+                      </Text>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${skill}`}
+                        onClick={() => setSkills((current) => current.filter((s) => s !== skill))}
+                        style={{
+                          display: 'inline-flex',
+                          padding: '2px',
+                          border: 'none',
+                          borderRadius: '9999px',
+                          background: 'transparent',
+                          color: solvoColors.brandText,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </Flex>
+                  ))}
+                </Flex>
+              )}
+
+              {skillSuggestions.length > 0 && (
+                <Box
+                  marginBottom="14px"
+                  padding="12px 14px"
+                  borderRadius="10px"
+                  bg={solvoColors.bg}
+                  borderWidth="1px"
+                  borderColor={solvoColors.border}
+                >
+                  <Flex align="center" justify="space-between" gap="10px" marginBottom="10px">
+                    <Text fontSize="12px" fontWeight={600} color={solvoColors.textMuted}>
+                      Suggestions — click to add
+                    </Text>
+                    <Flex gap="8px">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          addSkills(skillSuggestions);
+                          setSkillSuggestions([]);
+                        }}
+                        style={{ ...ghostButtonStyle, padding: '4px 10px', fontSize: '12px' }}
+                      >
+                        Add all
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSkillSuggestions([])}
+                        style={{ ...ghostButtonStyle, padding: '4px 10px', fontSize: '12px' }}
+                      >
+                        Dismiss
+                      </button>
+                    </Flex>
+                  </Flex>
+                  <Flex gap="8px" wrap="wrap">
+                    {skillSuggestions.map((skill) => (
+                      <button
+                        key={skill}
+                        type="button"
+                        onClick={() => {
+                          addSkills([skill]);
+                          setSkillSuggestions((current) => current.filter((s) => s !== skill));
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '5px 12px',
+                          borderRadius: '9999px',
+                          border: `1px dashed ${solvoColors.brandBorder}`,
+                          background: solvoColors.surface,
+                          color: solvoColors.text,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          fontFamily: solvoFonts.sans,
+                        }}
+                      >
+                        <Plus size={12} />
+                        {skill}
+                      </button>
+                    ))}
+                  </Flex>
+                </Box>
+              )}
+
+              <Flex gap="8px" align="center">
+                <input
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      commitSkillInput();
+                    }
+                  }}
+                  disabled={skills.length >= MAX_SKILLS}
+                  style={{ ...inputBaseStyle, flex: 1 }}
+                  placeholder="e.g. wedding dj — press Enter to add"
+                />
+                <button
+                  type="button"
+                  onClick={commitSkillInput}
+                  disabled={!skillInput.trim() || skills.length >= MAX_SKILLS}
+                  style={ghostButtonStyle}
+                >
+                  <Plus size={14} />
+                  Add
+                </button>
+              </Flex>
+              <Flex justify="space-between" gap="10px" marginTop="6px">
+                <Text fontSize="11px" color={skillsError ? solvoColors.roseText : solvoColors.textSubtle}>
+                  {skillsError ?? 'Changes go live when you save your profile.'}
+                </Text>
+                <Text fontSize="11px" color={solvoColors.textSubtle}>
+                  {skills.length}/{MAX_SKILLS}
                 </Text>
               </Flex>
             </Box>
