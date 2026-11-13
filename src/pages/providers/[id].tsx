@@ -236,7 +236,7 @@ export default function ProviderProfile() {
   // the same button edits their review. Not offered on your own storefront.
   const myReview =
     customerId != null
-      ? (supplier.reviewsReceived ?? []).find((r: any) => r.customer?.customerId === customerId)
+      ? (supplier.reviewsReceived ?? []).find((r) => r.customer?.customerId === customerId)
       : undefined;
   const isOwnStorefront = user?.supplierId != null && user.supplierId === supplier.supplierId;
   const canReview = isAuthenticated && customerId != null && !isOwnStorefront;
