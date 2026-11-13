@@ -7,6 +7,16 @@ const nextConfig: NextConfig = {
   // without dragging along the whole node_modules tree. Node runs it via
   // `node server.js`. Zero effect on local `next dev`.
   output: 'standalone',
+  // Legacy booking-flow pages are disabled while customers contact
+  // suppliers directly. Temporary (307) redirects keep the page code in
+  // place — delete an entry to bring its page back.
+  async redirects() {
+    return ['/requests', '/quotes', '/calendar'].map((source) => ({
+      source,
+      destination: '/',
+      permanent: false,
+    }));
+  },
 };
 
 // Sentry's Next.js integration:
