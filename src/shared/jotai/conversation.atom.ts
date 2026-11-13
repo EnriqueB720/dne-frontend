@@ -12,6 +12,8 @@ export interface UiMessage extends Omit<ConversationMessage, 'messageId' | 'conv
   parsedQuery?: ParsedQuery;
   /** Whether the providers attached to this bubble are real DB suppliers ('db') or AI-invented ('ai'). */
   providerSource?: 'db' | 'ai';
+  /** Provider whose contact info to surface as clickable links (set when the user clicks "Contact"). */
+  contactReveal?: ProviderData;
 }
 
 export interface ConversationState {

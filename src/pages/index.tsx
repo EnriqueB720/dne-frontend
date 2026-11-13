@@ -1051,52 +1051,32 @@ export default function Home() {
   // to 30 minutes by the hook's internal TTL.
   const { location: deviceLocation, status: locationStatus, request: requestLocation } =
     useUserLocation();
-  const [createdRequest, setCreatedRequest] = React.useState<{
-    requestId: number;
-    providerName: string;
-  } | null>(null);
   const [requestError, setRequestError] = React.useState<string | null>(null);
 
-  // Confirmation modal state — opened when "Select" is clicked on a card
-  const [selectModal, setSelectModal] = React.useState<{
-    provider: ProviderData;
-    isRealSupplier: boolean;
-    rawQuery: string;
-    city: string;
-    serviceDate: string;
-    guestCount: string;
-    message: string;
-    budget: string;
-  } | null>(null);
-  const submittingRequest = createRequestState.loading;
-
+  // Solvo's job ends at the introduction — contact details are already
+  // visible directly on the provider card (no more gating/reveal step), so
+  // selecting a provider no longer creates a Request/Quote or opens a
+  // booking-details modal. It just drops a confirmation into the chat
+  // thread pointing back at the contact info already on the card.
+  // Booking, scheduling, and payment all happen directly between the
+  // customer and supplier from here on.
   const handleSelectProvider = React.useCallback(
-    (provider: ProviderData, msg: UiMessage) => {
-      setRequestError(null);
-
-      const userMsgs = messages.filter((m) => m.role === 'user');
-      const rawQuery =
-        userMsgs.length > 0
-          ? userMsgs[userMsgs.length - 1].content
-          : `Interested in ${provider.name}`;
-
-      const parsed = msg.parsedQuery;
-      const cityRaw = parsed?.location?.split(',')[0]?.trim();
-      const guestNum = parsed?.people ? Number(parsed.people.replace(/\D/g, '')) : NaN;
-      const budgetNum = parsed?.budget ? Number(parsed.budget.replace(/[^\d]/g, '')) : NaN;
-
-      setSelectModal({
-        provider,
-        isRealSupplier: !!provider.isRealSupplier,
-        rawQuery,
-        city: cityRaw && cityRaw.length > 0 ? cityRaw : '',
-        serviceDate: '',
-        guestCount: Number.isFinite(guestNum) && guestNum > 0 ? String(guestNum) : '',
-        message: '',
-        budget: Number.isFinite(budgetNum) && budgetNum > 0 ? String(budgetNum) : '',
-      });
+    (provider: ProviderData) => {
+      const confirmationMsg: UiMessage = provider.isRealSupplier
+        ? {
+            role: 'assistant',
+            content: `Here's how to reach **${provider.name}** directly — tap any option below. Let them know Solvo sent you.`,
+            contactReveal: provider,
+            createdAt: new Date().toISOString(),
+          }
+        : {
+            role: 'assistant',
+            content: `**${provider.name}** is an AI-generated suggestion, not a verified Solvo supplier, so there's no real contact info for them yet. Try one of the verified "In our network" results instead.`,
+            createdAt: new Date().toISOString(),
+          };
+      setMessages((prev) => [...prev, confirmationMsg]);
     },
-    [messages],
+    [setMessages],
   );
 
   // Resolve the active customerId — auth first, falling back to a
@@ -1129,79 +1109,6 @@ export default function Home() {
     }
     return customerId;
   }, [user, isAuthenticated]);
-
-  const handleConfirmRequest = React.useCallback(async () => {
-    if (!selectModal) return;
-
-    // Resolve customerId (auth first, fall back to localStorage / prompt for testing)
-    const customerId = resolveCustomerId();
-    if (!customerId) return;
-
-    if (!selectModal.serviceDate) {
-      setRequestError('Pick a service date so the supplier can confirm availability.');
-      return;
-    }
-
-    const guestCount = selectModal.guestCount ? Number(selectModal.guestCount) : null;
-    const budget = selectModal.budget ? Number(selectModal.budget) : null;
-    const city = selectModal.city.trim() || null;
-
-    setRequestError(null);
-    try {
-      const { data } = await createRequest({
-        variables: {
-          data: {
-            customerId,
-            rawQuery: selectModal.rawQuery,
-            city,
-            serviceDate: selectModal.serviceDate,
-            guestCount,
-            budgetMin: budget,
-            budgetMax: budget,
-          } as any,
-        },
-      });
-      const requestId = data?.createRequest.requestId;
-      if (!requestId) throw new Error('Failed to create request');
-
-      // Link this Request back to the conversation that produced it, so the
-      // AI chat connects to the Request → Quote → Booking pipeline.
-      // Best-effort — the request is already created either way.
-      if (currentConvId) {
-        linkConversationToRequest(currentConvId, requestId).catch(() => {
-          /* non-critical — request exists, link is just a convenience */
-        });
-      }
-
- // Auto-create a quote when the provider is a real DB supplier
-      if (selectModal.isRealSupplier && selectModal.provider.id > 0) {
-        const validUntil = new Date();
-        validUntil.setDate(validUntil.getDate() + 14);
-        const priceDigits = selectModal.provider.priceLabel.replace(/[^\d]/g, '');
-        const totalPrice = priceDigits ? Number(priceDigits) : (budget ?? 0);
-
-        await createQuote({
-          variables: {
-            data: {
-              requestId,
-              supplierId: selectModal.provider.id,
-              totalPrice,
-              currency: 'CRC',
-              message: selectModal.message || `Quote for "${selectModal.rawQuery}".`,
-              validUntil: validUntil.toISOString(),
-            } as any,
-          },
-        }).catch(() => {
-          /* non-fatal — request is created, supplier can quote manually */
-        });
-      }
-
-      setCreatedRequest({ requestId, providerName: selectModal.provider.name });
-      setSelectModal(null);
-    } catch (err: any) {
-      setRequestError(err?.message ?? 'Failed to create request');
-    }
-  }, [selectModal, resolveCustomerId, createRequest, createQuote, currentConvId]);
 
   // ── Package builder ────────────────────────────────────────────────────
   const [pkgState, setPkgState] = useAtom(packageAtom);
@@ -2134,271 +2041,6 @@ export default function Home() {
   }, []);
 
   // ── Render ─────────────────────────────────────────────────────────────
-  const selectModalEl = (
-    <AnimatePresence>
-      {selectModal && (
-        <motion.div
-          key="select-backdrop"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: solvoColors.overlay,
-            backdropFilter: 'blur(4px)',
-            zIndex: 200,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px',
-          }}
-          onClick={() => !submittingRequest && setSelectModal(null)}
-        >
-          <motion.div
-            key="select-panel"
-            initial={{ opacity: 0, y: 16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.97 }}
-            transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              maxWidth: '520px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              background: solvoColors.surface,
-              borderRadius: '20px',
-              boxShadow: solvoShadows.heroInput,
-            }}
-          >
-            <Flex align="center" justify="space-between" padding="18px 22px" borderBottom={`1px solid ${solvoColors.border}`}>
-              <Flex align="center" gap="10px">
-                <Box fontSize="22px">{selectModal.provider.avatar}</Box>
-                <Box>
-                  <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
-                    {selectModal.provider.name}
-                  </Text>
-                  <Text fontSize="xs" color={selectModal.isRealSupplier ? solvoColors.emeraldText : solvoColors.amberText}>
-                    {selectModal.isRealSupplier
-                      ? `Real supplier · ${selectModal.provider.priceLabel}`
-                      : `AI-generated · ${selectModal.provider.priceLabel}`}
-                  </Text>
-                </Box>
-              </Flex>
-              <Box
-                as="button"
-                onClick={() => !submittingRequest && setSelectModal(null)}
-                width="30px"
-                height="30px"
-                borderRadius="9px"
-                bg="transparent"
-                border={`1px solid ${solvoColors.border}`}
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                cursor="pointer"
-              >
-                ✕
-              </Box>
-            </Flex>
-
-            <Box padding="20px 22px">
-              {!selectModal.isRealSupplier && (
-                <Box padding="10px 12px" borderRadius="10px" bg={solvoColors.amberLight} marginBottom="14px">
-                  <Text fontSize="xs" color={solvoColors.amberText}>
-                    This is an AI-suggested example. A request will be created, but no real supplier will receive it (this one doesn't exist in the DB yet).
-                  </Text>
-                </Box>
-              )}
-
-              <Box marginBottom="12px">
-                <Text fontSize="11px" fontWeight={600} color={solvoColors.textMuted} textTransform="uppercase" letterSpacing="0.04em" marginBottom="6px">
-                  Your request
-                </Text>
-                <textarea
-                  value={selectModal.rawQuery}
-                  onChange={(e) => setSelectModal({ ...selectModal, rawQuery: e.target.value })}
-                  rows={2}
-                  style={{
-                    width: '100%',
-                    padding: '11px 13px',
-                    borderRadius: '10px',
-                    border: `1px solid ${solvoColors.border}`,
-                    background: solvoColors.surface,
-                    color: solvoColors.text,
-                    fontFamily: solvoFonts.sans,
-                    fontSize: '14px',
-                    outline: 'none',
-                    resize: 'vertical',
-                  }}
-                />
-              </Box>
-
-              <Flex gap="10px" wrap="wrap" marginBottom="12px">
-                <Box flex="1" minWidth="180px">
-                  <Text fontSize="11px" fontWeight={600} color={solvoColors.textMuted} textTransform="uppercase" letterSpacing="0.04em" marginBottom="6px">
-                    Service date *
-                  </Text>
-                  <input
-                    type="datetime-local"
-                    value={selectModal.serviceDate}
-                    onChange={(e) => setSelectModal({ ...selectModal, serviceDate: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '11px 13px',
-                      borderRadius: '10px',
-                      border: `1px solid ${solvoColors.border}`,
-                      background: solvoColors.surface,
-                      color: solvoColors.text,
-                      fontFamily: solvoFonts.sans,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                </Box>
-                <Box flex="1" minWidth="120px">
-                  <Text fontSize="11px" fontWeight={600} color={solvoColors.textMuted} textTransform="uppercase" letterSpacing="0.04em" marginBottom="6px">
-                    Guests
-                  </Text>
-                  <input
-                    type="number"
-                    value={selectModal.guestCount}
-                    onChange={(e) => setSelectModal({ ...selectModal, guestCount: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '11px 13px',
-                      borderRadius: '10px',
-                      border: `1px solid ${solvoColors.border}`,
-                      background: solvoColors.surface,
-                      color: solvoColors.text,
-                      fontFamily: solvoFonts.sans,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                </Box>
-              </Flex>
-
-              <Flex gap="10px" wrap="wrap" marginBottom="14px">
-                <Box flex="1" minWidth="180px">
-                  <Text fontSize="11px" fontWeight={600} color={solvoColors.textMuted} textTransform="uppercase" letterSpacing="0.04em" marginBottom="6px">
-                    City
-                  </Text>
-                  <input
-                    type="text"
-                    value={selectModal.city}
-                    onChange={(e) => setSelectModal({ ...selectModal, city: e.target.value })}
-                    placeholder="Santa Ana"
-                    style={{
-                      width: '100%',
-                      padding: '11px 13px',
-                      borderRadius: '10px',
-                      border: `1px solid ${solvoColors.border}`,
-                      background: solvoColors.surface,
-                      color: solvoColors.text,
-                      fontFamily: solvoFonts.sans,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                </Box>
-                <Box flex="1" minWidth="120px">
-                  <Text fontSize="11px" fontWeight={600} color={solvoColors.textMuted} textTransform="uppercase" letterSpacing="0.04em" marginBottom="6px">
-                    Budget (₡)
-                  </Text>
-                  <input
-                    type="number"
-                    value={selectModal.budget}
-                    onChange={(e) => setSelectModal({ ...selectModal, budget: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '11px 13px',
-                      borderRadius: '10px',
-                      border: `1px solid ${solvoColors.border}`,
-                      background: solvoColors.surface,
-                      color: solvoColors.text,
-                      fontFamily: solvoFonts.sans,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                </Box>
-              </Flex>
-
-              <Box marginBottom="16px">
-                <Text fontSize="11px" fontWeight={600} color={solvoColors.textMuted} textTransform="uppercase" letterSpacing="0.04em" marginBottom="6px">
-                  Message to supplier (optional)
-                </Text>
-                <textarea
-                  value={selectModal.message}
-                  onChange={(e) => setSelectModal({ ...selectModal, message: e.target.value })}
-                  rows={2}
-                  placeholder="Any extra context, dietary needs, theme, etc."
-                  style={{
-                    width: '100%',
-                    padding: '11px 13px',
-                    borderRadius: '10px',
-                    border: `1px solid ${solvoColors.border}`,
-                    background: solvoColors.surface,
-                    color: solvoColors.text,
-                    fontFamily: solvoFonts.sans,
-                    fontSize: '14px',
-                    outline: 'none',
-                    resize: 'vertical',
-                  }}
-                />
-              </Box>
-
-              {requestError && (
-                <Box padding="10px 12px" borderRadius="10px" bg={solvoColors.roseLight} color={solvoColors.roseText} marginBottom="14px">
-                  <Text fontSize="sm">{requestError}</Text>
-                </Box>
-              )}
-
-              <Flex gap="10px">
-                <Box
-                  as="button"
-                  onClick={() => !submittingRequest && setSelectModal(null)}
-                  padding="11px 18px"
-                  borderRadius="12px"
-                  bg={solvoColors.surface}
-                  color={solvoColors.text}
-                  border={`1px solid ${solvoColors.border}`}
-                  fontWeight={600}
-                  fontSize="14px"
-                  cursor="pointer"
-                >
-                  Cancel
-                </Box>
-                <button
-                  type="button"
-                  onClick={handleConfirmRequest}
-                  disabled={submittingRequest}
-                  style={{
-                    flex: 1,
-                    padding: '11px 18px',
-                    borderRadius: '12px',
-                    border: 'none',
-                    background: solvoColors.accent,
-                    color: solvoColors.accentFg,
-                    fontWeight: 600,
-                    fontSize: '14px',
-                    fontFamily: solvoFonts.sans,
-                    cursor: 'pointer',
-                    opacity: submittingRequest ? 0.5 : 1,
-                  }}
-                >
-                  {submittingRequest ? 'Sending…' : 'Send request to supplier'}
-                </button>
-              </Flex>
-            </Box>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
 
   const feedbackBanner = (
     <>
@@ -2416,49 +2058,6 @@ export default function Home() {
           style={{ boxShadow: solvoShadows.floatingPanel }}
         >
           Creating request…
-        </Box>
-      )}
-      {createdRequest && (
-        <Box
-          position="fixed"
-          top="80px"
-          right="24px"
-          padding="14px 18px"
-          borderRadius="12px"
-          bg={solvoColors.surface}
-          border={`1px solid ${solvoColors.emerald}`}
-          maxWidth="360px"
-          zIndex={1000}
-          style={{ boxShadow: solvoShadows.floatingPanel }}
-        >
-          <Text fontSize="sm" fontWeight={600} color={solvoColors.text} marginBottom="4px">
-            Request #{createdRequest.requestId} created
-          </Text>
-          <Text fontSize="xs" color={solvoColors.textMuted} marginBottom="10px">
-            Interested in {createdRequest.providerName}. Suppliers can now send quotes.
-          </Text>
-          <Flex gap="10px">
-            <Link href="/requests" style={{ textDecoration: 'none' }}>
-              <Text
-                as="span"
-                fontSize="xs"
-                fontWeight={600}
-                color={solvoColors.indigo}
-                cursor="pointer"
-              >
-                View request →
-              </Text>
-            </Link>
-            <Text
-              as="span"
-              fontSize="xs"
-              color={solvoColors.textSubtle}
-              cursor="pointer"
-              onClick={() => setCreatedRequest(null)}
-            >
-              Dismiss
-            </Text>
-          </Flex>
         </Box>
       )}
       {requestError && (
@@ -2568,7 +2167,6 @@ export default function Home() {
           <HeroSection onSubmit={handleSend} onStartChat={handleNewChat} />
         </motion.div>
         {feedbackBanner}
-        {selectModalEl}
       </>
     );
   }
@@ -2680,7 +2278,6 @@ export default function Home() {
       )}
     </motion.div>
     {feedbackBanner}
-    {selectModalEl}
     </>
   );
 }

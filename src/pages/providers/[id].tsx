@@ -4,8 +4,6 @@ import { useRouter } from 'next/router';
 import {
   ArrowLeft,
   Calendar,
-  ChevronDown,
-  ChevronUp,
   Globe,
   Heart,
   Mail,
@@ -99,11 +97,6 @@ export default function ProviderProfile() {
   const [toggleFavorite, toggleState] = useToggleFavoriteMutation();
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const showFavorited = optimistic ?? isFavorited;
-
-  // Direct contact details stay collapsed by default. Requests, quotes and
-  // messages are meant to run through Solvo, so the off-platform channels
-  // are available but never the first thing a customer reaches for.
-  const [showContacts, setShowContacts] = useState(false);
 
   /**
    * Five gallery tiles: the supplier's uploaded photos first, padded out
@@ -671,7 +664,7 @@ export default function ProviderProfile() {
                 )}
               </Box>
 
-              {/* Direct contact — collapsed, and secondary to the on-site flow */}
+              {/* Direct contact — shown immediately alongside the on-site flow */}
               {contactChannels.length > 0 && (
                 <Box
                   marginTop="16px"
@@ -680,64 +673,37 @@ export default function ProviderProfile() {
                   borderTopStyle="solid"
                   borderTopColor={solvoColors.border}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setShowContacts((v) => !v)}
-                    aria-expanded={showContacts}
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '10px',
-                      border: `1px solid ${solvoColors.border}`,
-                      background: 'transparent',
-                      color: solvoColors.textSubtle,
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Flex align="center" justify="center" gap="6px">
-                      {showContacts ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                      {showContacts ? 'Hide contact details' : 'Show contact details'}
-                    </Flex>
-                  </button>
-
-                  {showContacts && (
-                    <Box marginTop="12px">
-                      <Text fontSize="11px" color={solvoColors.textSubtle} marginBottom="10px" lineHeight={1.5}>
-                        Starting the request here keeps your quotes, dates and payment in one
-                        place — and {supplier.companyName} replies faster on Solvo.
-                      </Text>
-                      <Flex direction="column" gap="6px">
-                        {contactChannels.map((c) => (
-                          <a
-                            key={`${c.kind}-${c.value}`}
-                            href={c.href}
-                            target={c.kind === 'website' ? '_blank' : undefined}
-                            rel={c.kind === 'website' ? 'noreferrer' : undefined}
-                            style={{ textDecoration: 'none' }}
-                          >
-                            <Flex
-                              align="center"
-                              gap="8px"
-                              padding="8px 10px"
-                              borderRadius="10px"
-                              bg={solvoColors.bg}
-                              color={solvoColors.textMuted}
-                              _hover={{ color: solvoColors.text }}
-                            >
-                              {c.kind === 'phone' && <Phone size={13} />}
-                              {c.kind === 'email' && <Mail size={13} />}
-                              {c.kind === 'website' && <Globe size={13} />}
-                              <Text fontSize="12px" style={{ wordBreak: 'break-all' }}>
-                                {c.value}
-                              </Text>
-                            </Flex>
-                          </a>
-                        ))}
-                      </Flex>
-                    </Box>
-                  )}
+                  <Text fontSize="11px" fontWeight={600} color={solvoColors.textSubtle} marginBottom="10px" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Contact details
+                  </Text>
+                  <Flex direction="column" gap="6px">
+                    {contactChannels.map((c) => (
+                      <a
+                        key={`${c.kind}-${c.value}`}
+                        href={c.href}
+                        target={c.kind === 'website' ? '_blank' : undefined}
+                        rel={c.kind === 'website' ? 'noreferrer' : undefined}
+                        style={{ textDecoration: 'none' }}
+                      >
+                        <Flex
+                          align="center"
+                          gap="8px"
+                          padding="8px 10px"
+                          borderRadius="10px"
+                          bg={solvoColors.bg}
+                          color={solvoColors.textMuted}
+                          _hover={{ color: solvoColors.text }}
+                        >
+                          {c.kind === 'phone' && <Phone size={13} />}
+                          {c.kind === 'email' && <Mail size={13} />}
+                          {c.kind === 'website' && <Globe size={13} />}
+                          <Text fontSize="12px" style={{ wordBreak: 'break-all' }}>
+                            {c.value}
+                          </Text>
+                        </Flex>
+                      </a>
+                    ))}
+                  </Flex>
                 </Box>
               )}
             </Box>
