@@ -29,6 +29,9 @@ function routeForNotification(
       return `/bookings?id=${entityId}`;
     case 'Conversation':
       return `/messages?id=${entityId}`;
+    case 'Supplier':
+      // Storefront reviews point at the reviewed supplier's public page.
+      return `/providers/${entityId}`;
     case 'Quote':
       // No standalone quote detail page yet — fall back to the supplier's
       // quotes inbox.
