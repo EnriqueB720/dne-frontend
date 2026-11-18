@@ -24,6 +24,7 @@ import {
 } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
+import { contactChannelFor, logSupplierContact } from '@/shared/services/contact.service';
 import {
   PromotionTier,
   useFavoritesByCustomerQuery,
@@ -759,6 +760,13 @@ export default function ProviderProfile() {
                         target={c.kind === 'website' ? '_blank' : undefined}
                         rel={c.kind === 'website' ? 'noreferrer' : undefined}
                         style={{ textDecoration: 'none' }}
+                        onClick={() =>
+                          logSupplierContact(
+                            supplier.supplierId,
+                            contactChannelFor(c.kind),
+                            'storefront',
+                          )
+                        }
                       >
                         <Flex
                           align="center"

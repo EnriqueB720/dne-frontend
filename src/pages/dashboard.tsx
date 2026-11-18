@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import AuthContext from '@/shared/contexts/auth.context';
 import { motion } from 'framer-motion';
 import { Inbox, Plus, Sparkles } from 'lucide-react';
-import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, Pill } from '@components';
+import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, Pill, ReviewPrompts } from '@components';
 import { solvoColors, solvoFonts } from '@constants';
 import {
   BookingStatus,
@@ -279,6 +279,9 @@ export default function Dashboard() {
             <Plus size={14} /> New request
           </Flex>
         </Flex>
+
+        {/* "How did it go?" — follow-ups on suppliers they contacted */}
+        <ReviewPrompts customerId={customerId} />
 
         {/* Tabs */}
         <Flex

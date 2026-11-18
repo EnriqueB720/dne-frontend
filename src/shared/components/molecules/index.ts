@@ -18,6 +18,7 @@ import PackageCard from './packageCard/packageCard.component';
 import NotificationBell from './notificationBell/notificationBell.component';
 import QuoteCreateModal from './quoteCreateModal/quoteCreateModal.component';
 import ReviewCreateModal from './reviewCreateModal/reviewCreateModal.component';
+import ReviewPrompts from './reviewPrompts/reviewPrompts.component';
 import ConfirmModal from './confirmModal/confirmModal.component';
 import StatusModal from './statusModal/statusModal.component';
 import ColorModeToggle from './colorModeToggle/colorModeToggle.component';
@@ -47,6 +48,7 @@ export {
   NotificationBell,
   QuoteCreateModal,
   ReviewCreateModal,
+  ReviewPrompts,
   ConfirmModal,
   AtmosphericGlow,
   ColorModeToggle,

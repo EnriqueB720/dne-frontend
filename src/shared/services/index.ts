@@ -4,6 +4,7 @@ import DictionaryService from './dictionary.service';
 
 export * from './ai.service';
 export * from './conversation.service';
+export * from './contact.service';
 
 export {
   StorageService,

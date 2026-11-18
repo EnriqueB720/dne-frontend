@@ -1,0 +1,3 @@
+mutation logSupplierContact($data: ContactLogInput!) {
+  logSupplierContact(data: $data)
+}

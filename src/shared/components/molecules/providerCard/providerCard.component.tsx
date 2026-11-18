@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { Box, Flex, Text } from '@atoms';
 import { Pill } from '@atoms';
 import { solvoColors, solvoFonts, solvoShadows } from '@constants';
+import { contactChannelFor, logSupplierContact } from '@/shared/services/contact.service';
 
 export interface ProviderData {
   id: number;
@@ -494,7 +495,12 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                       href={c.href}
                       target={c.kind === 'website' ? '_blank' : undefined}
                       rel={c.kind === 'website' ? 'noopener noreferrer' : undefined}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (provider.isRealSupplier) {
+                          logSupplierContact(provider.id, contactChannelFor(c.kind), 'chat');
+                        }
+                      }}
                       title={c.value}
                       style={{ ...linkStyle, fontSize: '13px' }}
                       onMouseEnter={onLinkEnter}

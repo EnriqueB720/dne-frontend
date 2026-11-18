@@ -6,6 +6,7 @@ import { ProviderCard } from '@molecules';
 import type { ProviderData } from '@molecules';
 import { solvoColors, solvoFonts } from '@constants';
 import type { UiMessage } from '@/shared/jotai/conversation.atom';
+import { contactChannelFor, logSupplierContact } from '@/shared/services/contact.service';
 
 /** Render text that may contain **bold** markdown spans and newlines. */
 function renderContent(text: string): React.ReactNode {
@@ -157,6 +158,11 @@ function ContactRevealCard({ provider }: { provider: ProviderData }) {
             target={c.key === 'website' ? '_blank' : undefined}
             rel={c.key === 'website' ? 'noopener noreferrer' : undefined}
             style={{ textDecoration: 'none' }}
+            onClick={() => {
+              if (provider.isRealSupplier) {
+                logSupplierContact(provider.id, contactChannelFor(c.key), 'chat');
+              }
+            }}
           >
             <Flex
               align="center"
