@@ -64,7 +64,9 @@ import {
   useCreateQuoteMutation,
   useSearchSuppliersLazyQuery,
   useSuppliersQuery,
+  ContactChannel,
 } from '@generated';
+import { logSupplierContact } from '@/shared/services/contact.service';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import AuthContext from '@/shared/contexts/auth.context';
@@ -1069,6 +1071,10 @@ export default function Home() {
   // customer and supplier from here on.
   const handleSelectProvider = React.useCallback(
     (provider: ProviderData) => {
+      // Clicking Contact is the lead — the follow-up review prompt hangs off it.
+      if (provider.isRealSupplier) {
+        logSupplierContact(provider.id, ContactChannel.ChatContact, 'chat');
+      }
       const confirmationMsg: UiMessage = provider.isRealSupplier
         ? {
             role: 'assistant',

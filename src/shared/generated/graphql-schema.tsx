@@ -253,6 +253,22 @@ export type CompleteOnboardingInput = {
   role: Scalars['String']['input'];
 };
 
+/** How a customer reached out to a supplier */
+export enum ContactChannel {
+  ChatContact = 'CHAT_CONTACT',
+  Email = 'EMAIL',
+  Phone = 'PHONE',
+  Website = 'WEBSITE',
+  Whatsapp = 'WHATSAPP'
+}
+
+export type ContactLogInput = {
+  channel: ContactChannel;
+  deviceId?: InputMaybe<Scalars['String']['input']>;
+  source?: InputMaybe<Scalars['String']['input']>;
+  supplierId: Scalars['Int']['input'];
+};
+
 export type Conversation = {
   __typename?: 'Conversation';
   contactShareWarnings: Scalars['Float']['output'];
@@ -460,7 +476,9 @@ export type Mutation = {
   deleteReview: Scalars['Boolean']['output'];
   deleteService: Scalars['Boolean']['output'];
   deleteSupplierMedia: Scalars['Boolean']['output'];
+  dismissReviewPrompt: Scalars['Boolean']['output'];
   linkAiConversationToRequest: AiConversation;
+  logSupplierContact: Scalars['Boolean']['output'];
   markAllNotificationsAsRead: Scalars['Int']['output'];
   markMessagesAsRead: Scalars['Float']['output'];
   markNotificationAsRead: Notification;
@@ -623,9 +641,19 @@ export type MutationDeleteSupplierMediaArgs = {
 };
 
 
+export type MutationDismissReviewPromptArgs = {
+  supplierId: Scalars['Int']['input'];
+};
+
+
 export type MutationLinkAiConversationToRequestArgs = {
   data: AiConversationLinkInput;
   deviceId?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationLogSupplierContactArgs = {
+  data: ContactLogInput;
 };
 
 
@@ -948,6 +976,7 @@ export type Query = {
   requestsByCustomer: Array<Request>;
   requestsBySupplier: Array<Request>;
   revenueByDay: Array<RevenueByDayRow>;
+  reviewPrompts: Array<ReviewPrompt>;
   search: Search;
   searchSuppliers: Array<Supplier>;
   servicesBySupplier: Array<Service>;
@@ -1397,6 +1426,14 @@ export type ReviewCreateInput = {
 export type ReviewDeleteInput = {
   customerId: Scalars['Int']['input'];
   reviewId: Scalars['Int']['input'];
+};
+
+export type ReviewPrompt = {
+  __typename?: 'ReviewPrompt';
+  city?: Maybe<Scalars['String']['output']>;
+  companyName: Scalars['String']['output'];
+  contactedAt: Scalars['DateTime']['output'];
+  supplierId: Scalars['Int']['output'];
 };
 
 export type ReviewUpdateInput = {
@@ -2010,6 +2047,25 @@ export type CategoriesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type CategoriesQuery = { __typename?: 'Query', categories: Array<{ __typename?: 'Category', categoryId: number, categoryName: string }> };
+
+export type DismissReviewPromptMutationVariables = Exact<{
+  supplierId: Scalars['Int']['input'];
+}>;
+
+
+export type DismissReviewPromptMutation = { __typename?: 'Mutation', dismissReviewPrompt: boolean };
+
+export type LogSupplierContactMutationVariables = Exact<{
+  data: ContactLogInput;
+}>;
+
+
+export type LogSupplierContactMutation = { __typename?: 'Mutation', logSupplierContact: boolean };
+
+export type ReviewPromptsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ReviewPromptsQuery = { __typename?: 'Query', reviewPrompts: Array<{ __typename?: 'ReviewPrompt', supplierId: number, companyName: string, city?: string | null, contactedAt: any }> };
 
 export type ArchiveConversationMutationVariables = Exact<{
   data: ConversationArchiveInput;
@@ -4004,6 +4060,113 @@ export type CategoriesQueryHookResult = ReturnType<typeof useCategoriesQuery>;
 export type CategoriesLazyQueryHookResult = ReturnType<typeof useCategoriesLazyQuery>;
 export type CategoriesSuspenseQueryHookResult = ReturnType<typeof useCategoriesSuspenseQuery>;
 export type CategoriesQueryResult = Apollo.QueryResult<CategoriesQuery, CategoriesQueryVariables>;
+export const DismissReviewPromptDocument = gql`
+    mutation dismissReviewPrompt($supplierId: Int!) {
+  dismissReviewPrompt(supplierId: $supplierId)
+}
+    `;
+export type DismissReviewPromptMutationFn = Apollo.MutationFunction<DismissReviewPromptMutation, DismissReviewPromptMutationVariables>;
+
+/**
+ * __useDismissReviewPromptMutation__
+ *
+ * To run a mutation, you first call `useDismissReviewPromptMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDismissReviewPromptMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [dismissReviewPromptMutation, { data, loading, error }] = useDismissReviewPromptMutation({
+ *   variables: {
+ *      supplierId: // value for 'supplierId'
+ *   },
+ * });
+ */
+export function useDismissReviewPromptMutation(baseOptions?: Apollo.MutationHookOptions<DismissReviewPromptMutation, DismissReviewPromptMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DismissReviewPromptMutation, DismissReviewPromptMutationVariables>(DismissReviewPromptDocument, options);
+      }
+export type DismissReviewPromptMutationHookResult = ReturnType<typeof useDismissReviewPromptMutation>;
+export type DismissReviewPromptMutationResult = Apollo.MutationResult<DismissReviewPromptMutation>;
+export type DismissReviewPromptMutationOptions = Apollo.BaseMutationOptions<DismissReviewPromptMutation, DismissReviewPromptMutationVariables>;
+export const LogSupplierContactDocument = gql`
+    mutation logSupplierContact($data: ContactLogInput!) {
+  logSupplierContact(data: $data)
+}
+    `;
+export type LogSupplierContactMutationFn = Apollo.MutationFunction<LogSupplierContactMutation, LogSupplierContactMutationVariables>;
+
+/**
+ * __useLogSupplierContactMutation__
+ *
+ * To run a mutation, you first call `useLogSupplierContactMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useLogSupplierContactMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [logSupplierContactMutation, { data, loading, error }] = useLogSupplierContactMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useLogSupplierContactMutation(baseOptions?: Apollo.MutationHookOptions<LogSupplierContactMutation, LogSupplierContactMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<LogSupplierContactMutation, LogSupplierContactMutationVariables>(LogSupplierContactDocument, options);
+      }
+export type LogSupplierContactMutationHookResult = ReturnType<typeof useLogSupplierContactMutation>;
+export type LogSupplierContactMutationResult = Apollo.MutationResult<LogSupplierContactMutation>;
+export type LogSupplierContactMutationOptions = Apollo.BaseMutationOptions<LogSupplierContactMutation, LogSupplierContactMutationVariables>;
+export const ReviewPromptsDocument = gql`
+    query reviewPrompts {
+  reviewPrompts {
+    supplierId
+    companyName
+    city
+    contactedAt
+  }
+}
+    `;
+
+/**
+ * __useReviewPromptsQuery__
+ *
+ * To run a query within a React component, call `useReviewPromptsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useReviewPromptsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useReviewPromptsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useReviewPromptsQuery(baseOptions?: Apollo.QueryHookOptions<ReviewPromptsQuery, ReviewPromptsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<ReviewPromptsQuery, ReviewPromptsQueryVariables>(ReviewPromptsDocument, options);
+      }
+export function useReviewPromptsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<ReviewPromptsQuery, ReviewPromptsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<ReviewPromptsQuery, ReviewPromptsQueryVariables>(ReviewPromptsDocument, options);
+        }
+// @ts-ignore
+export function useReviewPromptsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<ReviewPromptsQuery, ReviewPromptsQueryVariables>): Apollo.UseSuspenseQueryResult<ReviewPromptsQuery, ReviewPromptsQueryVariables>;
+export function useReviewPromptsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ReviewPromptsQuery, ReviewPromptsQueryVariables>): Apollo.UseSuspenseQueryResult<ReviewPromptsQuery | undefined, ReviewPromptsQueryVariables>;
+export function useReviewPromptsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<ReviewPromptsQuery, ReviewPromptsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<ReviewPromptsQuery, ReviewPromptsQueryVariables>(ReviewPromptsDocument, options);
+        }
+export type ReviewPromptsQueryHookResult = ReturnType<typeof useReviewPromptsQuery>;
+export type ReviewPromptsLazyQueryHookResult = ReturnType<typeof useReviewPromptsLazyQuery>;
+export type ReviewPromptsSuspenseQueryHookResult = ReturnType<typeof useReviewPromptsSuspenseQuery>;
+export type ReviewPromptsQueryResult = Apollo.QueryResult<ReviewPromptsQuery, ReviewPromptsQueryVariables>;
 export const ArchiveConversationDocument = gql`
     mutation archiveConversation($data: ConversationArchiveInput!) {
   archiveConversation(data: $data) {

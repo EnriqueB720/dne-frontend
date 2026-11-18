@@ -44,6 +44,7 @@ import {
   NotificationBell,
   QuoteCreateModal,
   ReviewCreateModal,
+  ReviewPrompts,
   ConfirmModal,
   StatusModal,
 } from '@molecules';
@@ -104,6 +105,7 @@ export {
   NotificationBell,
   QuoteCreateModal,
   ReviewCreateModal,
+  ReviewPrompts,
   ConfirmModal,
   StatusModal,
   SolvoNavBar,

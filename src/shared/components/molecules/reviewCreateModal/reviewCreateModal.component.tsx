@@ -30,6 +30,8 @@ export interface ReviewCreateModalProps {
   serviceDate?: string | null;
   /** When present the modal edits this review instead of creating one. */
   existingReview?: ExistingReview | null;
+  /** Pre-selected overall rating for a new review (e.g. a star clicked on a prompt). */
+  initialRating?: number;
   /** Called after a successful create or update. */
   onSaved: (reviewId: number) => void;
   onClose: () => void;
@@ -131,12 +133,13 @@ const ReviewCreateModal: React.FC<ReviewCreateModalProps> = ({
   bookingSummary,
   serviceDate,
   existingReview,
+  initialRating,
   onSaved,
   onClose,
 }) => {
   const isEdit = !!existingReview;
 
-  const [rating, setRating] = React.useState(existingReview?.rating ?? 0);
+  const [rating, setRating] = React.useState(existingReview?.rating ?? initialRating ?? 0);
   const [text, setText] = React.useState(existingReview?.text ?? '');
   const [subRatings, setSubRatings] = React.useState<Record<SubRatingKey, number>>({
     ratingQuality: existingReview?.ratingQuality ?? 0,
