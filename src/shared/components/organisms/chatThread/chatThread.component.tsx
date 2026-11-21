@@ -24,8 +24,7 @@ function renderContent(text: string): React.ReactNode {
 
 function UnderstoodCard({ msg }: { msg: UiMessage }) {
   const { t } = useI18n();
-  const p = msg.parsed;
-  if (!p?.service) return null;
+  if (!msg.service) return null;
   return (
     <Box
       borderRadius="12px"
@@ -39,10 +38,8 @@ function UnderstoodCard({ msg }: { msg: UiMessage }) {
         {t('chat.understood')}
       </Text>
       <Text fontSize="sm" color={solvoColors.text}>
-        {t('chat.lookingFor', { service: p.service })}{' '}
+        {t('chat.lookingFor', { service: msg.service })}{' '}
         {msg.zoneName ? t('chat.inZone', { zone: msg.zoneName }) : t('chat.nationwide')}
-        {p.when ? ` · ${p.when}` : ''}
-        {p.people ? ` · ${p.people}` : ''}
       </Text>
     </Box>
   );

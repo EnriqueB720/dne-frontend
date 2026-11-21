@@ -1,0 +1,15 @@
+mutation chatTurn($data: ChatTurnInput!) {
+  chatTurn(data: $data) {
+    conversationId
+    title
+    replies {
+      messageId
+      content
+      model
+      createdAt
+      providersJson
+      service
+      zoneName
+    }
+  }
+}

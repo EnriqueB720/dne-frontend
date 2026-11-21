@@ -8,12 +8,11 @@ import { solvoColors, solvoFonts, solvoShadows } from '@constants';
 import { useDeleteReviewMutation, useSaveReviewMutation, useSupplierQuery, useSupplierReviewsQuery } from '@generated';
 import AuthContext from '@/shared/contexts/auth.context';
 import { useI18n } from '@/shared/i18n';
-import { mediaSrc } from '@/shared/lib/api';
 import { categoryName, formatPrice } from '@/shared/lib/supplier';
 
 /**
  * Public supplier profile: who they are, where they work, how to contact
- * them, photos, and what customers say. Anyone can view it; signed-in
+ * them and what customers say. Anyone can view it; signed-in
  * customers can leave (or edit) one review.
  */
 export default function SupplierProfilePage() {
@@ -53,7 +52,7 @@ export default function SupplierProfilePage() {
     }
   };
 
-  if (!valid || (!loading && (error || !s))) {
+  if (router.isReady && (!valid || (!loading && (error || !s)))) {
     return (
       <Box minHeight="100vh" bg={solvoColors.bg}>
         <SolvoNavBar />
@@ -78,7 +77,6 @@ export default function SupplierProfilePage() {
   }
 
   const cats = [...(s.categories ?? [])].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
-  const photos = [...(s.media ?? [])].sort((a, b) => a.displayOrder - b.displayOrder);
   const place = [s.city, s.provinceName].filter(Boolean).join(', ');
 
   return (
@@ -98,15 +96,6 @@ export default function SupplierProfilePage() {
           </Notice>
         )}
 
-        {photos.length > 0 && (
-          <Box display="grid" gridTemplateColumns={{ base: '1fr', md: '2fr 1fr 1fr' }} gridTemplateRows={{ md: '160px 160px' }} gap="8px" marginBottom="24px" borderRadius="20px" overflow="hidden">
-            {photos.slice(0, 5).map((p, i) => (
-              <Box key={p.mediaAssetId} gridRow={{ md: i === 0 ? 'span 2' : undefined }} bg={solvoColors.surfaceMuted} minHeight={{ base: i === 0 ? '220px' : '0', md: 'auto' }} display={{ base: i === 0 ? 'block' : 'none', md: 'block' }}>
-                <img src={mediaSrc(p.mediaAssetId)} alt={p.altText ?? s.companyName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              </Box>
-            ))}
-          </Box>
-        )}
 
         <Box display="grid" gridTemplateColumns={{ base: '1fr', lg: '2fr 1fr' }} gap="24px" alignItems="start">
           <Flex direction="column" gap="20px">

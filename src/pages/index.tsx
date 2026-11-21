@@ -10,119 +10,26 @@ import {
   useCategoriesQuery,
   useProvincesQuery,
   useResolveProvinceLazyQuery,
-  useSearchSuppliersLazyQuery,
   useSuppliersQuery,
   ContactChannel,
-  type SearchSuppliersQuery,
 } from '@generated';
 import { useUserLocation } from '@hooks';
 import AuthContext from '@/shared/contexts/auth.context';
 import { useI18n } from '@/shared/i18n';
 import type { UiMessage } from '@/shared/lib/chat';
-import { fromStoredJson, toChatSupplier, type ChatSupplier, categoryName } from '@/shared/lib/supplier';
-import { isAdditiveFollowupRequest, parseQueryWithAi, wantsMoreResults, type ParsedQuery } from '@/shared/services/ai.service';
+import { fromStoredJson, type ChatSupplier, categoryName } from '@/shared/lib/supplier';
+import { runChatTurn } from '@/shared/services/chat.service';
 import { logSupplierContact } from '@/shared/services/contact.service';
 import {
-  createConversation,
   deleteConversation as apiDeleteConversation,
   getConversation,
+  getOrCreateDeviceId,
   listConversations,
-  rollbackLastTurn,
-  sendMessage as apiSendMessage,
-  updateMessageProviders,
   type ConversationSummary,
 } from '@/shared/services/conversation.service';
 
-// ─────────────────────────────────────────────────────────────────────────
-// How a turn works (see docs/ARCHITECTURE.md → "AI chat"):
-//  1. parseQueryWithAi → intent + what/where (backend: Claude, Gemini fallback)
-//  2. service_request / network_inquiry → searchSuppliers (DB only, strict to
-//     the resolved province: typed place → picked zone → device GPS)
-//  3. sendMessage with a grounding block describing EXACTLY those suppliers
-//  4. render the reply + one card per supplier found (no padding, no
-//     invented suppliers — zero results means zero cards)
-// ─────────────────────────────────────────────────────────────────────────
-
-/** Max cards per search. We show every match up to this — never fill gaps. */
-const RESULT_LIMIT = 10;
-/** The API rejects grounding blocks over 12k chars (cost guard). */
-const MAX_GROUNDING_CHARS = 11500;
 const ZONE_STORAGE_KEY = 'solvo:zone';
 const GUEST_BANNER_KEY = 'solvo:guest-banner-dismissed';
-
-/** "find", "busco", "muéstrame"… — a new search even when cards are on screen. */
-const SEARCH_ACTION_RE =
-  /\b(?:look(?:\s+(?:for|inside|at|around))?|search(?:\s+for)?|find(?:\s+me)?|show(?:\s+me)?|get(?:\s+me)?|give(?:\s+me)?|need|want|looking(?:\s+for)?|b[uú]sca(?:me|nos|r)?|necesito|ocupo|quiero|dame|mu[eé]str[aá](?:me|nos)?)\b/i;
-
-/** "never mind", "olvídalo"… — drop earlier turns from the parser's context. */
-const CONTEXT_CLEAR_RE =
-  /\b(?:never\s+mind|forget\s+(?:that|it|the|those|everything|all)?|scratch\s+that|start\s+over|olvida(?:te|lo|los|la|las)?(?:\s+(?:eso|lo\s+anterior|todo))?|mejor\s+no|al\s+final)\b/i;
-
-const SOLVO_CHAT_SYSTEM_PROMPT = `You are Solvo, an assistant that connects people in Costa Rica with local service providers (plumbers, electricians, cleaners, DJs…) and product or material suppliers (bakeries, hardware stores, building materials…).
-
-RULES — follow exactly:
-1. LANGUAGE: reply in the language of the user's latest message (Spanish or English). Never mix. In Spanish use "usted".
-2. ONLY REAL SUPPLIERS: you may only mention suppliers listed in the context blocks below or earlier in this conversation. NEVER invent a business, a phone number, an email, a website, a price or a review. If nothing matches, say so honestly.
-3. ZONE: searches are limited to one province. The "## Search result" block says which one. If 0 suppliers were found there, say that plainly for that province and suggest a neighboring province (they can just name it) or describing the need with other words. If the zone is "unknown", the results are from the whole country — say so and ask which province they need it in.
-4. CARDS: in a service request, the supplier cards are shown BELOW your message at the same moment. Speak in present tense ("Here are 3 plumbers that serve Heredia"). Do not list every business again; you may highlight one or two with a short reason (rating, specialty, preferred). NEVER say "one moment", "let me search" or anything implying results are still coming.
-5. NETWORK QUESTIONS ("## Network lookup"): no cards are shown — answer in text from the listed data (counts, names, provinces).
-6. CONTACT: Solvo connects people directly, there is no booking. When asked how to reach a supplier, give the phone / WhatsApp / email / website from the data, or tell them to tap "Contact" on the card. Never say contact info is hidden. If a supplier has no contact field, say you don't have it.
-7. FOLLOW-UPS ("## Known suppliers"): answer questions about suppliers already shown using only that data.
-8. STYLE: 1–3 sentences for searches, up to 5 for questions. At most one clarifying question. No markdown headers, no bullet lists.`;
-
-function formatSuppliersForGrounding(list: ChatSupplier[]): string {
-  return list
-    .map((s, i) => {
-      const parts = [
-        `${i + 1}. ${s.companyName}`,
-        s.tagline && `tagline: ${s.tagline}`,
-        `based in: ${[s.city, s.provinceName].filter(Boolean).join(', ') || 'unknown'}`,
-        s.serviceProvinceNames?.length && `serves: ${s.serviceProvinceNames.join(', ')}`,
-        s.categories?.length && `categories: ${s.categories.map((c) => c.nameEn).join(', ')}`,
-        s.skills?.length && `specialties: ${s.skills.join(', ')}`,
-        (s.reviewCount ?? 0) > 0 ? `rating: ${Number(s.rating).toFixed(1)} (${s.reviewCount} reviews)` : 'rating: no reviews yet',
-        s.services?.length &&
-          `services: ${s.services.map((sv) => (sv.priceFrom ? `${sv.name} from ₡${Number(sv.priceFrom).toLocaleString('en-US')}${sv.priceUnit ? `/${sv.priceUnit}` : ''}` : sv.name)).join('; ')}`,
-        s.verified && 'verified by Solvo',
-        s.preferred && 'preferred supplier',
-        s.businessPhone && `phone: ${s.businessPhone}`,
-        s.whatsappNumber && `whatsapp: ${s.whatsappNumber}`,
-        s.businessEmail && `email: ${s.businessEmail}`,
-        s.websiteUrl && `website: ${s.websiteUrl}`,
-      ];
-      return parts.filter(Boolean).join(' | ');
-    })
-    .join('\n');
-}
-
-function zoneLine(zoneName: string | null): string {
-  return zoneName ? `zone: ${zoneName} province (only suppliers serving it were searched)` : 'zone: unknown (searched the whole country)';
-}
-
-function searchResultContext(list: ChatSupplier[], parsed: ParsedQuery, zoneName: string | null): string {
-  const what = parsed.service ? `"${parsed.service}"` : 'any supplier';
-  if (list.length === 0) {
-    return `## Search result\n${zoneLine(zoneName)}\nrequest: ${what}\n0 suppliers found — NO cards are shown. Say so honestly; do not invent any.`;
-  }
-  return `## Search result\n${zoneLine(zoneName)}\nrequest: ${what}\n${list.length} supplier card(s) are shown below your message right now:\n${formatSuppliersForGrounding(list)}`;
-}
-
-function networkContext(list: ChatSupplier[], parsed: ParsedQuery, zoneName: string | null): string {
-  return (
-    `## Network lookup\n${zoneLine(zoneName)}\nquestion about: ${parsed.service || 'the supplier network'}\n` +
-    (list.length === 0
-      ? '0 suppliers match. Say so honestly. No cards are shown.'
-      : `${list.length} matching supplier(s), NO cards are shown — answer in text:\n${formatSuppliersForGrounding(list)}`)
-  );
-}
-
-function lastShownSuppliers(messages: UiMessage[]): ChatSupplier[] {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role === 'assistant' && m.suppliers?.length) return m.suppliers;
-  }
-  return [];
-}
 
 // ── Landing ──────────────────────────────────────────────────────────────
 
@@ -367,10 +274,7 @@ export default function Home() {
 
   const skipNextLoadRef = React.useRef<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
-  const activeConvRef = React.useRef<string | null>(null);
-  const newConvRef = React.useRef<string | null>(null);
 
-  const [searchSuppliers] = useSearchSuppliersLazyQuery({ fetchPolicy: 'network-only' });
 
   // ── Zone: picked province ▸ device location ▸ whole country ─────────────
   const { data: provincesData } = useProvincesQuery({ fetchPolicy: 'cache-first' });
@@ -472,113 +376,61 @@ export default function Home() {
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
     );
 
-  /** DB search in the right zone. Text in the message beats the picked zone. */
-  const runSearch = React.useCallback(
-    async (parsed: Pick<ParsedQuery, 'service' | 'location'>, limit: number, signal: AbortSignal) => {
-      const typed = parsed.location?.trim() || null;
-      const res = await searchSuppliers({
-        variables: {
-          data: {
-            query: parsed.service?.trim() || null,
-            location: typed,
-            province: !typed && zone.mode === 'picked' ? zone.code : null,
-            lat: !typed && zone.mode === 'device' && deviceLocation ? deviceLocation.lat : null,
-            lng: !typed && zone.mode === 'device' && deviceLocation ? deviceLocation.lng : null,
-            limit,
-          },
-        },
-        context: { fetchOptions: { signal } },
-      });
-      const result: SearchSuppliersQuery['searchSuppliers'] | undefined = res.data?.searchSuppliers;
-      return {
-        suppliers: (result?.suppliers ?? []).map(toChatSupplier),
-        zoneName: result?.province?.name ?? null,
-      };
-    },
-    [searchSuppliers, zone, deviceLocation],
-  );
-
+  /**
+   * One turn = one chatTurn call. The API parses the message, searches the
+   * DB in one province, grounds the reply on those suppliers and saves the
+   * turn (see dne-backend src/api/assistant). We only send the message and
+   * where the user is.
+   */
   const handleSend = React.useCallback(
     async (content: string) => {
       if (!content.trim() || waitingForAI) return;
-      const history = messages;
-
-      // Parser context: the last two user turns (unless the user reset or
-      // added a brand-new topic), so "y en Cartago?" keeps the service.
-      const fresh = CONTEXT_CLEAR_RE.test(content) || isAdditiveFollowupRequest(content);
-      const recentUser = fresh ? [] : history.filter((m) => m.role === 'user').slice(-2).map((m) => m.content);
-      const shown = lastShownSuppliers(history);
-
       setMessages((prev) => [...prev, { role: 'user', content, createdAt: new Date().toISOString() }]);
       setWaitingForAI(true);
       setMode('chat');
 
       const controller = new AbortController();
       abortRef.current = controller;
-      const { signal } = controller;
 
       try {
-        let convId = currentConvId;
-        if (!convId) {
-          const conv = await createConversation(content.length > 60 ? `${content.slice(0, 57)}…` : content);
-          convId = conv.conversationId;
-          if (signal.aborted) {
-            apiDeleteConversation(convId).catch(() => undefined);
-            return;
-          }
-          skipNextLoadRef.current = convId;
-          setCurrentConvId(convId);
-          setConversations((prev) => [conv, ...prev]);
-          newConvRef.current = convId;
-        }
-        activeConvRef.current = convId;
+        const turn = await runChatTurn(
+          {
+            conversationId: currentConvId,
+            message: content,
+            deviceId: getOrCreateDeviceId(),
+            province: zone.mode === 'picked' ? zone.code : null,
+            lat: zone.mode === 'device' && deviceLocation ? deviceLocation.lat : null,
+            lng: zone.mode === 'device' && deviceLocation ? deviceLocation.lng : null,
+          },
+          controller.signal,
+        );
 
-        const { parsed } = await parseQueryWithAi(content, recentUser, signal);
+        setMessages((prev) => [
+          ...prev,
+          ...turn.replies.map(
+            (r): UiMessage => ({
+              messageId: r.messageId,
+              role: 'assistant',
+              content: r.content,
+              model: r.model,
+              createdAt: r.createdAt,
+              suppliers: fromStoredJson(r.providersJson),
+              service: r.service ?? undefined,
+              zoneName: r.zoneName ?? null,
+            }),
+          ),
+        ]);
 
-        // Once cards are on screen most follow-ups are questions about them —
-        // unless the user clearly asks for a new search.
-        if (wantsMoreResults(content) || isAdditiveFollowupRequest(content)) {
-          parsed.intent = 'service_request';
-        } else if (shown.length && parsed.intent === 'service_request' && !SEARCH_ACTION_RE.test(content)) {
-          parsed.intent = 'chat';
-        }
-
-        const send = (text: string, system: string) =>
-          apiSendMessage(convId!, text, { system: system.slice(0, MAX_GROUNDING_CHARS), cachedSystem: SOLVO_CHAT_SYSTEM_PROMPT, signal });
-
-        const push = async (reply: Awaited<ReturnType<typeof send>>, extra: Partial<UiMessage>) => {
-          setMessages((prev) => [
+        if (!currentConvId) {
+          skipNextLoadRef.current = turn.conversationId;
+          setCurrentConvId(turn.conversationId);
+          setConversations((prev) => [
+            { conversationId: turn.conversationId, title: turn.title, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messages: [] },
             ...prev,
-            { messageId: reply.messageId, role: 'assistant', content: reply.content, model: reply.model, createdAt: reply.createdAt, ...extra },
           ]);
-          if (extra.suppliers?.length && reply.messageId) {
-            updateMessageProviders(convId!, reply.messageId, JSON.stringify(extra.suppliers)).catch(() => undefined);
-          }
-        };
-
-        if (parsed.intent === 'chat') {
-          const ctx = shown.length
-            ? `## Known suppliers (already shown — answer only from this data):\n${formatSuppliersForGrounding(shown)}`
-            : '## Conversation\nAnswer from the conversation history. If they need a supplier, ask what and where.';
-          await push(await send(content, ctx), {});
-        } else if (parsed.intent === 'network_inquiry') {
-          const { suppliers, zoneName } = await runSearch(parsed, 15, signal);
-          await push(await send(content, networkContext(suppliers, parsed, zoneName)), {});
-        } else if (parsed.subrequests && parsed.subrequests.length >= 2) {
-          // "fontanero y electricista": one search + one reply per topic.
-          for (const sub of parsed.subrequests.slice(0, 3)) {
-            if (signal.aborted) break;
-            const subParsed: ParsedQuery = { ...parsed, ...sub, subrequests: undefined, intent: 'service_request', location: sub.location ?? parsed.location } as ParsedQuery;
-            const { suppliers, zoneName } = await runSearch(subParsed, RESULT_LIMIT, signal);
-            const reply = await send(`(${subParsed.service}) ${content}`, searchResultContext(suppliers, subParsed, zoneName));
-            await push(reply, { suppliers, parsed: subParsed, zoneName });
-          }
         } else {
-          const { suppliers, zoneName } = await runSearch(parsed, RESULT_LIMIT, signal);
-          await push(await send(content, searchResultContext(suppliers, parsed, zoneName)), { suppliers, parsed, zoneName });
+          bumpConversation(turn.conversationId);
         }
-
-        bumpConversation(convId);
       } catch (err) {
         if (!controller.signal.aborted) {
           console.error('[chat] turn failed:', err);
@@ -586,30 +438,21 @@ export default function Home() {
         }
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
-        newConvRef.current = null;
         setWaitingForAI(false);
       }
     },
-    [currentConvId, messages, waitingForAI, runSearch, t],
+    [currentConvId, waitingForAI, zone, deviceLocation, t],
   );
 
-  /** Stop: cancel every in-flight request and roll the turn back server-side. */
+  /**
+   * Stop: cancel the request. The API only saves a turn once the reply is
+   * ready and the client is still connected, so nothing needs rolling back.
+   */
   const handleStop = React.useCallback(() => {
     abortRef.current?.abort(new DOMException('User stopped the response', 'AbortError'));
     abortRef.current = null;
     setWaitingForAI(false);
     setMessages((prev) => (prev.length && prev[prev.length - 1].role === 'user' ? prev.slice(0, -1) : prev));
-    const convId = activeConvRef.current;
-    activeConvRef.current = null;
-    if (!convId) return;
-    if (newConvRef.current === convId) {
-      newConvRef.current = null;
-      apiDeleteConversation(convId).catch(() => undefined);
-      setConversations((prev) => prev.filter((c) => c.conversationId !== convId));
-      setCurrentConvId(null);
-    } else {
-      rollbackLastTurn(convId).catch(() => undefined);
-    }
   }, []);
 
   /** "Contact": log the lead and show the supplier's contact links inline. */

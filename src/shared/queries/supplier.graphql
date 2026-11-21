@@ -53,12 +53,6 @@ fragment SupplierFull on Supplier {
     priceUnit
     currency
   }
-  media {
-    mediaAssetId
-    url
-    altText
-    displayOrder
-  }
 }
 
 query searchSuppliers($data: SupplierSearchInput!) {
@@ -135,10 +129,4 @@ mutation deleteMyService($serviceId: Int!) {
   deleteMyService(serviceId: $serviceId)
 }
 
-mutation deleteMySupplierMedia($mediaAssetId: Int!) {
-  deleteMySupplierMedia(mediaAssetId: $mediaAssetId)
-}
 
-mutation reorderMySupplierMedia($mediaAssetIds: [Int!]!) {
-  reorderMySupplierMedia(mediaAssetIds: $mediaAssetIds)
-}

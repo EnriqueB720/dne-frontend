@@ -1,17 +1,15 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ShieldCheck, Trash2, X } from 'lucide-react';
+import { ShieldCheck, X } from 'lucide-react';
 
 import { Box, Btn, Card, Chip, Flex, Notice, PageTitle, SectionTitle, SolvoNavBar, Text, TextAreaField, TextField, FieldLabel, inputStyle } from '@components';
 import { solvoColors } from '@constants';
 import {
   useCategoriesQuery,
   useDeleteMyServiceMutation,
-  useDeleteMySupplierMediaMutation,
   useMySupplierQuery,
   useProvincesQuery,
-  useReorderMySupplierMediaMutation,
   useSaveMyServiceMutation,
   useSetMySupplierCategoriesMutation,
   useSetMySupplierSkillsMutation,
@@ -20,7 +18,6 @@ import {
 } from '@generated';
 import AuthContext from '@/shared/contexts/auth.context';
 import { useI18n } from '@/shared/i18n';
-import { mediaSrc, uploadPhoto } from '@/shared/lib/api';
 import { categoryName, formatPrice } from '@/shared/lib/supplier';
 
 const PROFILE_FIELDS = [
@@ -43,7 +40,7 @@ const MAX_CATEGORIES = 5;
 /**
  * The supplier's own page: everything the AI chat uses to find them
  * (description, categories, specialties, provinces, contacts), plus their
- * services, photos and how many people contacted them.
+ * services and how many people contacted them.
  */
 export default function MyBusinessPage() {
   const router = useRouter();
@@ -59,8 +56,6 @@ export default function MyBusinessPage() {
   const [suggestSkills, suggestState] = useSuggestMySupplierSkillsLazyQuery({ fetchPolicy: 'network-only' });
   const [saveService] = useSaveMyServiceMutation();
   const [deleteService] = useDeleteMyServiceMutation();
-  const [deleteMedia] = useDeleteMySupplierMediaMutation();
-  const [reorderMedia] = useReorderMySupplierMediaMutation();
 
   const s = data?.mySupplier;
   const stats = data?.mySupplierStats;
@@ -78,7 +73,6 @@ export default function MyBusinessPage() {
   const [saving, setSaving] = React.useState(false);
   const [savedAt, setSavedAt] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [uploading, setUploading] = React.useState(false);
 
   React.useEffect(() => {
     if (!s) return;
@@ -160,22 +154,6 @@ export default function MyBusinessPage() {
       setSaving(false);
     }
   };
-
-  const onUpload = async (file?: File | null) => {
-    if (!file) return;
-    setUploading(true);
-    setError(null);
-    try {
-      await uploadPhoto(file, 'supplier');
-      await refetch();
-    } catch (e: any) {
-      setError(e?.message ?? t('common.error'));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const photos = [...(s.media ?? [])].sort((a, b) => a.displayOrder - b.displayOrder);
 
   return (
     <Shell>
@@ -387,54 +365,6 @@ export default function MyBusinessPage() {
             }}
           />
 
-          <Card>
-            <SectionTitle
-              right={
-                <label style={{ cursor: uploading ? 'wait' : 'pointer', color: solvoColors.brandText, fontWeight: 600, fontSize: '14px' }}>
-                  {uploading ? t('business.uploading') : t('business.addPhoto')}
-                  <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={uploading} onChange={(e) => onUpload(e.target.files?.[0])} />
-                </label>
-              }
-            >
-              {t('business.photos')}
-            </SectionTitle>
-            <Text fontSize="sm" color={solvoColors.textSubtle} marginBottom="10px">
-              {t('business.photosHint')}
-            </Text>
-            <Box display="grid" gridTemplateColumns="repeat(3, 1fr)" gap="8px">
-              {photos.map((p, i) => (
-                <Box key={p.mediaAssetId} position="relative" borderRadius="12px" overflow="hidden" bg={solvoColors.surfaceMuted} height="96px">
-                  <img src={mediaSrc(p.mediaAssetId)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <Flex position="absolute" bottom="4px" left="4px" right="4px" justify="space-between" gap="4px">
-                    {i === 0 ? (
-                      <Chip tone="accent">{t('business.cover')}</Chip>
-                    ) : (
-                      <button
-                        onClick={async () => {
-                          const ids = photos.map((x) => x.mediaAssetId);
-                          await reorderMedia({ variables: { mediaAssetIds: [p.mediaAssetId, ...ids.filter((id) => id !== p.mediaAssetId)] } });
-                          await refetch();
-                        }}
-                        style={{ border: 'none', borderRadius: '8px', fontSize: '11px', padding: '3px 6px', background: solvoColors.surface, color: solvoColors.text, cursor: 'pointer' }}
-                      >
-                        {t('business.makeCover')}
-                      </button>
-                    )}
-                    <button
-                      onClick={async () => {
-                        await deleteMedia({ variables: { mediaAssetId: p.mediaAssetId } });
-                        await refetch();
-                      }}
-                      aria-label={t('common.delete')}
-                      style={{ border: 'none', borderRadius: '8px', padding: '3px 5px', background: solvoColors.surface, color: solvoColors.roseText, cursor: 'pointer', display: 'flex' }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </Flex>
-                </Box>
-              ))}
-            </Box>
-          </Card>
         </Flex>
       </Box>
 

@@ -120,24 +120,6 @@ export type AdminTotals = {
   verifiedSuppliers: Scalars['Int']['output'];
 };
 
-export type AiChatMessageInput = {
-  content: Scalars['String']['input'];
-  role: Scalars['String']['input'];
-};
-
-export type AiCompletionInput = {
-  cachedSystem?: InputMaybe<Scalars['String']['input']>;
-  messages: Array<AiChatMessageInput>;
-  system?: InputMaybe<Scalars['String']['input']>;
-};
-
-export type AiCompletionResult = {
-  __typename?: 'AiCompletionResult';
-  content: Scalars['String']['output'];
-  model: Scalars['String']['output'];
-  usage?: Maybe<AiMessageUsage>;
-};
-
 export type AiConversation = {
   __typename?: 'AiConversation';
   conversationId: Scalars['String']['output'];
@@ -147,16 +129,6 @@ export type AiConversation = {
   title: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   userId?: Maybe<Scalars['Float']['output']>;
-};
-
-export type AiConversationCreateInput = {
-  deviceId?: InputMaybe<Scalars['String']['input']>;
-  title: Scalars['String']['input'];
-};
-
-export type AiConversationUpdateInput = {
-  conversationId: Scalars['String']['input'];
-  title?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type AiMessage = {
@@ -170,25 +142,6 @@ export type AiMessage = {
   role: Scalars['String']['output'];
 };
 
-export type AiMessageProvidersUpdateInput = {
-  conversationId: Scalars['String']['input'];
-  messageId: Scalars['String']['input'];
-  providersJson: Scalars['String']['input'];
-};
-
-export type AiMessageSendInput = {
-  cachedSystem?: InputMaybe<Scalars['String']['input']>;
-  content: Scalars['String']['input'];
-  conversationId: Scalars['String']['input'];
-  system?: InputMaybe<Scalars['String']['input']>;
-};
-
-export type AiMessageUsage = {
-  __typename?: 'AiMessageUsage';
-  inputTokens?: Maybe<Scalars['Float']['output']>;
-  outputTokens?: Maybe<Scalars['Float']['output']>;
-};
-
 export type Category = {
   __typename?: 'Category';
   categoryId: Scalars['Int']['output'];
@@ -196,6 +149,33 @@ export type Category = {
   nameEn: Scalars['String']['output'];
   nameEs: Scalars['String']['output'];
   slug: Scalars['String']['output'];
+};
+
+export type ChatTurnInput = {
+  conversationId?: InputMaybe<Scalars['String']['input']>;
+  deviceId?: InputMaybe<Scalars['String']['input']>;
+  lat?: InputMaybe<Scalars['Float']['input']>;
+  lng?: InputMaybe<Scalars['Float']['input']>;
+  message: Scalars['String']['input'];
+  province?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ChatTurnReplyModel = {
+  __typename?: 'ChatTurnReplyModel';
+  content: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  messageId: Scalars['String']['output'];
+  model: Scalars['String']['output'];
+  providersJson?: Maybe<Scalars['String']['output']>;
+  service?: Maybe<Scalars['String']['output']>;
+  zoneName?: Maybe<Scalars['String']['output']>;
+};
+
+export type ChatTurnResult = {
+  __typename?: 'ChatTurnResult';
+  conversationId: Scalars['String']['output'];
+  replies: Array<ChatTurnReplyModel>;
+  title: Scalars['String']['output'];
 };
 
 export type CompleteOnboardingInput = {
@@ -252,43 +232,27 @@ export type LoginUserInput = {
   password: Scalars['String']['input'];
 };
 
-export type MediaAsset = {
-  __typename?: 'MediaAsset';
-  altText?: Maybe<Scalars['String']['output']>;
-  displayOrder: Scalars['Int']['output'];
-  mediaAssetId: Scalars['Int']['output'];
-  mimeType?: Maybe<Scalars['String']['output']>;
-  url: Scalars['String']['output'];
-};
-
 export type Mutation = {
   __typename?: 'Mutation';
   adminSetSupplierPreferred: Scalars['Boolean']['output'];
   adminSetSupplierVerified: Scalars['Boolean']['output'];
-  aiComplete: AiCompletionResult;
+  chatTurn: ChatTurnResult;
   completeOnboarding: LoginOutput;
-  createAiConversation: AiConversation;
   deleteAiConversation: Scalars['Boolean']['output'];
   deleteMyService: Scalars['Boolean']['output'];
-  deleteMySupplierMedia: Scalars['Boolean']['output'];
   deleteReview: Scalars['Boolean']['output'];
   dismissReviewPrompt: Scalars['Boolean']['output'];
   logSupplierContact: Scalars['Boolean']['output'];
-  mergeGuestAiConversations: Scalars['Float']['output'];
+  mergeGuestAiConversations: Scalars['Int']['output'];
   mergeGuestContacts: Scalars['Int']['output'];
-  reorderMySupplierMedia: Scalars['Boolean']['output'];
   requestPasswordReset: PasswordResetResult;
   resetPassword: PasswordResetResult;
-  rollbackLastAiTurn: Scalars['Float']['output'];
   saveMyService: Service;
   saveReview: ReviewView;
-  sendAiMessage: SendAiMessageResult;
   setMySupplierCategories: Scalars['Boolean']['output'];
   setMySupplierSkills: Array<Scalars['String']['output']>;
   signup: User;
   socialLogin: LoginOutput;
-  updateAiConversation: AiConversation;
-  updateAiMessageProviders: AiMessage;
   updateMe: User;
   updateMySupplier: Supplier;
 };
@@ -305,18 +269,13 @@ export type MutationAdminSetSupplierVerifiedArgs = {
 };
 
 
-export type MutationAiCompleteArgs = {
-  data: AiCompletionInput;
+export type MutationChatTurnArgs = {
+  data: ChatTurnInput;
 };
 
 
 export type MutationCompleteOnboardingArgs = {
   data: CompleteOnboardingInput;
-};
-
-
-export type MutationCreateAiConversationArgs = {
-  data: AiConversationCreateInput;
 };
 
 
@@ -328,11 +287,6 @@ export type MutationDeleteAiConversationArgs = {
 
 export type MutationDeleteMyServiceArgs = {
   serviceId: Scalars['Int']['input'];
-};
-
-
-export type MutationDeleteMySupplierMediaArgs = {
-  mediaAssetId: Scalars['Int']['input'];
 };
 
 
@@ -361,11 +315,6 @@ export type MutationMergeGuestContactsArgs = {
 };
 
 
-export type MutationReorderMySupplierMediaArgs = {
-  mediaAssetIds: Array<Scalars['Int']['input']>;
-};
-
-
 export type MutationRequestPasswordResetArgs = {
   data: RequestPasswordResetInput;
 };
@@ -376,12 +325,6 @@ export type MutationResetPasswordArgs = {
 };
 
 
-export type MutationRollbackLastAiTurnArgs = {
-  conversationId: Scalars['String']['input'];
-  deviceId?: InputMaybe<Scalars['String']['input']>;
-};
-
-
 export type MutationSaveMyServiceArgs = {
   data: ServiceInput;
 };
@@ -389,12 +332,6 @@ export type MutationSaveMyServiceArgs = {
 
 export type MutationSaveReviewArgs = {
   data: ReviewInput;
-};
-
-
-export type MutationSendAiMessageArgs = {
-  data: AiMessageSendInput;
-  deviceId?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -415,18 +352,6 @@ export type MutationSignupArgs = {
 
 export type MutationSocialLoginArgs = {
   data: SocialLoginInput;
-};
-
-
-export type MutationUpdateAiConversationArgs = {
-  data: AiConversationUpdateInput;
-  deviceId?: InputMaybe<Scalars['String']['input']>;
-};
-
-
-export type MutationUpdateAiMessageProvidersArgs = {
-  data: AiMessageProvidersUpdateInput;
-  deviceId?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -607,16 +532,6 @@ export type SavedContact = {
   whatsappNumber?: Maybe<Scalars['String']['output']>;
 };
 
-export type SendAiMessageResult = {
-  __typename?: 'SendAiMessageResult';
-  content: Scalars['String']['output'];
-  createdAt: Scalars['DateTime']['output'];
-  messageId: Scalars['String']['output'];
-  model: Scalars['String']['output'];
-  role: Scalars['String']['output'];
-  usage?: Maybe<AiMessageUsage>;
-};
-
 export type Service = {
   __typename?: 'Service';
   currency: Scalars['String']['output'];
@@ -667,7 +582,6 @@ export type Supplier = {
   companyName: Scalars['String']['output'];
   createdAt?: Maybe<Scalars['DateTime']['output']>;
   description?: Maybe<Scalars['String']['output']>;
-  media?: Maybe<Array<MediaAsset>>;
   preferred: Scalars['Boolean']['output'];
   preferredAt?: Maybe<Scalars['DateTime']['output']>;
   preferredUntil?: Maybe<Scalars['DateTime']['output']>;
@@ -882,6 +796,13 @@ export type ResolveProvinceQueryVariables = Exact<{
 
 export type ResolveProvinceQuery = { __typename?: 'Query', resolveProvince?: { __typename?: 'ResolvedProvince', code: string, name: string, source: string } | null };
 
+export type ChatTurnMutationVariables = Exact<{
+  data: ChatTurnInput;
+}>;
+
+
+export type ChatTurnMutation = { __typename?: 'Mutation', chatTurn: { __typename?: 'ChatTurnResult', conversationId: string, title: string, replies: Array<{ __typename?: 'ChatTurnReplyModel', messageId: string, content: string, model: string, createdAt: any, providersJson?: string | null, service?: string | null, zoneName?: string | null }> } };
+
 export type LogSupplierContactMutationVariables = Exact<{
   data: ContactLogInput;
 }>;
@@ -931,7 +852,7 @@ export type DeleteReviewMutation = { __typename?: 'Mutation', deleteReview: bool
 
 export type SupplierCardFragment = { __typename?: 'Supplier', supplierId: number, companyName: string, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, province?: string | null, provinceName?: string | null, serviceProvinces?: Array<string> | null, serviceProvinceNames: Array<string>, rating?: string | null, reviewCount?: number | null, verified: boolean, preferred: boolean, businessPhone?: string | null, businessPhoneAlt?: string | null, whatsappNumber?: string | null, businessEmail?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, slug: string, nameEs: string, nameEn: string, icon?: string | null } | null }> | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, priceFrom?: string | null, priceUnit?: string | null, currency: string }> | null };
 
-export type SupplierFullFragment = { __typename?: 'Supplier', address?: string | null, verifiedAt?: any | null, createdAt?: any | null, supplierId: number, companyName: string, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, province?: string | null, provinceName?: string | null, serviceProvinces?: Array<string> | null, serviceProvinceNames: Array<string>, rating?: string | null, reviewCount?: number | null, verified: boolean, preferred: boolean, businessPhone?: string | null, businessPhoneAlt?: string | null, whatsappNumber?: string | null, businessEmail?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description?: string | null, priceFrom?: string | null, priceUnit?: string | null, currency: string }> | null, media?: Array<{ __typename?: 'MediaAsset', mediaAssetId: number, url: string, altText?: string | null, displayOrder: number }> | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, slug: string, nameEs: string, nameEn: string, icon?: string | null } | null }> | null };
+export type SupplierFullFragment = { __typename?: 'Supplier', address?: string | null, verifiedAt?: any | null, createdAt?: any | null, supplierId: number, companyName: string, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, province?: string | null, provinceName?: string | null, serviceProvinces?: Array<string> | null, serviceProvinceNames: Array<string>, rating?: string | null, reviewCount?: number | null, verified: boolean, preferred: boolean, businessPhone?: string | null, businessPhoneAlt?: string | null, whatsappNumber?: string | null, businessEmail?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description?: string | null, priceFrom?: string | null, priceUnit?: string | null, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, slug: string, nameEs: string, nameEn: string, icon?: string | null } | null }> | null };
 
 export type SearchSuppliersQueryVariables = Exact<{
   data: SupplierSearchInput;
@@ -953,19 +874,19 @@ export type SupplierQueryVariables = Exact<{
 }>;
 
 
-export type SupplierQuery = { __typename?: 'Query', supplier: { __typename?: 'Supplier', address?: string | null, verifiedAt?: any | null, createdAt?: any | null, supplierId: number, companyName: string, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, province?: string | null, provinceName?: string | null, serviceProvinces?: Array<string> | null, serviceProvinceNames: Array<string>, rating?: string | null, reviewCount?: number | null, verified: boolean, preferred: boolean, businessPhone?: string | null, businessPhoneAlt?: string | null, whatsappNumber?: string | null, businessEmail?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description?: string | null, priceFrom?: string | null, priceUnit?: string | null, currency: string }> | null, media?: Array<{ __typename?: 'MediaAsset', mediaAssetId: number, url: string, altText?: string | null, displayOrder: number }> | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, slug: string, nameEs: string, nameEn: string, icon?: string | null } | null }> | null } };
+export type SupplierQuery = { __typename?: 'Query', supplier: { __typename?: 'Supplier', address?: string | null, verifiedAt?: any | null, createdAt?: any | null, supplierId: number, companyName: string, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, province?: string | null, provinceName?: string | null, serviceProvinces?: Array<string> | null, serviceProvinceNames: Array<string>, rating?: string | null, reviewCount?: number | null, verified: boolean, preferred: boolean, businessPhone?: string | null, businessPhoneAlt?: string | null, whatsappNumber?: string | null, businessEmail?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description?: string | null, priceFrom?: string | null, priceUnit?: string | null, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, slug: string, nameEs: string, nameEn: string, icon?: string | null } | null }> | null } };
 
 export type MySupplierQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MySupplierQuery = { __typename?: 'Query', mySupplier: { __typename?: 'Supplier', address?: string | null, verifiedAt?: any | null, createdAt?: any | null, supplierId: number, companyName: string, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, province?: string | null, provinceName?: string | null, serviceProvinces?: Array<string> | null, serviceProvinceNames: Array<string>, rating?: string | null, reviewCount?: number | null, verified: boolean, preferred: boolean, businessPhone?: string | null, businessPhoneAlt?: string | null, whatsappNumber?: string | null, businessEmail?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description?: string | null, priceFrom?: string | null, priceUnit?: string | null, currency: string }> | null, media?: Array<{ __typename?: 'MediaAsset', mediaAssetId: number, url: string, altText?: string | null, displayOrder: number }> | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, slug: string, nameEs: string, nameEn: string, icon?: string | null } | null }> | null }, mySupplierStats: { __typename?: 'SupplierStats', contactsLast30Days: number, contactsTotal: number, reviewCount: number, rating?: string | null, contactsByChannel: Array<{ __typename?: 'ContactChannelCount', channel: string, count: number }> } };
+export type MySupplierQuery = { __typename?: 'Query', mySupplier: { __typename?: 'Supplier', address?: string | null, verifiedAt?: any | null, createdAt?: any | null, supplierId: number, companyName: string, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, province?: string | null, provinceName?: string | null, serviceProvinces?: Array<string> | null, serviceProvinceNames: Array<string>, rating?: string | null, reviewCount?: number | null, verified: boolean, preferred: boolean, businessPhone?: string | null, businessPhoneAlt?: string | null, whatsappNumber?: string | null, businessEmail?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description?: string | null, priceFrom?: string | null, priceUnit?: string | null, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, slug: string, nameEs: string, nameEn: string, icon?: string | null } | null }> | null }, mySupplierStats: { __typename?: 'SupplierStats', contactsLast30Days: number, contactsTotal: number, reviewCount: number, rating?: string | null, contactsByChannel: Array<{ __typename?: 'ContactChannelCount', channel: string, count: number }> } };
 
 export type UpdateMySupplierMutationVariables = Exact<{
   data: SupplierUpdateInput;
 }>;
 
 
-export type UpdateMySupplierMutation = { __typename?: 'Mutation', updateMySupplier: { __typename?: 'Supplier', address?: string | null, verifiedAt?: any | null, createdAt?: any | null, supplierId: number, companyName: string, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, province?: string | null, provinceName?: string | null, serviceProvinces?: Array<string> | null, serviceProvinceNames: Array<string>, rating?: string | null, reviewCount?: number | null, verified: boolean, preferred: boolean, businessPhone?: string | null, businessPhoneAlt?: string | null, whatsappNumber?: string | null, businessEmail?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description?: string | null, priceFrom?: string | null, priceUnit?: string | null, currency: string }> | null, media?: Array<{ __typename?: 'MediaAsset', mediaAssetId: number, url: string, altText?: string | null, displayOrder: number }> | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, slug: string, nameEs: string, nameEn: string, icon?: string | null } | null }> | null } };
+export type UpdateMySupplierMutation = { __typename?: 'Mutation', updateMySupplier: { __typename?: 'Supplier', address?: string | null, verifiedAt?: any | null, createdAt?: any | null, supplierId: number, companyName: string, tagline?: string | null, description?: string | null, skills?: Array<string> | null, city?: string | null, province?: string | null, provinceName?: string | null, serviceProvinces?: Array<string> | null, serviceProvinceNames: Array<string>, rating?: string | null, reviewCount?: number | null, verified: boolean, preferred: boolean, businessPhone?: string | null, businessPhoneAlt?: string | null, whatsappNumber?: string | null, businessEmail?: string | null, businessEmailAlt?: string | null, websiteUrl?: string | null, services?: Array<{ __typename?: 'Service', serviceId: number, name: string, description?: string | null, priceFrom?: string | null, priceUnit?: string | null, currency: string }> | null, categories?: Array<{ __typename?: 'SupplierCategory', isPrimary: boolean, category?: { __typename?: 'Category', categoryId: number, slug: string, nameEs: string, nameEn: string, icon?: string | null } | null }> | null } };
 
 export type SetMySupplierCategoriesMutationVariables = Exact<{
   data: SupplierCategoriesInput;
@@ -999,20 +920,6 @@ export type DeleteMyServiceMutationVariables = Exact<{
 
 
 export type DeleteMyServiceMutation = { __typename?: 'Mutation', deleteMyService: boolean };
-
-export type DeleteMySupplierMediaMutationVariables = Exact<{
-  mediaAssetId: Scalars['Int']['input'];
-}>;
-
-
-export type DeleteMySupplierMediaMutation = { __typename?: 'Mutation', deleteMySupplierMedia: boolean };
-
-export type ReorderMySupplierMediaMutationVariables = Exact<{
-  mediaAssetIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
-}>;
-
-
-export type ReorderMySupplierMediaMutation = { __typename?: 'Mutation', reorderMySupplierMedia: boolean };
 
 export const SessionUserFragmentDoc = gql`
     fragment SessionUser on User {
@@ -1089,12 +996,6 @@ export const SupplierFullFragmentDoc = gql`
     priceFrom
     priceUnit
     currency
-  }
-  media {
-    mediaAssetId
-    url
-    altText
-    displayOrder
   }
 }
     ${SupplierCardFragmentDoc}`;
@@ -1748,6 +1649,49 @@ export type ResolveProvinceQueryHookResult = ReturnType<typeof useResolveProvinc
 export type ResolveProvinceLazyQueryHookResult = ReturnType<typeof useResolveProvinceLazyQuery>;
 export type ResolveProvinceSuspenseQueryHookResult = ReturnType<typeof useResolveProvinceSuspenseQuery>;
 export type ResolveProvinceQueryResult = Apollo.QueryResult<ResolveProvinceQuery, ResolveProvinceQueryVariables>;
+export const ChatTurnDocument = gql`
+    mutation chatTurn($data: ChatTurnInput!) {
+  chatTurn(data: $data) {
+    conversationId
+    title
+    replies {
+      messageId
+      content
+      model
+      createdAt
+      providersJson
+      service
+      zoneName
+    }
+  }
+}
+    `;
+export type ChatTurnMutationFn = Apollo.MutationFunction<ChatTurnMutation, ChatTurnMutationVariables>;
+
+/**
+ * __useChatTurnMutation__
+ *
+ * To run a mutation, you first call `useChatTurnMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useChatTurnMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [chatTurnMutation, { data, loading, error }] = useChatTurnMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useChatTurnMutation(baseOptions?: Apollo.MutationHookOptions<ChatTurnMutation, ChatTurnMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ChatTurnMutation, ChatTurnMutationVariables>(ChatTurnDocument, options);
+      }
+export type ChatTurnMutationHookResult = ReturnType<typeof useChatTurnMutation>;
+export type ChatTurnMutationResult = Apollo.MutationResult<ChatTurnMutation>;
+export type ChatTurnMutationOptions = Apollo.BaseMutationOptions<ChatTurnMutation, ChatTurnMutationVariables>;
 export const LogSupplierContactDocument = gql`
     mutation logSupplierContact($data: ContactLogInput!) {
   logSupplierContact(data: $data)
@@ -2411,65 +2355,3 @@ export function useDeleteMyServiceMutation(baseOptions?: Apollo.MutationHookOpti
 export type DeleteMyServiceMutationHookResult = ReturnType<typeof useDeleteMyServiceMutation>;
 export type DeleteMyServiceMutationResult = Apollo.MutationResult<DeleteMyServiceMutation>;
 export type DeleteMyServiceMutationOptions = Apollo.BaseMutationOptions<DeleteMyServiceMutation, DeleteMyServiceMutationVariables>;
-export const DeleteMySupplierMediaDocument = gql`
-    mutation deleteMySupplierMedia($mediaAssetId: Int!) {
-  deleteMySupplierMedia(mediaAssetId: $mediaAssetId)
-}
-    `;
-export type DeleteMySupplierMediaMutationFn = Apollo.MutationFunction<DeleteMySupplierMediaMutation, DeleteMySupplierMediaMutationVariables>;
-
-/**
- * __useDeleteMySupplierMediaMutation__
- *
- * To run a mutation, you first call `useDeleteMySupplierMediaMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useDeleteMySupplierMediaMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [deleteMySupplierMediaMutation, { data, loading, error }] = useDeleteMySupplierMediaMutation({
- *   variables: {
- *      mediaAssetId: // value for 'mediaAssetId'
- *   },
- * });
- */
-export function useDeleteMySupplierMediaMutation(baseOptions?: Apollo.MutationHookOptions<DeleteMySupplierMediaMutation, DeleteMySupplierMediaMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<DeleteMySupplierMediaMutation, DeleteMySupplierMediaMutationVariables>(DeleteMySupplierMediaDocument, options);
-      }
-export type DeleteMySupplierMediaMutationHookResult = ReturnType<typeof useDeleteMySupplierMediaMutation>;
-export type DeleteMySupplierMediaMutationResult = Apollo.MutationResult<DeleteMySupplierMediaMutation>;
-export type DeleteMySupplierMediaMutationOptions = Apollo.BaseMutationOptions<DeleteMySupplierMediaMutation, DeleteMySupplierMediaMutationVariables>;
-export const ReorderMySupplierMediaDocument = gql`
-    mutation reorderMySupplierMedia($mediaAssetIds: [Int!]!) {
-  reorderMySupplierMedia(mediaAssetIds: $mediaAssetIds)
-}
-    `;
-export type ReorderMySupplierMediaMutationFn = Apollo.MutationFunction<ReorderMySupplierMediaMutation, ReorderMySupplierMediaMutationVariables>;
-
-/**
- * __useReorderMySupplierMediaMutation__
- *
- * To run a mutation, you first call `useReorderMySupplierMediaMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useReorderMySupplierMediaMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [reorderMySupplierMediaMutation, { data, loading, error }] = useReorderMySupplierMediaMutation({
- *   variables: {
- *      mediaAssetIds: // value for 'mediaAssetIds'
- *   },
- * });
- */
-export function useReorderMySupplierMediaMutation(baseOptions?: Apollo.MutationHookOptions<ReorderMySupplierMediaMutation, ReorderMySupplierMediaMutationVariables>) {
-        const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useMutation<ReorderMySupplierMediaMutation, ReorderMySupplierMediaMutationVariables>(ReorderMySupplierMediaDocument, options);
-      }
-export type ReorderMySupplierMediaMutationHookResult = ReturnType<typeof useReorderMySupplierMediaMutation>;
-export type ReorderMySupplierMediaMutationResult = Apollo.MutationResult<ReorderMySupplierMediaMutation>;
-export type ReorderMySupplierMediaMutationOptions = Apollo.BaseMutationOptions<ReorderMySupplierMediaMutation, ReorderMySupplierMediaMutationVariables>;

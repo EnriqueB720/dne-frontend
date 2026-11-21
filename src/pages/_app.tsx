@@ -24,7 +24,6 @@ const cacheTypePolicies = {
   User: { keyFields: ['userId'] as const },
   Supplier: { keyFields: ['supplierId'] as const },
   Service: { keyFields: ['serviceId'] as const },
-  MediaAsset: { keyFields: ['mediaAssetId'] as const },
   Category: { keyFields: ['categoryId'] as const },
   // Search results are a wrapper with no id — never normalize them.
   SupplierSearchResult: { keyFields: false as const },

@@ -1,7 +1,7 @@
 # Solvo web — Architecture
 
 Next.js 16 (pages router) + Chakra UI v3 + Apollo Client. Talks only to the
-GraphQL API in `dne-backend` (plus `POST /files/upload` for photos). API docs:
+GraphQL API in `dne-backend`. API docs:
 `../dne-backend/docs/ARCHITECTURE.md`.
 
 ## What the app is
@@ -10,13 +10,13 @@ GraphQL API in `dne-backend` (plus `POST /files/upload` for photos). API docs:
    "pan dulce cerca de mí"). Solvo replies and shows a card for every real
    supplier in the DB that serves that province, with direct contact links.
    Works without an account.
-2. **Supplier profile (`/providers/[id]`)** — public: info, photos, services
+2. **Supplier profile (`/providers/[id]`)** — public: info, services
    with "from" prices, provinces served, contact links, rating and reviews.
    Signed-in customers can leave one review per supplier.
 3. **My business (`/provider`)** — the supplier edits everything the chat uses
    to find them: description, categories (1–5), specialties (AI can suggest),
-   province + provinces served, contacts, services, photos. Shows contacts
-   received and verification status.
+   province + provinces served, contacts, services. Shows contacts received
+   and verification status. (No photos — removed on purpose to stay minimal.)
 4. **My contacts (`/dashboard`)** — signed-in customers: suppliers they
    contacted ("saved interactions") and "How did it go?" review prompts.
 5. **Admin (`/admin`)** — analytics, verification queue, preferred suppliers.
@@ -41,9 +41,9 @@ src/shared/
                            Notice, PageTitle, Stars, StarInput, Chip, AuthShell
   i18n/                    messages.es.ts (source), messages.en.ts, useI18n
   lib/                     supplier.ts (card shape, contact links, prices),
-                           chat.ts (UiMessage), api.ts (uploads, media URLs)
-  services/                ai.service (intent parser), conversation.service
-                           (persisted chats), contact.service (lead logging)
+                           chat.ts (UiMessage)
+  services/                chat.service (runChatTurn), conversation.service
+                           (chat history), contact.service (lead logging)
   contexts/                AuthProvider (JWT in localStorage '@token'), NextAuth bridge
   queries/*.graphql        every GraphQL operation → codegen
   generated/               graphql-schema.tsx (codegen output, don't edit)
@@ -55,31 +55,22 @@ src/shared/
 ```
 user message
   │
-  ├─ parseQueryWithAi(current, earlier[])          aiComplete (Claude → Gemini)
-  │     → intent: service_request | network_inquiry | chat
-  │     → service ("fontanero"), location ("Heredia" — only if typed)
+  └─ runChatTurn({ conversationId, message, deviceId,     chatTurn mutation
+                   province (picked zone) | lat/lng (device) })
+        API: parse → search ONE province → grounded reply → save
+        ← { conversationId, title, replies[{ content, providersJson, service, zoneName }] }
   │
-  ├─ service_request ─ runSearch()                  searchSuppliers
-  │     query = service
-  │     location = typed place      (wins)
-  │     province = zone picked in the "Zona" selector
-  │     lat/lng = device position   (if no place typed and zone = device)
-  │     → { province, suppliers[] }  (strict to that province, ≤ 10)
-  │
-  ├─ sendAiMessage(system = grounding block)        reply persisted server-side
-  │     "## Search result: zone Heredia, 2 cards: …name|serves|phone…"
-  │
-  └─ render reply + one SupplierCard per supplier (zero results = zero cards)
+  └─ render each reply + one SupplierCard per supplier in providersJson
+     (zero results = zero cards)
 ```
 
-- **network_inquiry** ("¿tienen electricistas en Cartago?") searches the same
-  way but answers in text, no cards.
-- **chat** (questions about suppliers already shown) grounds the reply on the
-  last cards shown.
-- Several services in one message → one search + reply per service.
+All prompts, intent rules and the model choice live in the API
+(`dne-backend/src/api/assistant`) — the browser never sends a prompt.
+
+- `runChatTurn` uses plain `fetch` (not Apollo) so **Stop** really aborts the
+  request; the API then saves nothing for that turn.
 - "Contact" on a card logs a `CHAT_CONTACT` lead and shows the supplier's
   contact links inline; every link tap logs its channel too.
-- Stop button aborts all in-flight requests and rolls the turn back.
 - The cards under a reply are saved (`providers_json`) so reloads show them.
 
 ### Zone (province) selection

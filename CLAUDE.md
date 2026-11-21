@@ -17,7 +17,12 @@ reviews). Suppliers edit their page at `/provider`; admins use `/admin`.
 
 - **Never show invented suppliers.** Cards come only from `searchSuppliers`;
   zero results → zero cards and an honest reply.
-- **No model picker.** The API always uses Claude, Gemini as fallback.
+- **No AI logic in the browser.** A chat turn is one `chatTurn` call
+  (`src/shared/services/chat.service.ts`); prompts, intent rules and the
+  model (Claude, Gemini fallback) live in `dne-backend/src/api/assistant`.
+  Never send a prompt from the client.
+- **Keep it minimal.** No supplier photos, bookings, quotes or in-app chat —
+  removed on purpose (old code on `archive/pre-mvp-simplification`).
 - **Every user-facing string goes through i18n** (`useI18n().t`). Spanish is
   the source (`src/shared/i18n/messages.es.ts`, "usted" register), English
   mirrors it (`messages.en.ts`) — the type and `npm test` enforce identical keys.
