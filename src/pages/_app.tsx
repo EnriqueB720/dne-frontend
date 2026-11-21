@@ -5,15 +5,11 @@ import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
 import { SessionProvider } from 'next-auth/react'
 import AuthProvider from '@/shared/contexts/auth.provider'
 import NextAuthBridge from '@/shared/contexts/nextauth-bridge'
-import { ApolloClient, HttpLink, InMemoryCache, split, from } from '@apollo/client';
+import { ApolloClient, HttpLink, InMemoryCache, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { ApolloProvider } from "@apollo/client/react";
-import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
-import { getMainDefinition } from '@apollo/client/utilities';
-import { createClient } from 'graphql-ws';
 import { setApolloClient } from '@/shared/services/apollo.client';
-import 'react-international-phone/style.css';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { I18nBoot } from '@/shared/i18n';
 
 
 /**
@@ -30,6 +26,8 @@ const cacheTypePolicies = {
   Service: { keyFields: ['serviceId'] as const },
   MediaAsset: { keyFields: ['mediaAssetId'] as const },
   Category: { keyFields: ['categoryId'] as const },
+  // Search results are a wrapper with no id — never normalize them.
+  SupplierSearchResult: { keyFields: false as const },
 };
 
 const createCache = () => new InMemoryCache({ typePolicies: cacheTypePolicies });
@@ -43,13 +41,8 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
 // backend for dev.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
 const HTTP_URI = `${API_BASE}/graphql`;
-// Subscriptions need the ws(s):// scheme — swap whatever http(s) scheme
-// API_BASE has rather than hardcoding one, so this also works correctly
-// against a plain http:// base in local dev.
-const WS_URI = `${API_BASE.replace(/^http/, 'ws')}/graphql`;
 
-  // Memo'd so the client doesn't get re-created on every render. The WebSocket
-  // link is only built on the browser — SSR/Node can't open a WS connection.
+  // Memo'd so the client isn't re-created on every render.
   const client = useMemo(() => {
     const httpLink = new HttpLink({ uri: HTTP_URI });
 
@@ -67,34 +60,7 @@ const WS_URI = `${API_BASE.replace(/^http/, 'ws')}/graphql`;
       };
     });
 
-    if (typeof window === 'undefined') {
-      // SSR: no WebSocket, no auth token — just HTTP.
-      return new ApolloClient({ link: httpLink, cache: createCache() });
-    }
-
-    const wsLink = new GraphQLWsLink(
-      createClient({
-        url: WS_URI,
-        // Auto-reconnect on transient disconnects (tab sleep, network blips).
-        retryAttempts: Infinity,
-        shouldRetry: () => true,
-      }),
-    );
-
-    // Subscriptions go over WS; queries/mutations go through authLink → HTTP.
-    const link = split(
-      ({ query }) => {
-        const def = getMainDefinition(query);
-        return (
-          def.kind === 'OperationDefinition' &&
-          def.operation === 'subscription'
-        );
-      },
-      wsLink,
-      from([authLink, httpLink]),
-    );
-
-    return new ApolloClient({ link, cache: createCache() });
+    return new ApolloClient({ link: from([authLink, httpLink]), cache: createCache() });
   }, []);
 
   setApolloClient(client);
@@ -102,7 +68,7 @@ const WS_URI = `${API_BASE.replace(/^http/, 'ws')}/graphql`;
   return <ChakraProvider value={defaultSystem}>
       <Head>
         <title>Solvo</title>
-        <meta name="description" content="Ask for anything. Solvo finds who solves it." />
+        <meta name="description" content="Solvo: encuentre proveedores y servicios en su provincia y contáctelos directo." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/assets/brand/favicon-32.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="/assets/brand/logo-192.png" />
@@ -134,6 +100,7 @@ const WS_URI = `${API_BASE.replace(/^http/, 'ws')}/graphql`;
       <SessionProvider session={session}>
         <ApolloProvider client={client}>
           <AuthProvider>
+            <I18nBoot />
             <NextAuthBridge />
             <Component {...pageProps} />
           </AuthProvider>

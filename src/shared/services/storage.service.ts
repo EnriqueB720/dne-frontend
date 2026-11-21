@@ -1,9 +1,4 @@
-import { Constants } from '@constants';
-
-import { Language } from '@generated';
-
 enum StorageName {
-  LANGUAGE = '@language',
   JWT_TOKEN = '@token'
 }
 
@@ -12,21 +7,6 @@ class StorageService {
     return localStorage.clear();
   }
 
-  async getLanguage(): Promise<Language> {
-    try {
-      const value = await localStorage.getItem(StorageName.LANGUAGE) as Language;
-
-      return value;
-
-    } catch(error) {
-      return Constants.DEFAULT_LANGUAGE;
-    }
-  }
-
-  async setLanguage(value: Language) {
-    return localStorage.setItem(StorageName.LANGUAGE, value);
-  }
-  
   async setJwtToken(token: string){
     return localStorage.setItem(StorageName.JWT_TOKEN, token);
   }

@@ -9,8 +9,7 @@ import { AuthService } from '@services';
 import { AuthProviderProps } from '@types';
 import { useLoginLazyQuery, useSignupMutation, useRefreshUserLazyQuery } from '@generated';
 import { StorageService } from '@services';
-import { useTranslation } from '@hooks';
-import { mergeGuestConversations } from '@/shared/services/conversation.service';
+import { mergeGuestData } from '@/shared/services/conversation.service';
 
 /** Well inside the API's one-hour token lifetime. */
 const TOKEN_RENEW_INTERVAL_MS = 15 * 60 * 1000;
@@ -34,7 +33,6 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   })
 
   const [signupQuery] = useSignupMutation();
-  const { setLanguage } = useTranslation();
 
 
   useEffect(() => {
@@ -68,9 +66,6 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       }
 
 
-      StorageService.setLanguage(data?.login.user.language!);
-      setLanguage(data?.login.user.language!);
-
       StorageService.setJwtToken(data?.login!.access_token!);
 
       const user = new User(data?.login!.user! as any);
@@ -80,7 +75,7 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
 
       // Best-effort: claim any chats the user started as a guest on this
       // device. Non-blocking — login succeeds even if this fails.
-      mergeGuestConversations().catch(() => {});
+      mergeGuestData().catch(() => {});
 
       return true;
 
@@ -151,9 +146,6 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       // means the session is over.
       const refreshed = data?.refreshUser;
       if (refreshed) {
-        StorageService.setLanguage(refreshed.user.language!);
-        setLanguage(refreshed.user.language!);
-
         StorageService.setJwtToken(refreshed.access_token!);
 
         const user = new User(refreshed.user as any);
@@ -166,7 +158,7 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
         // localStorage without going through the login flow.
         if (!guestChatsMerged.current) {
           guestChatsMerged.current = true;
-          mergeGuestConversations().catch(() => {});
+          mergeGuestData().catch(() => {});
         }
       } else {
         await StorageService.removeJwtToken();

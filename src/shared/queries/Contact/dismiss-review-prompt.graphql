@@ -1,3 +1,0 @@
-mutation dismissReviewPrompt($supplierId: Int!) {
-  dismissReviewPrompt(supplierId: $supplierId)
-}

@@ -1,9 +1,11 @@
 import * as React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, MoreVertical, Plus, Trash2, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { MessageSquare, Plus, Trash2, X } from 'lucide-react';
+
 import { Box, Flex, Text } from '@atoms';
-import { Logo } from '@molecules';
-import { solvoColors, solvoFonts, solvoShadows } from '@constants';
+import { solvoColors, solvoShadows } from '@constants';
+import Logo from '../../molecules/logo/logo.component';
+import { useI18n } from '@/shared/i18n';
 import type { ConversationSummary } from '@/shared/services/conversation.service';
 
 export interface ChatSidebarProps {
@@ -12,26 +14,19 @@ export interface ChatSidebarProps {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
-  /** Navigate back to the full landing / hero page */
   onGoHome: () => void;
-  /**
-   * Drawer state for screens below `lg`. On `lg` and up the sidebar is always
-   * visible inline and these are ignored.
-   */
+  /** Drawer state below `lg`; always visible inline on `lg`+. */
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-function formatTime(iso: string): string {
+function bucket(iso: string): 'today' | 'yesterday' | 'earlier' {
   const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffH = diffMs / 3600000;
-  if (diffH < 1) return 'just now';
-  if (diffH < 24) return `${Math.floor(diffH)}h ago`;
-  const diffD = diffH / 24;
-  if (diffD < 7) return `${Math.floor(diffD)}d ago`;
-  return d.toLocaleDateString();
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  if (d >= start) return 'today';
+  start.setDate(start.getDate() - 1);
+  return d >= start ? 'yesterday' : 'earlier';
 }
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -44,424 +39,130 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   isOpen = false,
   onClose,
 }) => {
-  const [hoveredId, setHoveredId] = React.useState<string | null>(null);
+  const { t } = useI18n();
+  const [confirmId, setConfirmId] = React.useState<string | null>(null);
 
-  // Row menu state — mirrors the pattern used in /messages
-  const [menuFor, setMenuFor] = React.useState<string | null>(null);
-  const [confirmDeleteFor, setConfirmDeleteFor] = React.useState<string | null>(null);
-  const [menuAnchor, setMenuAnchor] = React.useState<{ top: number; left: number } | null>(null);
-  const menuRef = React.useRef<HTMLDivElement>(null);
+  const groups = (['today', 'yesterday', 'earlier'] as const)
+    .map((key) => ({ key, items: conversations.filter((c) => bucket(c.updatedAt) === key) }))
+    .filter((g) => g.items.length > 0);
 
-  const closeMenu = React.useCallback(() => {
-    setMenuFor(null);
-    setConfirmDeleteFor(null);
-    setMenuAnchor(null);
-  }, []);
-
-  const openMenuAtElement = (el: HTMLElement, conversationId: string) => {
-    const rect = el.getBoundingClientRect();
-    const POPOVER_WIDTH = 240;
-    const left = Math.max(
-      8,
-      Math.min(window.innerWidth - POPOVER_WIDTH - 8, rect.right - POPOVER_WIDTH),
-    );
-    setMenuAnchor({ top: rect.bottom + 4, left });
-    setMenuFor(conversationId);
-    setConfirmDeleteFor(null);
-  };
-
-  const openMenuAtMouse = (e: React.MouseEvent, conversationId: string) => {
-    e.preventDefault();
-    const POPOVER_WIDTH = 240;
-    const left = Math.max(8, Math.min(window.innerWidth - POPOVER_WIDTH - 8, e.clientX));
-    setMenuAnchor({ top: e.clientY, left });
-    setMenuFor(conversationId);
-    setConfirmDeleteFor(null);
-  };
-
-  React.useEffect(() => {
-    if (menuFor === null) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        closeMenu();
-      }
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeMenu();
-    };
-    const handleScroll = () => closeMenu();
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    window.addEventListener('scroll', handleScroll, true);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-      window.removeEventListener('scroll', handleScroll, true);
-    };
-  }, [menuFor, closeMenu]);
-
-  const handleDelete = (id: string) => {
-    onDelete(id);
-    closeMenu();
-  };
-
-  // Auto-close the drawer when the user picks something. On lg+ `onClose`
-  // isn't wired so this is a no-op.
-  const handleSelect = (id: string) => {
-    onSelect(id);
-    onClose?.();
-  };
-  const handleNew = () => {
-    onNew();
-    onClose?.();
-  };
-  const handleGoHome = () => {
-    onGoHome();
-    onClose?.();
-  };
-
-  // Close drawer on Escape (only matters below lg, where `isOpen` is meaningful)
-  React.useEffect(() => {
-    if (!isOpen) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose?.();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
-
-  return (
-    <>
-      {/* Backdrop — only rendered below lg, only visible when drawer is open */}
-      <Box
-        display={{ base: isOpen ? 'block' : 'none', lg: 'none' }}
-        position="fixed"
-        top={0}
-        right={0}
-        bottom={0}
-        left={0}
-        bg={solvoColors.overlay}
-        zIndex={1050}
-        onClick={onClose}
-        style={{
-          transition: 'opacity 0.2s ease',
-          opacity: isOpen ? 1 : 0,
-        }}
-      />
-
-    <Box
-      width={{ base: '290px', lg: '260px' }}
-      flexShrink={0}
-      height="100vh"
-      display="flex"
-      flexDirection="column"
-      borderRight="1px solid"
-      borderColor={solvoColors.border}
-      bg={solvoColors.surface}
-      overflow="hidden"
-      position={{ base: 'fixed', lg: 'relative' }}
-      top={{ base: 0, lg: 'auto' }}
-      left={{ base: 0, lg: 'auto' }}
-      zIndex={{ base: 1100, lg: 'auto' }}
-      transform={{ base: isOpen ? 'translateX(0)' : 'translateX(-100%)', lg: 'none' }}
-      boxShadow={{ base: isOpen ? solvoShadows.floatingPanel : 'none', lg: 'none' }}
-      style={{ transition: 'transform 0.25s ease-out, box-shadow 0.25s ease-out' }}
-    >
-      {/* Header */}
-      <Flex
-        align="center"
-        justify="space-between"
-        padding="16px"
-        borderBottom="1px solid"
-        borderColor={solvoColors.border}
-        flexShrink={0}
-      >
-        <button
-          onClick={handleGoHome}
-          title="Back to home"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '2px 4px',
-            borderRadius: '8px',
-          }}
-        >
-          <Logo size="sm" />
-        </button>
-
-        <Flex align="center" gap="4px">
-          <Box
-            as="button"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            width="28px"
-            height="28px"
-            borderRadius="8px"
-            cursor="pointer"
-            color={solvoColors.textMuted}
-            style={{ border: 'none', background: 'transparent', padding: 0 }}
-            onClick={handleNew}
-            title="New conversation"
+  const body = (
+    <Flex direction="column" height="100%" width="270px" bg={solvoColors.surface} borderRight="1px solid" borderColor={solvoColors.border}>
+      <Flex align="center" justify="space-between" padding="16px" gap="8px">
+        <Logo size="sm" onClick={onGoHome} />
+        <Flex gap="6px">
+          <button
+            onClick={onNew}
+            title={t('nav.newChat')}
+            aria-label={t('nav.newChat')}
+            style={{ border: 'none', borderRadius: '10px', padding: '8px', background: solvoColors.accent, color: solvoColors.accentFg, cursor: 'pointer', display: 'flex' }}
           >
             <Plus size={16} />
-          </Box>
-
-          {/* Close button — only shown when in drawer mode (below lg) */}
-          <Box
-            display={{ base: 'flex', lg: 'none' }}
-            as="button"
-            alignItems="center"
-            justifyContent="center"
-            width="28px"
-            height="28px"
-            borderRadius="8px"
-            cursor="pointer"
-            color={solvoColors.textMuted}
-            style={{ border: 'none', background: 'transparent', padding: 0 }}
-            onClick={onClose}
-            title="Close menu"
-            aria-label="Close menu"
-          >
-            <X size={16} />
-          </Box>
+          </button>
+          {onClose && (
+            <Box display={{ base: 'block', lg: 'none' }}>
+              <button onClick={onClose} aria-label={t('common.close')} style={{ border: 'none', background: 'transparent', color: solvoColors.textMuted, cursor: 'pointer', padding: '8px', display: 'flex' }}>
+                <X size={16} />
+              </button>
+            </Box>
+          )}
         </Flex>
       </Flex>
 
-      {/* Conversation list */}
-      <Box flex="1" overflowY="auto" padding="8px">
-        {conversations.length === 0 ? (
-          <Flex
-            direction="column"
-            align="center"
-            justify="center"
-            height="120px"
-            gap="8px"
-          >
-            <Text fontSize="xs" color={solvoColors.textSubtle} textAlign="center">
-              No conversations yet.
-              <br />
-              Ask Solvo something!
+      <Box flex="1" overflowY="auto" padding="0 10px 16px">
+        {conversations.length === 0 && (
+          <Text fontSize="xs" color={solvoColors.textSubtle} textAlign="center" marginTop="24px">
+            {t('chat.noChats')}
+          </Text>
+        )}
+        {groups.map((g) => (
+          <Box key={g.key} marginBottom="12px">
+            <Text fontSize="10px" fontWeight={700} letterSpacing="0.08em" color={solvoColors.textSubtle} padding="6px 8px">
+              {t(`chat.${g.key}`).toUpperCase()}
             </Text>
-          </Flex>
-        ) : (
-          <AnimatePresence initial={false}>
-            {conversations.map((conv, i) => {
-              const isActive = conv.conversationId === currentConvId;
-              const isHovered = hoveredId === conv.conversationId;
-              const isMenuOpen = menuFor === conv.conversationId;
-              const lastMsg = conv.messages?.[0];
-
+            {g.items.map((c) => {
+              const active = c.conversationId === currentConvId;
               return (
-                <motion.div
-                  key={conv.conversationId}
-                  layout
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0 }}
-                  transition={{ delay: i * 0.03, duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-                  style={{ overflow: 'hidden' }}
+                <Flex
+                  key={c.conversationId}
+                  align="center"
+                  gap="8px"
+                  padding="9px 10px"
+                  borderRadius="10px"
+                  cursor="pointer"
+                  bg={active ? solvoColors.accentSoft : 'transparent'}
+                  _hover={{ bg: active ? solvoColors.accentSoft : solvoColors.bg }}
+                  onClick={() => {
+                    onSelect(c.conversationId);
+                    onClose?.();
+                  }}
                 >
-                  <Box
-                    position="relative"
-                    padding="10px 12px"
-                    borderRadius="10px"
-                    cursor="pointer"
-                    marginBottom="2px"
-                    bg={isActive ? solvoColors.indigoLight : isHovered ? solvoColors.bg : 'transparent'}
-                    onClick={() => handleSelect(conv.conversationId)}
-                    onContextMenu={(e) => openMenuAtMouse(e, conv.conversationId)}
-                    onMouseEnter={() => setHoveredId(conv.conversationId)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    transition="background 0.15s"
-                  >
-                    <Flex align="center" gap="8px">
-                      <Box color={isActive ? solvoColors.indigo : solvoColors.textSubtle} flexShrink={0}>
-                        <MessageSquare size={14} />
-                      </Box>
-                      <Box flex="1" minWidth="0">
-                        <Text
-                          fontSize="sm"
-                          fontWeight={isActive ? '600' : '400'}
-                          color={isActive ? solvoColors.text : solvoColors.textMuted}
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            paddingRight: '20px',
-                          }}
-                        >
-                          {conv.title}
-                        </Text>
-                        {lastMsg && (
-                          <Text
-                            fontSize="xs"
-                            color={solvoColors.textSubtle}
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {formatTime(conv.updatedAt)}
-                          </Text>
-                        )}
-                      </Box>
-                    </Flex>
-
-                    {/* Kebab button — always rendered on hover / when menu is open */}
-                    {(isHovered || isMenuOpen) && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isMenuOpen) closeMenu();
-                          else openMenuAtElement(e.currentTarget, conv.conversationId);
-                        }}
-                        aria-label="Conversation actions"
-                        title="Conversation actions"
-                        style={{
-                          position: 'absolute',
-                          right: '8px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '22px',
-                          height: '22px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          border: 'none',
-                          background: 'transparent',
-                          padding: 0,
-                          color: solvoColors.textSubtle,
-                        }}
-                      >
-                        <MoreVertical size={14} />
-                      </button>
-                    )}
+                  <Box color={solvoColors.textSubtle} flexShrink={0}>
+                    <MessageSquare size={14} />
                   </Box>
-                </motion.div>
+                  <Text fontSize="13px" color={solvoColors.text} flex="1" truncate>
+                    {c.title}
+                  </Text>
+                  {confirmId === c.conversationId ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmId(null);
+                        onDelete(c.conversationId);
+                      }}
+                      style={{ border: 'none', borderRadius: '8px', padding: '3px 8px', fontSize: '11px', fontWeight: 600, background: solvoColors.roseLight, color: solvoColors.roseText, cursor: 'pointer' }}
+                    >
+                      {t('common.delete')}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmId(c.conversationId);
+                      }}
+                      title={t('chat.deleteChat')}
+                      aria-label={t('chat.deleteChat')}
+                      style={{ border: 'none', background: 'transparent', color: solvoColors.textSubtle, cursor: 'pointer', padding: '2px', display: 'flex' }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </Flex>
               );
             })}
-          </AnimatePresence>
-        )}
+          </Box>
+        ))}
       </Box>
+    </Flex>
+  );
 
-      {/* Footer */}
-      <Box
-        padding="12px 16px"
-        borderTop="1px solid"
-        borderColor={solvoColors.border}
-        flexShrink={0}
-      >
-        <Text fontSize="xs" color={solvoColors.textSubtle}>
-          Powered by AI · Costa Rica
-        </Text>
+  return (
+    <>
+      <Box display={{ base: 'none', lg: 'block' }} height="100vh" flexShrink={0}>
+        {body}
       </Box>
-
-      {/* Floating row-action menu — page-level fixed so it isn't clipped by the sidebar's overflow */}
       <AnimatePresence>
-        {menuFor !== null && menuAnchor && (
-          <motion.div
-            ref={menuRef as any}
-            initial={{ opacity: 0, y: -6, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.97 }}
-            transition={{ duration: 0.15, ease: [0.2, 0.8, 0.2, 1] }}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: 'fixed',
-              top: menuAnchor.top,
-              left: menuAnchor.left,
-              zIndex: 1000,
-              width: '240px',
-              background: solvoColors.surface,
-              border: `1px solid ${solvoColors.border}`,
-              borderRadius: '12px',
-              padding: '6px',
-              boxShadow: solvoShadows.floatingPanel,
-            }}
-          >
-            {confirmDeleteFor === menuFor ? (
-              <Box padding="8px 10px">
-                <Text fontSize="xs" color={solvoColors.text} fontWeight={600} marginBottom="4px">
-                  Delete this chat?
-                </Text>
-                <Text fontSize="11px" color={solvoColors.textSubtle} marginBottom="10px">
-                  This conversation will be permanently deleted. This can't be undone.
-                </Text>
-                <Flex gap="6px">
-                  <button
-                    type="button"
-                    onClick={closeMenu}
-                    style={{
-                      flex: 1,
-                      padding: '8px 10px',
-                      borderRadius: '8px',
-                      background: solvoColors.surface,
-                      color: solvoColors.text,
-                      border: `1px solid ${solvoColors.border}`,
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      fontFamily: solvoFonts.sans,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(menuFor)}
-                    style={{
-                      flex: 1,
-                      padding: '8px 10px',
-                      borderRadius: '8px',
-                      background: solvoColors.roseText,
-                      color: solvoColors.surface,
-                      border: 'none',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      fontFamily: solvoFonts.sans,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Delete
-                  </button>
-                </Flex>
-              </Box>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteFor(menuFor)}
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  borderRadius: '8px',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontFamily: solvoFonts.sans,
-                }}
-              >
-                <Flex align="center" gap="8px" color={solvoColors.roseText}>
-                  <Trash2 size={13} />
-                  <Text fontSize="13px" fontWeight={600}>
-                    Delete conversation
-                  </Text>
-                </Flex>
-              </button>
-            )}
-          </motion.div>
+        {isOpen && (
+          <Box display={{ base: 'block', lg: 'none' }}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+              style={{ position: 'fixed', inset: 0, background: solvoColors.overlay, zIndex: 1000 }}
+            />
+            <motion.div
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ duration: 0.2 }}
+              style={{ position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 1001, boxShadow: solvoShadows.floatingPanel }}
+            >
+              {body}
+            </motion.div>
+          </Box>
         )}
       </AnimatePresence>
-    </Box>
     </>
   );
 };

@@ -1,6 +1,0 @@
-mutation archiveConversation($data: ConversationArchiveInput!) {
-  archiveConversation(data: $data) {
-    conversationId
-    status
-  }
-}

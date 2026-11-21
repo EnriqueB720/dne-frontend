@@ -27,7 +27,7 @@ export function contactChannelFor(kind: string): ContactChannel {
 export function logSupplierContact(
   supplierId: number,
   channel: ContactChannel,
-  source: 'chat' | 'storefront',
+  source: 'chat' | 'profile',
 ): void {
   if (!Number.isFinite(supplierId) || supplierId <= 0) return;
   try {

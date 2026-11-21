@@ -1,222 +1,69 @@
-import { useState, useContext } from 'react';
-import { useRouter } from 'next/router';
+import { useContext, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Eye, EyeOff } from 'lucide-react';
-import { AtmosphericGlow, Box, Flex, Logo, Text } from '@components';
-import { solvoColors, solvoFonts, solvoShadows } from '@constants';
+import { useRouter } from 'next/router';
+
+import { AuthShell, Box, Btn, Flex, Logo, Notice, SocialAuthButtons, SolvoNavBar, Text, TextField } from '@components';
+import { solvoColors, solvoFonts } from '@constants';
+import PasswordField from '@/shared/components/molecules/passwordField';
 import AuthContext from '@/shared/contexts/auth.context';
-import SocialAuthButtons from '@/shared/components/molecules/socialAuthButtons/social-auth-buttons.component';
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '12px 14px',
-  borderRadius: '10px',
-  border: `1px solid ${solvoColors.border}`,
-  background: solvoColors.surface,
-  color: solvoColors.text,
-  fontFamily: solvoFonts.sans,
-  fontSize: '15px',
-  outline: 'none',
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: '12px',
-  fontWeight: 600,
-  color: solvoColors.textMuted,
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  marginBottom: '6px',
-  display: 'block',
-};
-
-// Password field: extra right-padding so text doesn't slide under the
-// visibility toggle button.
-const passwordInputStyle: React.CSSProperties = {
-  ...inputStyle,
-  paddingRight: '42px',
-};
-
-const toggleButtonStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: '50%',
-  right: '10px',
-  transform: 'translateY(-50%)',
-  background: 'transparent',
-  border: 'none',
-  cursor: 'pointer',
-  padding: '4px',
-  color: solvoColors.textSubtle,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
+import { useI18n } from '@/shared/i18n';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const { login, isLoading } = useContext(AuthContext);
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const next = typeof router.query.next === 'string' && router.query.next.startsWith('/') ? router.query.next : '/';
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    try {
-      const ok = await login({ credentials: { email, password } } as any);
-      if (ok) {
-        const next = (router.query.next as string) || '/';
-        router.push(next);
-      } else {
-        setError('Invalid email or password');
-      }
-    } catch (err: any) {
-      setError(err?.message ?? 'Login failed');
-    }
+    const ok = await login({ credentials: { email, password } } as any);
+    if (ok) router.push(next);
+    else setError(t('auth.invalid'));
   };
 
   return (
-    <Box minHeight="100vh" bg={solvoColors.bg} position="relative">
-      <AtmosphericGlow intensity="full" />
-
-      <Flex minHeight="100vh" align="center" justify="center" padding="24px">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          style={{ width: '100%', maxWidth: '420px' }}
-        >
-          <Box
-            bg={solvoColors.surface}
-            border={`1px solid ${solvoColors.border}`}
-            borderRadius="24px"
-            padding="36px 32px"
-            style={{ boxShadow: solvoShadows.heroInput }}
-          >
-            <Box marginBottom="18px">
-              <Logo size="lg" showText={false} />
-            </Box>
-
-            <Text fontFamily={solvoFonts.display} fontSize="32px" color={solvoColors.text} marginBottom="6px">
-              Welcome back.
-            </Text>
-            <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="24px">
-              Sign in to manage your requests, quotes, and bookings.
-            </Text>
-
-            <form onSubmit={handleSubmit}>
-              <Box marginBottom="14px">
-                <label style={labelStyle}>Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  style={inputStyle}
-                />
-              </Box>
-
-              <Box marginBottom="18px">
-                <Flex justify="space-between" align="baseline" marginBottom="6px">
-                  <label style={labelStyle}>Password</label>
-                  <Link
-                    href="/forgot-password"
-                    style={{
-                      fontSize: '12px',
-                      color: solvoColors.indigo,
-                      textDecoration: 'none',
-                      fontWeight: 500,
-                    }}
-                  >
-                    Forgot your password?
-                  </Link>
-                </Flex>
-                <Box position="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    minLength={4}
-                    style={passwordInputStyle}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    style={toggleButtonStyle}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </Box>
-              </Box>
-
-              {error && (
-                <Box
-                  padding="10px 12px"
-                  borderRadius="10px"
-                  bg={solvoColors.roseLight}
-                  color={solvoColors.roseText}
-                  marginBottom="14px"
-                >
-                  <Text fontSize="sm">{error}</Text>
-                </Box>
-              )}
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  borderRadius: '12px',
-                  border: 'none',
-                  background: solvoColors.accent,
-                  color: solvoColors.accentFg,
-                  fontWeight: 600,
-                  fontSize: '15px',
-                  cursor: 'pointer',
-                  fontFamily: solvoFonts.sans,
-                  opacity: isLoading ? 0.6 : 1,
-                }}
-              >
-                {isLoading ? 'Signing in…' : 'Sign in'}
-              </button>
-            </form>
-
-            {/* Divider */}
-            <Flex align="center" gap="12px" marginTop="20px" marginBottom="16px">
-              <Box flex="1" height="1px" bg={solvoColors.border} />
-              <Text fontSize="xs" color={solvoColors.textSubtle}>
-                or
-              </Text>
-              <Box flex="1" height="1px" bg={solvoColors.border} />
-            </Flex>
-
-            <SocialAuthButtons callbackUrl="/" />
-
-            <Flex justify="center" marginTop="20px">
-              <Text fontSize="sm" color={solvoColors.textMuted}>
-                Don't have an account?{' '}
-                <Link href="/register" style={{ color: solvoColors.indigo, fontWeight: 600 }}>
-                  Sign up
-                </Link>
-              </Text>
-            </Flex>
-          </Box>
-
-          <Flex justify="center" marginTop="16px">
-            <Link href="/" style={{ color: solvoColors.textSubtle, fontSize: '13px' }}>
-              ← Back home
+    <Box minHeight="100vh" bg={solvoColors.bg}>
+      <SolvoNavBar />
+      <AuthShell>
+        <Box marginBottom="16px">
+          <Logo size="lg" showText={false} />
+        </Box>
+        <Text fontFamily={solvoFonts.display} fontSize="30px" fontWeight={700} color={solvoColors.text}>
+          {t('auth.loginTitle')}
+        </Text>
+        <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="22px">
+          {t('auth.loginSub')}
+        </Text>
+        <form onSubmit={submit}>
+          <TextField label={t('auth.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+          <PasswordField label={t('auth.password')} value={password} onChange={setPassword} minLength={4} />
+          <Flex justify="flex-end" marginTop="-6px" marginBottom="14px">
+            <Link href="/forgot-password" style={{ fontSize: '13px', color: solvoColors.brandText, textDecoration: 'none' }}>
+              {t('auth.forgot')}
             </Link>
           </Flex>
-        </motion.div>
-      </Flex>
+          {error && <Notice tone="error">{error}</Notice>}
+          <Btn type="submit" disabled={isLoading} style={{ width: '100%', padding: '12px' }}>
+            {isLoading ? t('common.loading') : t('auth.loginSubmit')}
+          </Btn>
+        </form>
+        <Flex align="center" gap="10px" margin="18px 0" color={solvoColors.textSubtle} fontSize="12px">
+          <Box flex="1" height="1px" bg={solvoColors.border} />
+          {t('common.or')}
+          <Box flex="1" height="1px" bg={solvoColors.border} />
+        </Flex>
+        <SocialAuthButtons callbackUrl={next} />
+        <Text fontSize="sm" color={solvoColors.textMuted} textAlign="center" marginTop="20px">
+          {t('auth.noAccount')}{' '}
+          <Link href="/register" style={{ color: solvoColors.brandText, fontWeight: 700 }}>
+            {t('auth.createOne')}
+          </Link>
+        </Text>
+      </AuthShell>
     </Box>
   );
 }

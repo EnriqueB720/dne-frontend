@@ -1,0 +1,34 @@
+mutation logSupplierContact($data: ContactLogInput!) {
+  logSupplierContact(data: $data)
+}
+
+mutation mergeGuestContacts($deviceId: String!) {
+  mergeGuestContacts(deviceId: $deviceId)
+}
+
+query mySavedContacts {
+  mySavedContacts {
+    supplierId
+    companyName
+    city
+    province
+    businessPhone
+    whatsappNumber
+    businessEmail
+    websiteUrl
+    lastContactedAt
+    lastChannel
+    contactCount
+    myRating
+  }
+  reviewPrompts {
+    supplierId
+    companyName
+    city
+    contactedAt
+  }
+}
+
+mutation dismissReviewPrompt($supplierId: Int!) {
+  dismissReviewPrompt(supplierId: $supplierId)
+}

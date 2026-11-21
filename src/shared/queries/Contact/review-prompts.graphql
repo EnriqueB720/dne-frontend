@@ -1,8 +1,0 @@
-query reviewPrompts {
-  reviewPrompts {
-    supplierId
-    companyName
-    city
-    contactedAt
-  }
-}

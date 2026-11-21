@@ -7,10 +7,12 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     // Stub out Apollo and GraphQL imports — not needed for pure-logic tests
     '^@apollo/client(.*)$': '<rootDir>/src/__tests__/__mocks__/apollo.ts',
-    '^graphql-ws$': '<rootDir>/src/__tests__/__mocks__/graphql-ws.ts',
+    // Only enums are needed from the generated client in unit tests.
+    '^@generated$': '<rootDir>/src/__tests__/__mocks__/generated.ts',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: { jsx: 'react' } }],
   },
   testMatch: ['**/__tests__/**/*.test.ts'],
+  modulePathIgnorePatterns: ['<rootDir>/.next/'],
 };

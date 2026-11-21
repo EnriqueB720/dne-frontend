@@ -1,7 +1,0 @@
-subscription quoteEventForCustomer($customerId: Int!) {
-  quoteEventForCustomer(customerId: $customerId) {
-    eventType
-    quoteId
-    requestId
-  }
-}

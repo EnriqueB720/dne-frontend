@@ -1,6 +1,0 @@
-mutation cancelCalendarEvent($data: CalendarEventCancelInput!) {
-  cancelCalendarEvent(data: $data) {
-    calendarEventId
-    status
-  }
-}
