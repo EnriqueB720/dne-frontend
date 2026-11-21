@@ -64,6 +64,8 @@ import {
   useCreateQuoteMutation,
   useSearchSuppliersLazyQuery,
   useSuppliersQuery,
+  useRecordLeadEventMutation,
+  LeadSource,
 } from '@generated';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -1050,6 +1052,7 @@ export default function Home() {
   const { user, isAuthenticated } = React.useContext(AuthContext);
   const [createRequest, createRequestState] = useCreateRequestMutation();
   const [createQuote, createQuoteState] = useCreateQuoteMutation();
+  const [recordLeadEvent] = useRecordLeadEventMutation();
   const [searchSuppliers] = useSearchSuppliersLazyQuery({ fetchPolicy: 'network-only' });
 
   // Device geolocation — requested lazily on the first send so the user
@@ -1082,8 +1085,23 @@ export default function Home() {
             createdAt: new Date().toISOString(),
           };
       setMessages((prev) => [...prev, confirmationMsg]);
+
+      // Lead-gen value metric — log that this customer got as far as the
+      // supplier's contact info. Fire-and-forget: a logging failure must
+      // never block the customer from reaching the supplier.
+      if (provider.isRealSupplier) {
+        recordLeadEvent({
+          variables: {
+            data: {
+              supplierId: provider.id,
+              customerId: user?.customerId ?? undefined,
+              source: LeadSource.Chat,
+            },
+          },
+        }).catch(() => {});
+      }
     },
-    [setMessages],
+    [setMessages, recordLeadEvent, user?.customerId],
   );
 
   // Resolve the active customerId — auth first, falling back to a

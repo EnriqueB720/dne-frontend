@@ -1,0 +1,8 @@
+mutation recordLeadEvent($data: LeadEventCreateInput!) {
+  recordLeadEvent(data: $data) {
+    leadEventId
+    supplierId
+    source
+    createdAt
+  }
+}

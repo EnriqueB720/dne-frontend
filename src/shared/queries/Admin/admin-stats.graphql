@@ -7,5 +7,7 @@ query adminStats($adminUserId: Int!) {
     mtdRevenue
     allTimeRevenue
     currency
+    totalLeads
+    leadsThisMonth
   }
 }
