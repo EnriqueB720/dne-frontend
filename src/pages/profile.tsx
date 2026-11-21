@@ -1,321 +1,96 @@
-import { useContext, useEffect, useState } from 'react';
-import Link from 'next/link';
+import * as React from 'react';
 import { useRouter } from 'next/router';
-import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar } from '@components';
-import { solvoColors, solvoFonts } from '@constants';
+
+import { Box, Btn, Card, Chip, Flex, FieldLabel, Notice, PageTitle, SolvoNavBar, TextField, inputStyle } from '@components';
+import { solvoColors } from '@constants';
+import { Language, useUpdateMeMutation } from '@generated';
 import AuthContext from '@/shared/contexts/auth.context';
-import {
-  useCustomerQuery,
-  useUpdateCustomerMutation,
-  useUpdateUserMutation,
-} from '@generated';
+import { useI18n, type Lang } from '@/shared/i18n';
 
-const inputBaseStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: '10px',
-  border: `1px solid ${solvoColors.border}`,
-  background: solvoColors.surface,
-  color: solvoColors.text,
-  fontFamily: solvoFonts.sans,
-  fontSize: '14px',
-  outline: 'none',
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: '11px',
-  fontWeight: 600,
-  color: solvoColors.textMuted,
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  marginBottom: '6px',
-  display: 'block',
-};
-
-const sectionStyle: React.CSSProperties = {
-  background: solvoColors.surface,
-  border: `1px solid ${solvoColors.border}`,
-  borderRadius: '16px',
-  padding: '24px',
-};
-
-export default function ProfilePage() {
+/** Account settings: name, phone, language, sign out. */
+export default function AccountPage() {
   const router = useRouter();
-  const { user, isAuthenticated, refreshUserToken } = useContext(AuthContext);
-  const customerId = user?.customerId ?? null;
-  const userId = user?.userId ?? null;
+  const { t, lang, setLang } = useI18n();
+  const { user, isAuthenticated, logout, refreshUserToken } = React.useContext(AuthContext);
+  const [updateMe, { loading }] = useUpdateMeMutation();
+  const [name, setName] = React.useState('');
+  const [phone, setPhone] = React.useState('');
+  const [msg, setMsg] = React.useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
-  const customerQuery = useCustomerQuery({
-    variables: { where: { customerId: customerId ?? 0 } },
-    skip: !customerId,
-    fetchPolicy: 'cache-and-network',
-  });
-  const [updateCustomer, updateCustomerState] = useUpdateCustomerMutation();
-  const [updateUser, updateUserState] = useUpdateUserMutation();
+  React.useEffect(() => {
+    if (!user) return;
+    setName(user.name ?? '');
+    setPhone(user.phone ?? '');
+  }, [user?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const profile = customerQuery.data?.customer;
+  React.useEffect(() => {
+    if (isAuthenticated === false && typeof window !== 'undefined' && !localStorage.getItem('@token')) {
+      router.replace('/login?next=/profile');
+    }
+  }, [isAuthenticated, router]);
 
-  // Form state — initialized from fetched profile, kept editable
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [country, setCountry] = useState('');
-  const [defaultCity, setDefaultCity] = useState('');
-  const [defaultAddress, setDefaultAddress] = useState('');
+  if (!user) {
+    return (
+      <Box minHeight="100vh" bg={solvoColors.bg}>
+        <SolvoNavBar />
+      </Box>
+    );
+  }
 
-  const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const changeLanguage = async (next: Lang) => {
+    setLang(next);
+    // Saved on the account too, for future emails.
+    await updateMe({ variables: { data: { language: next === 'es' ? Language.Spanish : Language.English } } }).catch(() => undefined);
+  };
 
-  // Sync form when data loads
-  useEffect(() => {
-    if (!profile) return;
-    setName(profile.user?.name ?? '');
-    setPhone(profile.user?.phone ?? '');
-    setCountry(profile.user?.country ?? '');
-    setDefaultCity(profile.defaultCity ?? '');
-    setDefaultAddress(profile.defaultAddress ?? '');
-  }, [profile]);
-
-  const handleSave = async () => {
-    if (!userId || !customerId) return;
-    setFeedback(null);
+  const save = async () => {
+    setMsg(null);
     try {
-      await Promise.all([
-        updateUser({
-          variables: {
-            data: {
-              userId,
-              name: name || undefined,
-              phone: phone || undefined,
-              country: country || undefined,
-            },
-          },
-        }),
-        updateCustomer({
-          variables: {
-            data: {
-              customerId,
-              defaultCity: defaultCity || undefined,
-              defaultAddress: defaultAddress || undefined,
-            },
-          },
-        }),
-      ]);
-      setFeedback({ kind: 'ok', text: 'Profile saved.' });
-      // Refresh the in-memory user so the header / nav reflect the new name
-      refreshUserToken().catch(() => {});
-      setTimeout(() => setFeedback(null), 3000);
-    } catch (err: any) {
-      setFeedback({ kind: 'err', text: err?.message ?? 'Save failed' });
+      await updateMe({ variables: { data: { name: name.trim(), phone: phone.trim() } } });
+      await refreshUserToken();
+      setMsg({ tone: 'success', text: t('common.saved') });
+    } catch (e: any) {
+      setMsg({ tone: 'error', text: e?.message ?? t('common.error') });
     }
   };
 
-  const busy = updateCustomerState.loading || updateUserState.loading;
-
-  // ── Gates ───────────────────────────────────────────────────────────
-  if (!isAuthenticated || !user) {
-    return (
-      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-        <AtmosphericGlow />
-        <SolvoNavBar activePath="/profile" />
-        <Flex minHeight="60vh" align="center" justify="center" padding="24px">
-          <Box style={sectionStyle} maxWidth="420px" textAlign="center">
-            <Text fontFamily={solvoFonts.display} fontSize="22px" color={solvoColors.text} marginBottom="6px">
-              Sign in to edit your profile
-            </Text>
-            <Link href="/login" style={{ color: solvoColors.indigo }}>
-              Sign in
-            </Link>
-          </Box>
-        </Flex>
-      </Box>
-    );
-  }
-
-  // Supplier-only users edit their business profile at /provider/settings
-  if (!customerId && user.supplierId) {
-    router.replace('/provider/settings');
-    return null;
-  }
-
-  if (!customerId) {
-    return (
-      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-        <AtmosphericGlow />
-        <SolvoNavBar activePath="/profile" />
-        <Flex minHeight="60vh" align="center" justify="center" padding="24px">
-          <Box style={sectionStyle} maxWidth="460px" textAlign="center">
-            <Text fontFamily={solvoFonts.display} fontSize="20px" color={solvoColors.text}>
-              No customer profile on your account.
-            </Text>
-          </Box>
-        </Flex>
-      </Box>
-    );
-  }
-
   return (
-    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-      <AtmosphericGlow />
-      <SolvoNavBar activePath="/profile" />
-
-      <Box maxWidth="780px" margin="0 auto" padding={{ base: '32px 16px', md: '48px 24px' }}>
-        <Text fontSize="xs" color={solvoColors.textSubtle} letterSpacing="0.08em" fontWeight={600} marginBottom="6px">
-          ACCOUNT
-        </Text>
-        <Text
-          fontFamily={solvoFonts.display}
-          fontSize={{ base: '28px', md: '36px' }}
-          color={solvoColors.text}
-          marginBottom="6px"
-        >
-          Your profile
-        </Text>
-        <Text fontSize="sm" color={solvoColors.textMuted} marginBottom="32px">
-          Update your contact info and default location. These are used when you start a new request.
-        </Text>
-
-        {feedback && (
-          <Box
-            marginBottom="20px"
-            padding="12px 14px"
-            borderRadius="10px"
-            bg={feedback.kind === 'ok' ? solvoColors.successLight : solvoColors.roseLight}
-            color={feedback.kind === 'ok' ? solvoColors.successText : solvoColors.roseText}
-          >
-            <Text fontSize="sm">{feedback.text}</Text>
+    <Box minHeight="100vh" bg={solvoColors.bg}>
+      <SolvoNavBar />
+      <Box maxWidth="560px" margin="0 auto" padding={{ base: '20px 16px 60px', md: '32px 24px' }}>
+        <PageTitle title={t('account.title')} />
+        <Flex gap="6px" marginBottom="16px" wrap="wrap">
+          {user.isCustomer && <Chip tone="brand">{t('account.typeCustomer')}</Chip>}
+          {user.isSupplier && <Chip tone="brand">{t('account.typeSupplier')}</Chip>}
+          {user.isAdmin && <Chip tone="accent">{t('account.typeAdmin')}</Chip>}
+        </Flex>
+        {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
+        <Card>
+          <TextField label={t('account.email')} value={user.email ?? ''} disabled style={{ opacity: 0.7 }} />
+          <TextField label={t('account.name')} value={name} onChange={(e) => setName(e.target.value)} maxLength={100} />
+          <TextField label={t('account.phone')} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+506" />
+          <Box marginBottom="16px">
+            <FieldLabel>{t('account.language')}</FieldLabel>
+            <select value={lang} onChange={(e) => changeLanguage(e.target.value as Lang)} style={inputStyle}>
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
           </Box>
-        )}
-
-        {customerQuery.loading && !profile ? (
-          <Text fontSize="sm" color={solvoColors.textSubtle}>Loading…</Text>
-        ) : (
-          <Flex direction="column" gap="20px">
-            {/* Identity */}
-            <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.display} fontSize="18px" marginBottom="16px">
-                Identity
-              </Text>
-
-              <Flex gap="14px" wrap="wrap">
-                <Box flex="1" minWidth="220px">
-                  <label style={labelStyle}>Full name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    style={inputBaseStyle}
-                    placeholder="Your name"
-                  />
-                </Box>
-                <Box flex="1" minWidth="220px">
-                  <label style={labelStyle}>Email (read only)</label>
-                  <input
-                    type="email"
-                    value={profile?.user?.email ?? ''}
-                    readOnly
-                    style={{
-                      ...inputBaseStyle,
-                      background: solvoColors.bg,
-                      color: solvoColors.textMuted,
-                      cursor: 'not-allowed',
-                    }}
-                  />
-                </Box>
-              </Flex>
-
-              <Flex gap="14px" wrap="wrap" marginTop="14px">
-                <Box flex="1" minWidth="220px">
-                  <label style={labelStyle}>Phone</label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    style={inputBaseStyle}
-                    placeholder="+506 …"
-                  />
-                </Box>
-                <Box flex="1" minWidth="160px">
-                  <label style={labelStyle}>Country</label>
-                  <input
-                    type="text"
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    style={inputBaseStyle}
-                    placeholder="Costa Rica"
-                  />
-                </Box>
-              </Flex>
-            </Box>
-
-            {/* Default location */}
-            <Box style={sectionStyle}>
-              <Text fontFamily={solvoFonts.display} fontSize="18px" marginBottom="4px">
-                Default location
-              </Text>
-              <Text fontSize="xs" color={solvoColors.textSubtle} marginBottom="16px">
-                Used to match you with nearby providers when you create a new request.
-              </Text>
-
-              <Box marginBottom="14px">
-                <label style={labelStyle}>City</label>
-                <input
-                  type="text"
-                  value={defaultCity}
-                  onChange={(e) => setDefaultCity(e.target.value)}
-                  style={inputBaseStyle}
-                  placeholder="Santa Ana"
-                />
-              </Box>
-
-              <Box>
-                <label style={labelStyle}>Address (optional)</label>
-                <input
-                  type="text"
-                  value={defaultAddress}
-                  onChange={(e) => setDefaultAddress(e.target.value)}
-                  style={inputBaseStyle}
-                  placeholder="Street, building, etc."
-                />
-              </Box>
-            </Box>
-
-            {/* Actions */}
-            <Flex justify="flex-end" gap="10px">
-              <Link href="/dashboard" style={{ textDecoration: 'none' }}>
-                <Box
-                  padding="10px 16px"
-                  borderRadius="10px"
-                  border={`1px solid ${solvoColors.border}`}
-                  color={solvoColors.text}
-                  fontSize="14px"
-                  fontWeight={600}
-                  cursor="pointer"
-                  bg={solvoColors.surface}
-                >
-                  Cancel
-                </Box>
-              </Link>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={busy}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: solvoColors.accent,
-                  color: solvoColors.accentFg,
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  cursor: busy ? 'wait' : 'pointer',
-                  opacity: busy ? 0.6 : 1,
-                  fontFamily: solvoFonts.sans,
-                }}
-              >
-                {busy ? 'Saving…' : 'Save changes'}
-              </button>
-            </Flex>
+          <Flex justify="space-between" gap="8px">
+            <Btn
+              variant="secondary"
+              onClick={async () => {
+                await logout();
+                router.push('/');
+              }}
+            >
+              {t('common.signOut')}
+            </Btn>
+            <Btn onClick={save} disabled={loading || name.trim().length < 2}>
+              {loading ? t('common.saving') : t('common.save')}
+            </Btn>
           </Flex>
-        )}
+        </Card>
       </Box>
     </Box>
   );

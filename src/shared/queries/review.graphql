@@ -1,0 +1,26 @@
+query supplierReviews($supplierId: Int!) {
+  supplierReviews(supplierId: $supplierId) {
+    reviewId
+    supplierId
+    rating
+    text
+    reviewerName
+    createdAt
+    isMine
+  }
+}
+
+mutation saveReview($data: ReviewInput!) {
+  saveReview(data: $data) {
+    reviewId
+    rating
+    text
+    reviewerName
+    createdAt
+    isMine
+  }
+}
+
+mutation deleteReview($reviewId: Int!) {
+  deleteReview(reviewId: $reviewId)
+}

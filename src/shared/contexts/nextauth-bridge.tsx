@@ -6,6 +6,20 @@ import AuthContext from './auth.context';
 import { StorageService } from '@services';
 
 /**
+ * `iat` (issued-at, seconds) from a JWT, or 0 when there is no readable
+ * token. Read-only: the signature is the API's job, this only orders tokens.
+ */
+function issuedAt(token: string | null | undefined): number {
+  if (!token) return 0;
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return Number(JSON.parse(atob(payload)).iat) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Bridges a NextAuth (social login) session into the app's existing auth flow.
  *
  * We read the session with `getSession()` (a direct fetch to /api/auth/session)
@@ -43,8 +57,15 @@ const NextAuthBridge: FC = () => {
 
       if (!bridged.current) {
         bridged.current = true;
-        await StorageService.setJwtToken(session.backendToken);
-        await refreshUserToken();
+        // The NextAuth cookie outlives our one-hour token and keeps handing
+        // back the token minted at social sign-in. Only adopt it when it is
+        // newer than what we hold — otherwise every reload would swap a
+        // freshly renewed token for an expired one and sign the user out.
+        const current = await StorageService.getJwtToken();
+        if (issuedAt(session.backendToken) > issuedAt(current)) {
+          await StorageService.setJwtToken(session.backendToken);
+          await refreshUserToken();
+        }
       }
     })();
 

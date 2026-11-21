@@ -1,0 +1,25 @@
+query categories {
+  categories {
+    categoryId
+    slug
+    nameEs
+    nameEn
+    icon
+  }
+}
+
+query provinces($country: String) {
+  provinces(country: $country) {
+    code
+    name
+    country
+  }
+}
+
+query resolveProvince($location: String, $lat: Float, $lng: Float) {
+  resolveProvince(location: $location, lat: $lat, lng: $lng) {
+    code
+    name
+    source
+  }
+}

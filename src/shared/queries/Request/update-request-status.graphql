@@ -1,7 +1,0 @@
-mutation updateRequestStatus($data: RequestUpdateStatusInput!) {
-  updateRequestStatus(data: $data) {
-    requestId
-    status
-    updatedAt
-  }
-}

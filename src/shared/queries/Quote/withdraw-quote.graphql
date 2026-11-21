@@ -1,7 +1,0 @@
-mutation withdrawQuote($data: QuoteWithdrawInput!) {
-  withdrawQuote(data: $data) {
-    quoteId
-    status
-    respondedAt
-  }
-}

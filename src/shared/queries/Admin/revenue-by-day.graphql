@@ -1,7 +1,0 @@
-query revenueByDay($adminUserId: Int!, $daysBack: Int) {
-  revenueByDay(adminUserId: $adminUserId, daysBack: $daysBack) {
-    day
-    platformFee
-    bookings
-  }
-}

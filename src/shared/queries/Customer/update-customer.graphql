@@ -1,8 +1,0 @@
-mutation updateCustomer($data: CustomerUpdateInput!) {
-  updateCustomer(data: $data) {
-    customerId
-    defaultCity
-    defaultAddress
-    marketingOptIn
-  }
-}

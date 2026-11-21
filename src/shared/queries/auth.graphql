@@ -1,0 +1,86 @@
+fragment SessionUser on User {
+  userId
+  email
+  name
+  phone
+  language
+  country
+  profilePicture
+  isCustomer
+  isSupplier
+  isAdmin
+  supplier {
+    supplierId
+    companyName
+  }
+  customer {
+    customerId
+  }
+}
+
+query login($data: LoginUserInput!) {
+  login(data: $data) {
+    access_token
+    expiresAt
+    user {
+      ...SessionUser
+    }
+  }
+}
+
+query refreshUser($data: String!) {
+  refreshUser(data: $data) {
+    access_token
+    expiresAt
+    user {
+      ...SessionUser
+    }
+  }
+}
+
+mutation signup($data: SignUpInput!) {
+  signup(data: $data) {
+    userId
+    isCustomer
+    isSupplier
+  }
+}
+
+mutation socialLogin($data: SocialLoginInput!) {
+  socialLogin(data: $data) {
+    access_token
+    expiresAt
+    user {
+      ...SessionUser
+    }
+  }
+}
+
+mutation completeOnboarding($data: CompleteOnboardingInput!) {
+  completeOnboarding(data: $data) {
+    access_token
+    expiresAt
+    user {
+      ...SessionUser
+    }
+  }
+}
+
+mutation requestPasswordReset($data: RequestPasswordResetInput!) {
+  requestPasswordReset(data: $data) {
+    ok
+    resetUrl
+  }
+}
+
+mutation resetPassword($data: ResetPasswordInput!) {
+  resetPassword(data: $data) {
+    ok
+  }
+}
+
+mutation updateMe($data: UserUpdateInput!) {
+  updateMe(data: $data) {
+    ...SessionUser
+  }
+}
