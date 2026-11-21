@@ -1,0 +1,8 @@
+query topSuppliersByLeads($adminUserId: Int!, $limit: Int) {
+  topSuppliersByLeads(adminUserId: $adminUserId, limit: $limit) {
+    supplierId
+    companyName
+    city
+    leadCount
+  }
+}

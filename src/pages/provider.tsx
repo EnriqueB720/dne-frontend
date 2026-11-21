@@ -9,6 +9,7 @@ import {
   Sparkles,
   Store,
   TrendingUp,
+  Users,
   Zap,
 } from 'lucide-react';
 import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, Pill, QuoteCreateModal } from '@components';
@@ -28,12 +29,14 @@ const TONE_BG: Record<string, string> = {
   indigo: solvoColors.indigoLight,
   amber: solvoColors.amberLight,
   rose: solvoColors.roseLight,
+  accent: solvoColors.accentSoft,
 };
 const TONE_TEXT: Record<string, string> = {
   emerald: solvoColors.emeraldText,
   indigo: solvoColors.indigo,
   amber: solvoColors.amberText,
   rose: solvoColors.roseText,
+  accent: solvoColors.accentText,
 };
 
 const formatColones = (value: string | number): string => {
@@ -133,6 +136,13 @@ export default function ProviderDashboard() {
   // ── Stats cards data ────────────────────────────────────────────────
   const statCards = stats
     ? [
+        {
+          label: 'Leads this month',
+          value: String(stats.leadsThisMonth),
+          sub: `${stats.leadsAllTime} all time`,
+          icon: Users,
+          tone: 'accent' as const,
+        },
         {
           label: 'Response rate',
           value: `${stats.responseRate}%`,
@@ -316,11 +326,11 @@ export default function ProviderDashboard() {
         {/* Stats grid */}
         <Box
           display="grid"
-          gridTemplateColumns={{ base: '1fr 1fr', md: 'repeat(4, 1fr)' }}
+          gridTemplateColumns={{ base: '1fr 1fr', md: 'repeat(5, 1fr)' }}
           gap="14px"
           marginBottom="32px"
         >
-          {(statCards ?? new Array(4).fill(null)).map((stat, i) => {
+          {(statCards ?? new Array(5).fill(null)).map((stat, i) => {
             if (!stat) {
               return (
                 <Box

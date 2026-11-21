@@ -17,8 +17,10 @@ import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, Pill } from '@components
 import { solvoColors, solvoFonts } from '@constants';
 import AuthContext from '@/shared/contexts/auth.context';
 import {
+  LeadSource,
   PromotionTier,
   useFavoritesByCustomerQuery,
+  useRecordLeadEventMutation,
   useSupplierQuery,
   useToggleFavoriteMutation,
 } from '@generated';
@@ -80,6 +82,22 @@ export default function ProviderProfile() {
     fetchPolicy: 'cache-and-network',
   });
   const supplier = supplierQuery.data?.supplier ?? null;
+
+  const [recordLeadEvent] = useRecordLeadEventMutation();
+  // Lead-gen value metric — log that this customer reached a contact
+  // channel. Fire-and-forget: a logging failure must never block the link.
+  const handleContactClick = () => {
+    if (!supplierId) return;
+    recordLeadEvent({
+      variables: {
+        data: {
+          supplierId,
+          customerId: customerId ?? undefined,
+          source: LeadSource.Storefront,
+        },
+      },
+    }).catch(() => {});
+  };
 
   // Favorites — only fetched for signed-in customers
   const favoritesQuery = useFavoritesByCustomerQuery({
@@ -683,6 +701,7 @@ export default function ProviderProfile() {
                         href={c.href}
                         target={c.kind === 'website' ? '_blank' : undefined}
                         rel={c.kind === 'website' ? 'noreferrer' : undefined}
+                        onClick={handleContactClick}
                         style={{ textDecoration: 'none' }}
                       >
                         <Flex

@@ -10,6 +10,7 @@ import {
   Star,
   TrendingUp,
   Users,
+  Zap,
 } from 'lucide-react';
 
 import AuthContext from '@/shared/contexts/auth.context';
@@ -22,6 +23,7 @@ import {
   useAiUsageBreakdownQuery,
   useRevenueByDayQuery,
   useSetSupplierPromotionMutation,
+  useTopSuppliersByLeadsQuery,
   useTopSuppliersQuery,
 } from '@generated';
 
@@ -66,6 +68,7 @@ export default function AdminPage() {
   const aiQuery = useAiUsageBreakdownQuery({ variables: { adminUserId, daysBack: aiWindow }, skip, fetchPolicy: 'cache-and-network' });
   const [revenueWindow, setRevenueWindow] = useState<number>(30);
   const revenueQuery = useRevenueByDayQuery({ variables: { adminUserId, daysBack: revenueWindow }, skip, fetchPolicy: 'cache-and-network' });
+  const topLeadsQuery = useTopSuppliersByLeadsQuery({ variables: { adminUserId, limit: 10 }, skip, fetchPolicy: 'cache-and-network' });
   const suppliersQuery = useAdminSuppliersQuery({ skip, fetchPolicy: 'cache-and-network' });
 
   const [setPromotion, { loading: setPromotionLoading }] = useSetSupplierPromotionMutation({
@@ -78,6 +81,7 @@ export default function AdminPage() {
 
   const stats = statsQuery.data?.adminStats;
   const top = topQuery.data?.topSuppliers ?? [];
+  const topByLeads = topLeadsQuery.data?.topSuppliersByLeads ?? [];
   const aiRows = aiQuery.data?.aiUsageBreakdown ?? [];
   const suppliers = suppliersQuery.data?.suppliers ?? [];
   const revenueRows = revenueQuery.data?.revenueByDay ?? [];
@@ -199,7 +203,7 @@ export default function AdminPage() {
           display="grid"
           gridTemplateColumns={{ base: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }}
           gap="16px"
-          marginBottom="40px"
+          marginBottom="16px"
         >
           <StatCard
             icon={<Users size={18} />}
@@ -231,6 +235,23 @@ export default function AdminPage() {
             label="Revenue (MTD)"
             value={formatMoney(stats?.mtdRevenue, stats?.currency ?? 'CRC')}
             sub={`${formatMoney(stats?.allTimeRevenue, stats?.currency ?? 'CRC')} all time`}
+            loading={statsQuery.loading && !stats}
+          />
+        </Box>
+
+        {/* Lead-gen volume — new under the lead-tracking model */}
+        <Box
+          display="grid"
+          gridTemplateColumns={{ base: '1fr', sm: 'repeat(3, 1fr)' }}
+          gap="16px"
+          marginBottom="40px"
+        >
+          <StatCard
+            icon={<Zap size={18} />}
+            tone="amber"
+            label="Leads this month"
+            value={formatInt(stats?.leadsThisMonth)}
+            sub={`${formatInt(stats?.totalLeads)} all time`}
             loading={statsQuery.loading && !stats}
           />
         </Box>
@@ -448,6 +469,71 @@ export default function AdminPage() {
                     <Text fontSize="sm" fontWeight={600} color={solvoColors.indigo}>
                       {formatMoney(r.costUsd, 'USD')}
                     </Text>
+                  </Flex>
+                ))}
+              </Box>
+            )}
+          </Panel>
+        </Box>
+
+        {/* Top suppliers by leads — lead-gen leaderboard, distinct from the
+            booking-based "Top suppliers" panel above */}
+        <Box marginBottom="40px">
+          <Panel title="Top suppliers by leads" icon={<Zap size={16} color={solvoColors.indigo} />}>
+            {topLeadsQuery.loading && topByLeads.length === 0 ? (
+              <Text color={solvoColors.textMuted} fontSize="sm" padding="8px 0">
+                Loading…
+              </Text>
+            ) : topByLeads.length === 0 ? (
+              <Text color={solvoColors.textMuted} fontSize="sm" padding="8px 0">
+                No leads yet.
+              </Text>
+            ) : (
+              <Box>
+                {topByLeads.map((row, i) => (
+                  <Flex
+                    key={row.supplierId}
+                    align="center"
+                    justify="space-between"
+                    padding="12px 4px"
+                    borderTop={i === 0 ? undefined : `1px solid ${solvoColors.border}`}
+                    gap="12px"
+                  >
+                    <Flex align="center" gap="12px" minWidth={0}>
+                      <Box
+                        width="28px"
+                        height="28px"
+                        borderRadius="full"
+                        bg={solvoColors.bg}
+                        borderWidth="1px"
+                        borderStyle="solid"
+                        borderColor={solvoColors.border}
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        flexShrink={0}
+                      >
+                        <Text fontSize="xs" fontWeight={600} color={solvoColors.textMuted}>
+                          {i + 1}
+                        </Text>
+                      </Box>
+                      <Box minWidth={0}>
+                        <Text fontWeight={600} color={solvoColors.text} fontSize="sm">
+                          {row.companyName}
+                        </Text>
+                        <Text fontSize="xs" color={solvoColors.textSubtle}>
+                          {row.city ?? '—'}
+                        </Text>
+                      </Box>
+                    </Flex>
+                    <Box textAlign="right" flexShrink={0}>
+                      <Text fontSize="xs" color={solvoColors.textSubtle}>
+                        Leads
+                      </Text>
+                      <Text fontSize="sm" fontWeight={600} color={solvoColors.text}>
+                        {row.leadCount}
+                      </Text>
+                    </Box>
                   </Flex>
                 ))}
               </Box>
@@ -686,6 +772,7 @@ function StatCard({
   );
 }
 
+/** Generic day-bucketed bar chart — used for both revenue and MRR trends. */
 function RevenueBars({
   rows,
   loading,
@@ -726,7 +813,7 @@ function RevenueBars({
         height="140px"
         padding="0 2px"
       >
-        {rows.map((r, i) => {
+        {rows.map((r) => {
           const value = Number(r.platformFee);
           const pct = (value / max) * 100;
           // Always show at least a sliver for days with any bookings, so

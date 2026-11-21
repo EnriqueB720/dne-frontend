@@ -8,5 +8,7 @@ query supplierDashboardStats($supplierId: Int!) {
     currency
     platformFeeRate
     weeklyLeadCounts
+    leadsThisMonth
+    leadsAllTime
   }
 }

@@ -22,9 +22,11 @@ export type AdminStats = {
   __typename?: 'AdminStats';
   allTimeRevenue: Scalars['String']['output'];
   currency: Scalars['String']['output'];
+  leadsThisMonth: Scalars['Int']['output'];
   mtdRevenue: Scalars['String']['output'];
   totalBookings: Scalars['Int']['output'];
   totalCustomers: Scalars['Int']['output'];
+  totalLeads: Scalars['Int']['output'];
   totalSuppliers: Scalars['Int']['output'];
   totalUsers: Scalars['Int']['output'];
 };
@@ -366,6 +368,27 @@ export enum Language {
   Spanish = 'SPANISH'
 }
 
+export type LeadEvent = {
+  __typename?: 'LeadEvent';
+  createdAt: Scalars['DateTime']['output'];
+  customerId?: Maybe<Scalars['Int']['output']>;
+  leadEventId: Scalars['Int']['output'];
+  source: LeadSource;
+  supplierId: Scalars['Int']['output'];
+};
+
+export type LeadEventCreateInput = {
+  customerId?: InputMaybe<Scalars['Int']['input']>;
+  source?: InputMaybe<LeadSource>;
+  supplierId: Scalars['Int']['input'];
+};
+
+/** Where a contact-reveal lead was captured — the AI chat or a supplier storefront. */
+export enum LeadSource {
+  Chat = 'CHAT',
+  Storefront = 'STOREFRONT'
+}
+
 export type LoginOutput = {
   __typename?: 'LoginOutput';
   access_token: Scalars['String']['output'];
@@ -466,6 +489,7 @@ export type Mutation = {
   markNotificationAsRead: Notification;
   markQuotesViewed: Scalars['Float']['output'];
   mergeGuestAiConversations: Scalars['Float']['output'];
+  recordLeadEvent: LeadEvent;
   reorderSupplierMedia: Scalars['Boolean']['output'];
   requestPasswordReset: PasswordResetResult;
   resetPassword: PasswordResetResult;
@@ -651,6 +675,11 @@ export type MutationMarkQuotesViewedArgs = {
 
 export type MutationMergeGuestAiConversationsArgs = {
   deviceId: Scalars['String']['input'];
+};
+
+
+export type MutationRecordLeadEventArgs = {
+  data: LeadEventCreateInput;
 };
 
 
@@ -956,6 +985,7 @@ export type Query = {
   supplierDashboardStats: SupplierDashboardStats;
   suppliers: Array<Supplier>;
   topSuppliers: Array<TopSupplierRow>;
+  topSuppliersByLeads: Array<TopSupplierByLeadsRow>;
   unreadNotificationCount: Scalars['Int']['output'];
   user: User;
 };
@@ -1172,6 +1202,12 @@ export type QuerySupplierDashboardStatsArgs = {
 
 
 export type QueryTopSuppliersArgs = {
+  adminUserId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryTopSuppliersByLeadsArgs = {
   adminUserId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -1645,6 +1681,8 @@ export type SupplierDashboardStats = {
   activeLeadsCount: Scalars['Int']['output'];
   conversionRate: Scalars['Float']['output'];
   currency: Scalars['String']['output'];
+  leadsAllTime: Scalars['Int']['output'];
+  leadsThisMonth: Scalars['Int']['output'];
   mtdEarnings: Scalars['String']['output'];
   mtdGross: Scalars['String']['output'];
   platformFeeRate: Scalars['Float']['output'];
@@ -1699,6 +1737,14 @@ export type SupplierUpdateInput = {
 
 export type SupplierWhereInput = {
   supplierId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type TopSupplierByLeadsRow = {
+  __typename?: 'TopSupplierByLeadsRow';
+  city?: Maybe<Scalars['String']['output']>;
+  companyName: Scalars['String']['output'];
+  leadCount: Scalars['Int']['output'];
+  supplierId: Scalars['Int']['output'];
 };
 
 export type TopSupplierRow = {
@@ -1760,7 +1806,7 @@ export type AdminStatsQueryVariables = Exact<{
 }>;
 
 
-export type AdminStatsQuery = { __typename?: 'Query', adminStats: { __typename?: 'AdminStats', totalUsers: number, totalCustomers: number, totalSuppliers: number, totalBookings: number, mtdRevenue: string, allTimeRevenue: string, currency: string } };
+export type AdminStatsQuery = { __typename?: 'Query', adminStats: { __typename?: 'AdminStats', totalUsers: number, totalCustomers: number, totalSuppliers: number, totalBookings: number, mtdRevenue: string, allTimeRevenue: string, currency: string, totalLeads: number, leadsThisMonth: number } };
 
 export type AdminSuppliersQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1789,6 +1835,14 @@ export type SetSupplierPromotionMutationVariables = Exact<{
 
 
 export type SetSupplierPromotionMutation = { __typename?: 'Mutation', setSupplierPromotion: { __typename?: 'SupplierPromotionResult', supplierId: number, promotionTier: PromotionTier, promotionStartDate?: any | null, promotionEndDate?: any | null } };
+
+export type TopSuppliersByLeadsQueryVariables = Exact<{
+  adminUserId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type TopSuppliersByLeadsQuery = { __typename?: 'Query', topSuppliersByLeads: Array<{ __typename?: 'TopSupplierByLeadsRow', supplierId: number, companyName: string, city?: string | null, leadCount: number }> };
 
 export type TopSuppliersQueryVariables = Exact<{
   adminUserId: Scalars['Int']['input'];
@@ -2113,6 +2167,13 @@ export type ToggleFavoriteMutationVariables = Exact<{
 
 export type ToggleFavoriteMutation = { __typename?: 'Mutation', toggleFavorite: { __typename?: 'FavoriteToggleResult', favoriteId?: number | null, customerId: number, supplierId: number, wasAdded: boolean } };
 
+export type RecordLeadEventMutationVariables = Exact<{
+  data: LeadEventCreateInput;
+}>;
+
+
+export type RecordLeadEventMutation = { __typename?: 'Mutation', recordLeadEvent: { __typename?: 'LeadEvent', leadEventId: number, supplierId: number, source: LeadSource, createdAt: any } };
+
 export type MarkAllNotificationsAsReadMutationVariables = Exact<{
   data: NotificationsMarkAllReadInput;
 }>;
@@ -2364,7 +2425,7 @@ export type SupplierDashboardStatsQueryVariables = Exact<{
 }>;
 
 
-export type SupplierDashboardStatsQuery = { __typename?: 'Query', supplierDashboardStats: { __typename?: 'SupplierDashboardStats', responseRate: number, conversionRate: number, activeLeadsCount: number, mtdEarnings: string, mtdGross: string, currency: string, platformFeeRate: number, weeklyLeadCounts: Array<number> } };
+export type SupplierDashboardStatsQuery = { __typename?: 'Query', supplierDashboardStats: { __typename?: 'SupplierDashboardStats', responseRate: number, conversionRate: number, activeLeadsCount: number, mtdEarnings: string, mtdGross: string, currency: string, platformFeeRate: number, weeklyLeadCounts: Array<number>, leadsThisMonth: number, leadsAllTime: number } };
 
 export type SupplierQueryVariables = Exact<{
   where: SupplierWhereInput;
@@ -2403,6 +2464,8 @@ export const AdminStatsDocument = gql`
     mtdRevenue
     allTimeRevenue
     currency
+    totalLeads
+    leadsThisMonth
   }
 }
     `;
@@ -2622,6 +2685,53 @@ export function useSetSupplierPromotionMutation(baseOptions?: Apollo.MutationHoo
 export type SetSupplierPromotionMutationHookResult = ReturnType<typeof useSetSupplierPromotionMutation>;
 export type SetSupplierPromotionMutationResult = Apollo.MutationResult<SetSupplierPromotionMutation>;
 export type SetSupplierPromotionMutationOptions = Apollo.BaseMutationOptions<SetSupplierPromotionMutation, SetSupplierPromotionMutationVariables>;
+export const TopSuppliersByLeadsDocument = gql`
+    query topSuppliersByLeads($adminUserId: Int!, $limit: Int) {
+  topSuppliersByLeads(adminUserId: $adminUserId, limit: $limit) {
+    supplierId
+    companyName
+    city
+    leadCount
+  }
+}
+    `;
+
+/**
+ * __useTopSuppliersByLeadsQuery__
+ *
+ * To run a query within a React component, call `useTopSuppliersByLeadsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useTopSuppliersByLeadsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useTopSuppliersByLeadsQuery({
+ *   variables: {
+ *      adminUserId: // value for 'adminUserId'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useTopSuppliersByLeadsQuery(baseOptions: Apollo.QueryHookOptions<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables> & ({ variables: TopSuppliersByLeadsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables>(TopSuppliersByLeadsDocument, options);
+      }
+export function useTopSuppliersByLeadsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables>(TopSuppliersByLeadsDocument, options);
+        }
+// @ts-ignore
+export function useTopSuppliersByLeadsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables>): Apollo.UseSuspenseQueryResult<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables>;
+export function useTopSuppliersByLeadsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables>): Apollo.UseSuspenseQueryResult<TopSuppliersByLeadsQuery | undefined, TopSuppliersByLeadsQueryVariables>;
+export function useTopSuppliersByLeadsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables>(TopSuppliersByLeadsDocument, options);
+        }
+export type TopSuppliersByLeadsQueryHookResult = ReturnType<typeof useTopSuppliersByLeadsQuery>;
+export type TopSuppliersByLeadsLazyQueryHookResult = ReturnType<typeof useTopSuppliersByLeadsLazyQuery>;
+export type TopSuppliersByLeadsSuspenseQueryHookResult = ReturnType<typeof useTopSuppliersByLeadsSuspenseQuery>;
+export type TopSuppliersByLeadsQueryResult = Apollo.QueryResult<TopSuppliersByLeadsQuery, TopSuppliersByLeadsQueryVariables>;
 export const TopSuppliersDocument = gql`
     query topSuppliers($adminUserId: Int!, $limit: Int) {
   topSuppliers(adminUserId: $adminUserId, limit: $limit) {
@@ -4638,6 +4748,42 @@ export function useToggleFavoriteMutation(baseOptions?: Apollo.MutationHookOptio
 export type ToggleFavoriteMutationHookResult = ReturnType<typeof useToggleFavoriteMutation>;
 export type ToggleFavoriteMutationResult = Apollo.MutationResult<ToggleFavoriteMutation>;
 export type ToggleFavoriteMutationOptions = Apollo.BaseMutationOptions<ToggleFavoriteMutation, ToggleFavoriteMutationVariables>;
+export const RecordLeadEventDocument = gql`
+    mutation recordLeadEvent($data: LeadEventCreateInput!) {
+  recordLeadEvent(data: $data) {
+    leadEventId
+    supplierId
+    source
+    createdAt
+  }
+}
+    `;
+export type RecordLeadEventMutationFn = Apollo.MutationFunction<RecordLeadEventMutation, RecordLeadEventMutationVariables>;
+
+/**
+ * __useRecordLeadEventMutation__
+ *
+ * To run a mutation, you first call `useRecordLeadEventMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRecordLeadEventMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [recordLeadEventMutation, { data, loading, error }] = useRecordLeadEventMutation({
+ *   variables: {
+ *      data: // value for 'data'
+ *   },
+ * });
+ */
+export function useRecordLeadEventMutation(baseOptions?: Apollo.MutationHookOptions<RecordLeadEventMutation, RecordLeadEventMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RecordLeadEventMutation, RecordLeadEventMutationVariables>(RecordLeadEventDocument, options);
+      }
+export type RecordLeadEventMutationHookResult = ReturnType<typeof useRecordLeadEventMutation>;
+export type RecordLeadEventMutationResult = Apollo.MutationResult<RecordLeadEventMutation>;
+export type RecordLeadEventMutationOptions = Apollo.BaseMutationOptions<RecordLeadEventMutation, RecordLeadEventMutationVariables>;
 export const MarkAllNotificationsAsReadDocument = gql`
     mutation markAllNotificationsAsRead($data: NotificationsMarkAllReadInput!) {
   markAllNotificationsAsRead(data: $data)
@@ -6149,6 +6295,8 @@ export const SupplierDashboardStatsDocument = gql`
     currency
     platformFeeRate
     weeklyLeadCounts
+    leadsThisMonth
+    leadsAllTime
   }
 }
     `;
