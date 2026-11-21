@@ -1,0 +1,7 @@
+query mrrByDay($adminUserId: Int!, $daysBack: Int) {
+  mrrByDay(adminUserId: $adminUserId, daysBack: $daysBack) {
+    day
+    mrr
+    paidSupplierCount
+  }
+}

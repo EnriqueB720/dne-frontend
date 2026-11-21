@@ -9,5 +9,8 @@ query adminStats($adminUserId: Int!) {
     currency
     totalLeads
     leadsThisMonth
+    mrr
+    paidSupplierCount
+    freeToPaidConversionRate
   }
 }
