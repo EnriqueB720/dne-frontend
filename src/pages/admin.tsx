@@ -21,7 +21,7 @@ import {
   useAdminStatsQuery,
   useAdminSuppliersQuery,
   useAiUsageBreakdownQuery,
-  useRevenueByDayQuery,
+  useMrrByDayQuery,
   useSetSupplierPromotionMutation,
   useTopSuppliersByLeadsQuery,
   useTopSuppliersQuery,
@@ -66,8 +66,8 @@ export default function AdminPage() {
   const topQuery = useTopSuppliersQuery({ variables: { adminUserId, limit: 10 }, skip, fetchPolicy: 'cache-and-network' });
   const [aiWindow, setAiWindow] = useState<number>(30);
   const aiQuery = useAiUsageBreakdownQuery({ variables: { adminUserId, daysBack: aiWindow }, skip, fetchPolicy: 'cache-and-network' });
-  const [revenueWindow, setRevenueWindow] = useState<number>(30);
-  const revenueQuery = useRevenueByDayQuery({ variables: { adminUserId, daysBack: revenueWindow }, skip, fetchPolicy: 'cache-and-network' });
+  const [mrrWindow, setMrrWindow] = useState<number>(30);
+  const mrrQuery = useMrrByDayQuery({ variables: { adminUserId, daysBack: mrrWindow }, skip, fetchPolicy: 'cache-and-network' });
   const topLeadsQuery = useTopSuppliersByLeadsQuery({ variables: { adminUserId, limit: 10 }, skip, fetchPolicy: 'cache-and-network' });
   const suppliersQuery = useAdminSuppliersQuery({ skip, fetchPolicy: 'cache-and-network' });
 
@@ -84,17 +84,15 @@ export default function AdminPage() {
   const topByLeads = topLeadsQuery.data?.topSuppliersByLeads ?? [];
   const aiRows = aiQuery.data?.aiUsageBreakdown ?? [];
   const suppliers = suppliersQuery.data?.suppliers ?? [];
-  const revenueRows = revenueQuery.data?.revenueByDay ?? [];
+  const mrrRows = mrrQuery.data?.mrrByDay ?? [];
 
-  const revenueTotals = useMemo(() => {
-    const total = revenueRows.reduce((acc, r) => acc + Number(r.platformFee), 0);
-    const bookings = revenueRows.reduce((acc, r) => acc + r.bookings, 0);
-    const peak = revenueRows.reduce(
-      (acc, r) => Math.max(acc, Number(r.platformFee)),
-      0,
-    );
-    return { total, bookings, peak };
-  }, [revenueRows]);
+  const mrrTotals = useMemo(() => {
+    const latest = mrrRows[mrrRows.length - 1];
+    const current = latest ? Number(latest.mrr) : 0;
+    const paidSuppliers = latest ? latest.paidSupplierCount : 0;
+    const peak = mrrRows.reduce((acc, r) => Math.max(acc, Number(r.mrr)), 0);
+    return { current, paidSuppliers, peak };
+  }, [mrrRows]);
 
   const aiTotals = useMemo(() => {
     return aiRows.reduce(
@@ -232,14 +230,14 @@ export default function AdminPage() {
           <StatCard
             icon={<DollarSign size={18} />}
             tone="rose"
-            label="Revenue (MTD)"
-            value={formatMoney(stats?.mtdRevenue, stats?.currency ?? 'CRC')}
-            sub={`${formatMoney(stats?.allTimeRevenue, stats?.currency ?? 'CRC')} all time`}
+            label="MRR"
+            value={formatMoney(stats?.mrr, 'CRC')}
+            sub="active paid subscriptions"
             loading={statsQuery.loading && !stats}
           />
         </Box>
 
-        {/* Lead-gen volume — new under the lead-tracking model */}
+        {/* Platform health — lead-gen + subscription conversion metrics */}
         <Box
           display="grid"
           gridTemplateColumns={{ base: '1fr', sm: 'repeat(3, 1fr)' }}
@@ -254,12 +252,28 @@ export default function AdminPage() {
             sub={`${formatInt(stats?.totalLeads)} all time`}
             loading={statsQuery.loading && !stats}
           />
+          <StatCard
+            icon={<ShieldCheck size={18} />}
+            tone="emerald"
+            label="Paid suppliers"
+            value={formatInt(stats?.paidSupplierCount)}
+            sub="on an active paid plan"
+            loading={statsQuery.loading && !stats}
+          />
+          <StatCard
+            icon={<TrendingUp size={18} />}
+            tone="indigo"
+            label="Free → paid conversion"
+            value={`${stats?.freeToPaidConversionRate ?? 0}%`}
+            sub="of subscribed suppliers"
+            loading={statsQuery.loading && !stats}
+          />
         </Box>
 
-        {/* Revenue trend chart */}
+        {/* MRR trend chart — subscription revenue, not booking fees */}
         <Box marginBottom="20px">
           <Panel
-            title="Revenue trend"
+            title="MRR trend"
             icon={<TrendingUp size={16} color={solvoColors.indigo} />}
             right={
               <Flex gap="6px">
@@ -267,13 +281,13 @@ export default function AdminPage() {
                   <button
                     key={d}
                     type="button"
-                    onClick={() => setRevenueWindow(d)}
+                    onClick={() => setMrrWindow(d)}
                     style={{
                       background:
-                        revenueWindow === d ? solvoColors.text : 'transparent',
+                        mrrWindow === d ? solvoColors.text : 'transparent',
                       color:
-                        revenueWindow === d ? solvoColors.surface : solvoColors.textMuted,
-                      border: `1px solid ${revenueWindow === d ? solvoColors.text : solvoColors.border}`,
+                        mrrWindow === d ? solvoColors.surface : solvoColors.textMuted,
+                      border: `1px solid ${mrrWindow === d ? solvoColors.text : solvoColors.border}`,
                       borderRadius: '999px',
                       padding: '4px 10px',
                       fontSize: '12px',
@@ -295,22 +309,27 @@ export default function AdminPage() {
                   textTransform="uppercase"
                   letterSpacing="0.1em"
                 >
-                  Platform fees · last {revenueWindow}d
+                  Monthly recurring revenue · today
                 </Text>
                 <Text fontFamily={solvoFonts.display} fontSize="28px" color={solvoColors.text}>
-                  {formatMoney(revenueTotals.total, stats?.currency ?? 'CRC')}
+                  {formatMoney(mrrTotals.current, 'CRC')}
                 </Text>
               </Box>
               <Box textAlign="right">
                 <Text fontSize="xs" color={solvoColors.textSubtle}>
-                  {formatInt(revenueTotals.bookings)} bookings
+                  {formatInt(mrrTotals.paidSuppliers)} paid suppliers
                 </Text>
                 <Text fontSize="xs" color={solvoColors.textSubtle}>
-                  peak day {formatMoney(revenueTotals.peak, stats?.currency ?? 'CRC')}
+                  peak {formatMoney(mrrTotals.peak, 'CRC')}
                 </Text>
               </Box>
             </Flex>
-            <RevenueBars rows={revenueRows} loading={revenueQuery.loading && revenueRows.length === 0} />
+            <TrendBars
+              rows={mrrRows.map((r) => ({ day: r.day, value: r.mrr, count: r.paidSupplierCount }))}
+              loading={mrrQuery.loading && mrrRows.length === 0}
+              emptyLabel="No paid subscriptions yet."
+              unitLabel={(count) => `${count} paid supplier${count === 1 ? '' : 's'}`}
+            />
           </Panel>
         </Box>
 
@@ -773,12 +792,17 @@ function StatCard({
 }
 
 /** Generic day-bucketed bar chart — used for both revenue and MRR trends. */
-function RevenueBars({
+/** Generic day-bucketed bar chart — used for both revenue and MRR trends. */
+function TrendBars({
   rows,
   loading,
+  emptyLabel,
+  unitLabel,
 }: {
-  rows: { day: string; platformFee: string; bookings: number }[];
+  rows: { day: string; value: string; count: number }[];
   loading?: boolean;
+  emptyLabel: string;
+  unitLabel: (count: number) => string;
 }) {
   if (loading) {
     return (
@@ -790,12 +814,12 @@ function RevenueBars({
   if (rows.length === 0) {
     return (
       <Text color={solvoColors.textMuted} fontSize="sm" padding="8px 0">
-        No revenue yet.
+        {emptyLabel}
       </Text>
     );
   }
 
-  const max = Math.max(...rows.map((r) => Number(r.platformFee)), 1);
+  const max = Math.max(...rows.map((r) => Number(r.value)), 1);
   // Pick a handful of evenly-spaced labels along the x-axis so they fit
   // within the card at any window size (7 / 30 / 90).
   const labelCount = Math.min(rows.length, 7);
@@ -814,10 +838,10 @@ function RevenueBars({
         padding="0 2px"
       >
         {rows.map((r) => {
-          const value = Number(r.platformFee);
+          const value = Number(r.value);
           const pct = (value / max) * 100;
-          // Always show at least a sliver for days with any bookings, so
-          // small-but-nonzero days don't look identical to empty ones.
+          // Always show at least a sliver for nonzero days, so small
+          // values don't look identical to empty ones.
           const heightPct = value > 0 ? Math.max(pct, 4) : 0;
           return (
             <Box
@@ -826,7 +850,7 @@ function RevenueBars({
               height="100%"
               display="flex"
               alignItems="flex-end"
-              title={`${r.day} · ${value.toLocaleString()} · ${r.bookings} booking${r.bookings === 1 ? '' : 's'}`}
+              title={`${r.day} · ${value.toLocaleString()} · ${unitLabel(r.count)}`}
             >
               <Box
                 width="100%"

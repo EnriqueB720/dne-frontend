@@ -22,8 +22,11 @@ export type AdminStats = {
   __typename?: 'AdminStats';
   allTimeRevenue: Scalars['String']['output'];
   currency: Scalars['String']['output'];
+  freeToPaidConversionRate: Scalars['Float']['output'];
   leadsThisMonth: Scalars['Int']['output'];
+  mrr: Scalars['String']['output'];
   mtdRevenue: Scalars['String']['output'];
+  paidSupplierCount: Scalars['Int']['output'];
   totalBookings: Scalars['Int']['output'];
   totalCustomers: Scalars['Int']['output'];
   totalLeads: Scalars['Int']['output'];
@@ -454,6 +457,13 @@ export enum MessageType {
   SystemNotice = 'SYSTEM_NOTICE',
   Text = 'TEXT'
 }
+
+export type MrrByDayRow = {
+  __typename?: 'MrrByDayRow';
+  day: Scalars['String']['output'];
+  mrr: Scalars['String']['output'];
+  paidSupplierCount: Scalars['Int']['output'];
+};
 
 export type Mutation = {
   __typename?: 'Mutation';
@@ -964,6 +974,7 @@ export type Query = {
   favoritesByCustomer: Array<Favorite>;
   login: LoginOutput;
   messagesByConversation: Array<Message>;
+  mrrByDay: Array<MrrByDayRow>;
   notificationsByUser: Array<Notification>;
   openRequestsForSupplier: Array<Request>;
   post: Post;
@@ -1090,6 +1101,12 @@ export type QueryLoginArgs = {
 export type QueryMessagesByConversationArgs = {
   conversationId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryMrrByDayArgs = {
+  adminUserId: Scalars['Int']['input'];
+  daysBack?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -1806,7 +1823,7 @@ export type AdminStatsQueryVariables = Exact<{
 }>;
 
 
-export type AdminStatsQuery = { __typename?: 'Query', adminStats: { __typename?: 'AdminStats', totalUsers: number, totalCustomers: number, totalSuppliers: number, totalBookings: number, mtdRevenue: string, allTimeRevenue: string, currency: string, totalLeads: number, leadsThisMonth: number } };
+export type AdminStatsQuery = { __typename?: 'Query', adminStats: { __typename?: 'AdminStats', totalUsers: number, totalCustomers: number, totalSuppliers: number, totalBookings: number, mtdRevenue: string, allTimeRevenue: string, currency: string, totalLeads: number, leadsThisMonth: number, mrr: string, paidSupplierCount: number, freeToPaidConversionRate: number } };
 
 export type AdminSuppliersQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1820,6 +1837,14 @@ export type AiUsageBreakdownQueryVariables = Exact<{
 
 
 export type AiUsageBreakdownQuery = { __typename?: 'Query', aiUsageBreakdown: Array<{ __typename?: 'AiUsageBreakdownRow', modelName: string, requests: number, inputTokens: number, outputTokens: number, costUsd: string }> };
+
+export type MrrByDayQueryVariables = Exact<{
+  adminUserId: Scalars['Int']['input'];
+  daysBack?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type MrrByDayQuery = { __typename?: 'Query', mrrByDay: Array<{ __typename?: 'MrrByDayRow', day: string, mrr: string, paidSupplierCount: number }> };
 
 export type RevenueByDayQueryVariables = Exact<{
   adminUserId: Scalars['Int']['input'];
@@ -2466,6 +2491,9 @@ export const AdminStatsDocument = gql`
     currency
     totalLeads
     leadsThisMonth
+    mrr
+    paidSupplierCount
+    freeToPaidConversionRate
   }
 }
     `;
@@ -2603,6 +2631,52 @@ export type AiUsageBreakdownQueryHookResult = ReturnType<typeof useAiUsageBreakd
 export type AiUsageBreakdownLazyQueryHookResult = ReturnType<typeof useAiUsageBreakdownLazyQuery>;
 export type AiUsageBreakdownSuspenseQueryHookResult = ReturnType<typeof useAiUsageBreakdownSuspenseQuery>;
 export type AiUsageBreakdownQueryResult = Apollo.QueryResult<AiUsageBreakdownQuery, AiUsageBreakdownQueryVariables>;
+export const MrrByDayDocument = gql`
+    query mrrByDay($adminUserId: Int!, $daysBack: Int) {
+  mrrByDay(adminUserId: $adminUserId, daysBack: $daysBack) {
+    day
+    mrr
+    paidSupplierCount
+  }
+}
+    `;
+
+/**
+ * __useMrrByDayQuery__
+ *
+ * To run a query within a React component, call `useMrrByDayQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMrrByDayQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMrrByDayQuery({
+ *   variables: {
+ *      adminUserId: // value for 'adminUserId'
+ *      daysBack: // value for 'daysBack'
+ *   },
+ * });
+ */
+export function useMrrByDayQuery(baseOptions: Apollo.QueryHookOptions<MrrByDayQuery, MrrByDayQueryVariables> & ({ variables: MrrByDayQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<MrrByDayQuery, MrrByDayQueryVariables>(MrrByDayDocument, options);
+      }
+export function useMrrByDayLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<MrrByDayQuery, MrrByDayQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<MrrByDayQuery, MrrByDayQueryVariables>(MrrByDayDocument, options);
+        }
+// @ts-ignore
+export function useMrrByDaySuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<MrrByDayQuery, MrrByDayQueryVariables>): Apollo.UseSuspenseQueryResult<MrrByDayQuery, MrrByDayQueryVariables>;
+export function useMrrByDaySuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<MrrByDayQuery, MrrByDayQueryVariables>): Apollo.UseSuspenseQueryResult<MrrByDayQuery | undefined, MrrByDayQueryVariables>;
+export function useMrrByDaySuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<MrrByDayQuery, MrrByDayQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<MrrByDayQuery, MrrByDayQueryVariables>(MrrByDayDocument, options);
+        }
+export type MrrByDayQueryHookResult = ReturnType<typeof useMrrByDayQuery>;
+export type MrrByDayLazyQueryHookResult = ReturnType<typeof useMrrByDayLazyQuery>;
+export type MrrByDaySuspenseQueryHookResult = ReturnType<typeof useMrrByDaySuspenseQuery>;
+export type MrrByDayQueryResult = Apollo.QueryResult<MrrByDayQuery, MrrByDayQueryVariables>;
 export const RevenueByDayDocument = gql`
     query revenueByDay($adminUserId: Int!, $daysBack: Int) {
   revenueByDay(adminUserId: $adminUserId, daysBack: $daysBack) {
