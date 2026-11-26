@@ -1,1283 +1,335 @@
 import * as React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Sparkles,
-  Paperclip,
-  Mic,
-  ArrowRight,
-  ShieldCheck,
-  Zap,
-  TrendingUp,
-  Calendar,
-  Home as HomeIcon,
-  Briefcase,
-  Scissors,
-  Car,
-} from 'lucide-react';
-import {
-  Box,
-  Flex,
-  Text,
-  Textarea,
-  SolvoNavBar,
-  ChatSidebar,
-  ChatThread,
-  ChatComposer,
-  PackagePanel,
-  MultiQuoteModal,
-  type MultiQuoteFormData,
-  type ProviderData,
-} from '@components';
-import {
-  solvoColors,
-  solvoFonts,
-  solvoGlows,
-  solvoGradients,
-  solvoShadows,
-  solvoTints,
-} from '@constants';
-import { useAtom } from 'jotai';
-import type { ModelKey } from '@/shared/jotai/ai-usage.atom';
-import type { UiMessage } from '@/shared/jotai/conversation.atom';
-import { packageAtom, packageKey } from '@/shared/jotai/package.atom';
-import {
-  parseQueryWithAi,
-  generateProvidersWithAi,
-  wantsMoreResults,
-  wantsOutsideNetwork,
-  isAdditiveFollowupRequest,
-  type ParsedQuery,
-} from '@/shared/services/ai.service';
-import {
-  listConversations,
-  createConversation,
-  getConversation,
-  sendMessage as apiSendMessage,
-  deleteConversation as apiDeleteConversation,
-  updateMessageProviders,
-  rollbackLastTurn,
-  linkConversationToRequest,
-  type ConversationSummary,
-} from '@/shared/services/conversation.service';
-import {
-  useCreateRequestMutation,
-  useCreateQuoteMutation,
-  useSearchSuppliersLazyQuery,
-  useSuppliersQuery,
-} from '@generated';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import AuthContext from '@/shared/contexts/auth.context';
+import { motion } from 'framer-motion';
+import { ArrowRight, Map as MapIcon, ShieldCheck, Star, Sparkles, X } from 'lucide-react';
+
+import { Box, ChatComposer, ChatSidebar, ChatThread, Flex, SolvoNavBar, Text, type ZoneState } from '@components';
+import { solvoColors, solvoFonts, solvoGlows, solvoGradients, solvoShadows } from '@constants';
+import {
+  useCategoriesQuery,
+  useProvincesQuery,
+  useResolveProvinceLazyQuery,
+  useSuppliersQuery,
+  ContactChannel,
+} from '@generated';
 import { useUserLocation } from '@hooks';
+import AuthContext from '@/shared/contexts/auth.context';
+import { useI18n } from '@/shared/i18n';
+import type { UiMessage } from '@/shared/lib/chat';
+import { fromStoredJson, type ChatSupplier, categoryName } from '@/shared/lib/supplier';
+import { runChatTurn } from '@/shared/services/chat.service';
+import { logSupplierContact } from '@/shared/services/contact.service';
+import {
+  deleteConversation as apiDeleteConversation,
+  getConversation,
+  getOrCreateDeviceId,
+  listConversations,
+  type ConversationSummary,
+} from '@/shared/services/conversation.service';
 
-// ── Helpers for post-parse intent override ─────────────────────────────────
-//
-// When the user's message contains an explicit search/action verb ("look",
-// "find", "show", "need", etc.) it's almost certainly a NEW search request —
-// even if providers are already on screen. We must NOT downgrade it to `chat`
-// just because recentGrounding exists. This regex guards that case.
-const SEARCH_ACTION_RE =
-  /\b(?:look(?:\s+(?:for|inside|at|around))?|search(?:\s+for)?|find(?:\s+me)?|show(?:\s+me)?|get(?:\s+me)?|give(?:\s+me)?|need|want|looking(?:\s+for)?|b[uú]sca(?:me|nos|r)?|necesito|quiero|dame|mu[eé]str[aá](?:me|nos)?)\b/i;
+const ZONE_STORAGE_KEY = 'solvo:zone';
+const GUEST_BANNER_KEY = 'solvo:guest-banner-dismissed';
 
-// ── Context-reset detection ─────────────────────────────────────────────────
-//
-// When the user says "never mind", "forget that", "scratch that", etc., they
-// are explicitly starting fresh. We clear the previous user messages from
-// contextQuery so the parser doesn't bleed old service/category mentions into
-// the new request. Example: "never mind can I also get AC repair" after a DJ
-// search should produce service="AC repair", not service="DJ, catering, AC repair".
-const CONTEXT_CLEAR_RE =
-  /\b(?:never\s+mind|forget\s+(?:that|it|the|those|everything|all)?|scratch\s+that|start\s+over|disregard\s+(?:that|it)|olvida(?:te|lo|los|la|las)?(?:\s+(?:eso|lo\s+anterior|todo))?|deja\s+(?:eso|eso\s+de\s+lado)|al\s+final|better\s+yet|actually\s+no|wait\s+no)\b/i;
+// ── Landing ──────────────────────────────────────────────────────────────
 
-// ── System prompt for chat AI ──────────────────────────────────────────────
-const SOLVO_CHAT_SYSTEM_PROMPT = `You are Solvo, an AI concierge for a service marketplace in Costa Rica.
-
-RULES — follow exactly:
-1. LANGUAGE: Detect the language of the user's latest message and reply in that EXACT language. If their message is in English, reply in English. If Spanish, reply in Spanish. Never mix languages.
-2. BREVITY: Keep responses to 1–3 sentences for service requests. For conversational questions you may use up to 4–5 sentences if needed to answer properly.
-3. TIMING — CRITICAL: Your reply and the provider cards are delivered TOGETHER, in the SAME message, at the SAME instant. There is NO "later". NEVER say "hold on", "one moment", "please wait", "I'll find", "let me search", "give me a second", or anything implying results are still coming. Always speak in the PRESENT or PAST tense about what is already on screen.
-4. THREE MODES OF REPLY — the context block below your prompt tells you which one applies:
-   a) Service request — a "## Search result" block tells you EXACTLY how many provider cards are shown to the user right now.
-      - If the count is 1 or more: the cards are ALREADY visible below your message. Acknowledge what you found in present tense ("Here are 4 Italian options near Santo Domingo") and invite them to look. Do NOT list or describe the specific businesses yourself.
-      - If the count is 0: there are NO cards. Tell the user plainly that you couldn't find matches, and offer to broaden it. Do NOT pretend results exist.
-   b) Network lookup — a "## Network lookup" block lists suppliers found in the Solvo network for an informational question ("do you have DJs in Heredia?", "are there suppliers in our network?"). NO cards are shown. Answer in plain text: summarise what the network has (counts, names, categories, locations) using ONLY the listed data. If the block says zero matches, say so honestly. Do NOT say "see the cards" — there are none.
-   c) Conversation — a "## Known providers" block, a "## Conversation" block, or no context block at all. General questions (how Solvo works, what's verified), greetings, thanks, comparisons of results ALREADY shown, or questions about a specific provider already shown. NO cards appear. Answer fully in plain text. Do NOT mention "the cards" or "the options below".
-      - "## Known providers": use those fields to answer. Do not invent any detail.
-      - "## Conversation": no structured data — use the conversation history above to answer. Speak naturally, referencing what was said earlier in the chat.
-      - No context block at all: treat the same as "## Conversation" — rely on history.
-5. PROVIDER FACTS — NO HALLUCINATION:
-   - When the user asks about a specific named provider, look FIRST in the context blocks below (## Known providers / ## Search result / ## Network lookup), then in the conversation history above this system prompt.
-   - If found in either place, answer using that data. Do not invent addresses, hours, or services that are not in the data.
-   - If genuinely not found in the blocks OR the conversation history, say you don't have detailed info on it and offer to search. Never make up the answer.
-   - NEVER guess what category a named provider belongs to. Use ONLY the data you have.
-   - NETWORK STATUS (CRITICAL — two separate rules, both non-negotiable):
-     RULE A — Per-provider honesty: Every provider in the context blocks has a "network:" field.
-       • "network: VERIFIED — in Solvo network" → real verified supplier. You may confirm it is in our network.
-       • "network: AI SUGGESTION — NOT in Solvo network" → AI-generated example, not a real Solvo partner. Never claim it IS in the network.
-     RULE B — Never extrapolate emptiness: Seeing AI SUGGESTION cards does NOT mean the Solvo network lacks that service. The DB may simply not have been searched (e.g. the user requested outside-network options), or results may be in nearby areas. You are ONLY allowed to say "we have no [service] in our network" when a ## Network lookup block EXPLICITLY states 0 DB results for that service. Without that block, say "I'd need to search our network to check" — never assume absence.
-6. CONTACT DETAILS — SHARE FREELY:
-   - Solvo connects customers DIRECTLY with providers. Sharing a provider's phone, email, WhatsApp or website is expected and encouraged — there is no booking step and nothing is "unlocked later".
-   - When the user asks how to reach a provider, or is clearly ready to move forward with one, give the contact details confidently and suggest they reach out directly.
-   - NEVER say contact info is hidden, private, available only after booking, or that Solvo must relay messages for them.
-   - Use ONLY the phone/email/website fields in the context blocks or conversation history — never invent or guess a number, email or URL. If a provider has no contact field, say you don't have their contact details on hand.
-   - For "network: AI SUGGESTION" providers, add that the details are not verified by Solvo.
-7. QUESTIONS: Ask at most ONE clarifying question per turn.
-8. FORMAT: No bullet points, no markdown headers, no numbered lists.
-
-Service-request examples:
-- (4 cards shown) "Here are 4 Italian options near Santo Domingo, Heredia — take a look below and tell me if you'd like to adjust anything."
-- (0 cards shown) "I couldn't find Italian options near Santo Domingo specifically. Want me to widen the search to the rest of Heredia, or try a different cuisine?"
-
-Network-lookup examples:
-- User: "Are there any suppliers in our network?" (block lists 8) → "Yes — there are verified suppliers across catering, DJs, photography and more. For example, Sabor Catering in Santa Ana and DJ Carlos Mix in Alajuela. Want me to pull up options for something specific?"
-- User: "Do you have AC repair in Cartago?" (block: 0 matches) → "I don't see any AC repair suppliers in Cartago in our network right now. Want me to check nearby areas?"
-
-Conversational examples:
-- User: "How does Solvo work?" → "You describe what you need in your own words and I match you with verified providers in your area. You can contact any of them directly by phone, email or WhatsApp — no booking step needed."
-- User: "How do I reach Sabor Catering?" (block has phone + email) → "You can call Sabor Catering at 8888-1234 or email hola@saborcatering.cr — go ahead and reach out to them directly."
-- User: "Compare the first and last result" (both in the block) → "The first, Sabor Catering, is ₡210,000 with a 4.7 rating; the last, Cocina Express, is ₡175,000 at 4.4. Sabor costs more but rates higher — Cocina is the cheaper pick."
-- User: "Where is XYZ Cafe?" (XYZ Cafe NOT in the block) → "I don't have details on XYZ Cafe handy — want me to look for similar providers instead?"
-- User: "Thanks!" → "You're welcome! Let me know whenever you need something else."`;
-
-// ── Static hero data ────────────────────────────────────────────────────────
-const SUGGESTED_PROMPTS = [
-  '🎂 Plan a birthday party',
-  '❄️ Fix my AC',
-  '🧽 Find a cleaning service',
-  '🎧 Get a DJ for an event',
-  '📸 Hire a photographer',
-  '🚚 Need movers this weekend',
-];
-
-const TRUST_ITEMS = [
-  { icon: ShieldCheck, title: 'Verified providers', subtitle: 'Every business is identity-checked' },
-  { icon: Zap, title: 'Replies in minutes', subtitle: 'Average first response: 8 minutes' },
-  { icon: TrendingUp, title: 'Compare instantly', subtitle: 'Side-by-side options & pricing' },
-];
-
-const CATEGORIES = [
-  { icon: Calendar, label: 'Events', count: '2.4k providers', ...solvoTints.events },
-  { icon: HomeIcon, label: 'Home services', count: '1.8k providers', ...solvoTints.home },
-  { icon: Briefcase, label: 'Business', count: '920 providers', ...solvoTints.business },
-  { icon: Scissors, label: 'Beauty & wellness', count: '1.2k providers', ...solvoTints.beauty },
-  { icon: Car, label: 'Auto', count: '640 providers', ...solvoTints.auto },
-];
-
-// ── DB Supplier → ProviderCard mapping ────────────────────────────────────
-function pickAvatarForSupplier(name: string, services: { name: string }[] = []): string {
-  const blob = `${name} ${services.map((s) => s.name).join(' ')}`.toLowerCase();
-  if (/cater|food|menu|buffet|chef/.test(blob)) return '🍽️';
-  if (/dj|music|sound/.test(blob)) return '🎧';
-  if (/photo/.test(blob)) return '📸';
-  if (/clean/.test(blob)) return '🧽';
-  if (/ac|fix|repair/.test(blob)) return '❄️';
-  if (/cake|bakery|sweet/.test(blob)) return '🎂';
-  if (/floral|flower|decor/.test(blob)) return '🌸';
-  if (/move|moving/.test(blob)) return '🚚';
-  return '✨';
-}
-
-function dbSupplierToProviderData(s: any, index: number): ProviderData {
-  const services: any[] = s.services ?? [];
-  const prices = services.map((srv) => Number(srv.basePrice)).filter((n) => Number.isFinite(n) && n > 0);
-  const lowestPrice = prices.length > 0 ? Math.min(...prices) : null;
-
-  const includes: string[] =
-    services.length > 0
-      ? services.slice(0, 4).map((srv) => srv.name)
-      : s.tagline
-        ? [s.tagline]
-        : [];
-
-  const tags: string[] = [];
-  if (index === 0) tags.push('AI Match');
-  if (s.premium) tags.push('Premium');
-
-  const rating = s.rating ? Number(s.rating) : 4.7;
-
-  return {
-    id: s.supplierId,
-    name: s.companyName,
-    rating,
-    reviews: s.reviewCount ?? 0,
-    priceLabel: lowestPrice
-      ? `From ₡${lowestPrice.toLocaleString('en-US')}`
-      : 'Contact for pricing',
-    includes,
-    tags,
-    responseTime: s.responseTimeMinutes
-      ? `Replies in ~${s.responseTimeMinutes} min`
-      : 'Replies within a day',
-    location: s.city ?? 'Costa Rica',
-    avatar: pickAvatarForSupplier(s.companyName ?? '', services),
-    verified: !!s.verified,
-    recommended: index === 0,
-    website: s.websiteUrl ?? undefined,
-    email: s.businessEmail ?? undefined,
-    emailAlt: s.businessEmailAlt ?? undefined,
-    phone: s.businessPhone ?? undefined,
-    phoneAlt: s.businessPhoneAlt ?? undefined,
-    isRealSupplier: true,
-    sponsored: isSponsoredActive(
-      s.promotionTier,
-      s.promotionStartDate,
-      s.promotionEndDate,
-    ),
-  };
-}
-
-/**
- * Whether a supplier currently qualifies for the "Sponsored" badge — i.e.
- * tier is FEATURED and the optional start/end window is currently active.
- */
-function isSponsoredActive(
-  tier: string | null | undefined,
-  startDate: unknown,
-  endDate: unknown,
-): boolean {
-  if (tier !== 'FEATURED') return false;
-  const now = Date.now();
-  if (startDate && new Date(startDate as string).getTime() > now) return false;
-  if (endDate && new Date(endDate as string).getTime() < now) return false;
-  return true;
-}
-
-// ── AI grounding from provider cards ──────────────────────────────────────
-//
-// When the user asks follow-up questions about a specific provider that's
-// already been shown ("where is PikiTiki located?", "how much does Sabor
-// Catering charge?"), the AI needs the actual data to answer factually —
-// otherwise it hallucinates. We format the providers as a compact reference
-// block appended to the system prompt.
-
-/** Format a provider list into a compact, one-line-per-provider block. */
-function formatProvidersForGrounding(providers: ProviderData[]): string {
-  return providers
-    .map((p, idx) => {
-      const parts: string[] = [
-        `${idx + 1}. ${p.name}`,
-        `location: ${p.location}`,
-        `price: ${p.priceLabel}`,
-        `rating: ${p.rating} (${p.reviews} reviews)`,
-        `response: ${p.responseTime}`,
-      ];
-      if (p.includes.length > 0) {
-        parts.push(`includes: ${p.includes.join(', ')}`);
-      }
-      if (p.tags.length > 0) parts.push(`tags: ${p.tags.join(', ')}`);
-      if (p.phone) parts.push(`phone: ${p.phone}`);
-      if (p.email) parts.push(`email: ${p.email}`);
-      if (p.website) parts.push(`website: ${p.website}`);
-      // This label is read by the AI to decide whether to claim a provider is
-      // in the Solvo network. Keep the wording consistent with rule 5 of
-      // SOLVO_CHAT_SYSTEM_PROMPT or the AI will not enforce it correctly.
-      parts.push(
-        p.isRealSupplier
-          ? 'network: VERIFIED — in Solvo network'
-          : 'network: AI SUGGESTION — NOT in Solvo network',
-      );
-      return parts.join(' | ');
-    })
-    .join('\n');
-}
-
-/**
- * Walk message history backwards and format the most recent assistant
- * message that carried provider cards. Used for conversational turns where
- * the user references a provider shown earlier.
- */
-function buildProviderGrounding(messages: UiMessage[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role !== 'assistant') continue;
-    if (!m.providers || m.providers.length === 0) continue;
-    return formatProvidersForGrounding(m.providers);
-  }
-  return '';
-}
-
-// The chat AI's system prompt is split into two parts so the backend can
-// cache the stable half (provider-side prompt caching, see #1):
-//   - cachedSystem  = SOLVO_CHAT_SYSTEM_PROMPT (constant, every turn)
-//   - system        = the per-turn dynamic CONTEXT block built below
-// The two builders return ONLY that dynamic block (or '' for none).
-
-/**
- * Conversational-turn context: grounds the AI in providers shown earlier so
- * it can answer "where is X?" factually. No card-count framing — this turn
- * isn't producing cards.
- */
-function groundingContext(grounding: string): string {
-  if (!grounding) return '';
-  return (
-    `## Known providers (answer questions about these specific businesses using ONLY this data — do not invent details):\n${grounding}\n\n` +
-    `REMINDER: Any "network: AI SUGGESTION" labels above mean those SPECIFIC CARDS were AI-generated examples — ` +
-    `they do NOT mean the Solvo network is empty of that service. ` +
-    `If the user asks whether Solvo has [service] providers, say you'd need to run a search to confirm — ` +
-    `never assert the network lacks a category just because the shown cards are AI suggestions.`
-  );
-}
-
-/**
- * Service-request context: tells the AI EXACTLY how many cards are being
- * shown alongside its message (including zero), so it speaks accurately and
- * never promises results that aren't there. Built AFTER the search + AI fill
- * resolve, so the count is final.
- */
-function searchResultContext(
-  providers: ProviderData[],
-  parsed: ParsedQuery,
-  outsideNetwork = false,
-): string {
-  const count = providers.length;
-  const requestLine = [
-    parsed.service && `service: ${parsed.service}`,
-    parsed.location && `location: ${parsed.location}`,
-    parsed.people && `people: ${parsed.people}`,
-    parsed.budget && `budget: ${parsed.budget}`,
-  ]
-    .filter(Boolean)
-    .join(' | ');
-
-  if (count === 0) {
-    return (
-      `## Search result\n` +
-      `0 provider cards are shown. The search for [${requestLine || 'this request'}] returned nothing. ` +
-      `Tell the user plainly you couldn't find matches and offer to broaden the search — DO NOT imply results are still loading.`
-    );
-  }
-
-  // Honesty check: did EVERY card actually match the requested location?
-  // The backend ranks city-matches first but degrades gracefully to
-  // "service matches elsewhere", so the cards may be in nearby areas.
-  let locationNote = '';
-  if (parsed.location) {
-    const wanted = parsed.location.toLowerCase();
-    const allMatch = providers.every((p) =>
-      p.location.toLowerCase().includes(wanted),
-    );
-    if (!allMatch) {
-      locationNote =
-        ` NOTE: not all of these are located in "${parsed.location}" exactly — some are in nearby areas. ` +
-        `Be honest about that (e.g. "I didn't find any right in ${parsed.location}, but here are some close by").`;
-    }
-  }
-
-  // Break down how many are real DB suppliers vs AI suggestions so the AI
-  // can frame them correctly ("we found X in our network plus Y suggestions").
-  const verifiedCount = providers.filter((p) => p.isRealSupplier).length;
-  const aiCount = count - verifiedCount;
-
-  // When the user explicitly requested outside-network results, the DB was
-  // intentionally skipped — the AI MUST NOT interpret "all AI suggestions"
-  // as "the Solvo network has no providers for this service."
-  const outsideNetworkWarning = outsideNetwork
-    ? ` OUTSIDE-NETWORK SEARCH: The Solvo supplier database was intentionally skipped this turn because the user asked for non-network options. There may well be verified Solvo partners for this service — the DB simply was not queried. Do NOT tell the user the Solvo network lacks providers for this service.`
-    : '';
-
-  const networkSummary =
-    verifiedCount === count
-      ? `All ${count} are verified Solvo suppliers.`
-      : aiCount === count
-        ? `All ${count} are AI-generated suggestions (NOT in the Solvo network).${outsideNetworkWarning}`
-        : `${verifiedCount} verified Solvo supplier${verifiedCount === 1 ? '' : 's'} + ${aiCount} AI-generated suggestion${aiCount === 1 ? '' : 's'} (not in network).`;
-
-  return (
-    `## Search result\n` +
-    `${count} provider card${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} shown to the user RIGHT NOW, below your message, for [${requestLine || 'this request'}]. ${networkSummary}` +
-    locationNote +
-    ` Acknowledge them in present tense. The cards:\n${formatProvidersForGrounding(providers)}`
-  );
-}
-
-/**
- * Network-lookup context: the user asked ABOUT the supplier network
- * ("are there suppliers in our network?", "do you have DJs in Heredia?").
- * We searched the DB and pass the matches as reference data — the AI
- * answers in plain text. NO cards are rendered for this turn.
- */
-function networkInquiryContext(
-  providers: ProviderData[],
-  parsed: ParsedQuery,
-): string {
-  const filterLine = [
-    parsed.service && `service: ${parsed.service}`,
-    parsed.location && `location: ${parsed.location}`,
-  ]
-    .filter(Boolean)
-    .join(' | ');
-  const scope = filterLine ? ` for [${filterLine}]` : '';
-
-  if (providers.length === 0) {
-    return (
-      `## Network lookup\n` +
-      `A search of the Solvo supplier network${scope} returned NO matches. ` +
-      `Tell the user honestly there are no suppliers matching that in the network right now, and offer to check nearby areas or a different service. No cards are shown.`
-    );
-  }
-
-  return (
-    `## Network lookup\n` +
-    `The user is asking about the Solvo supplier network. A search${scope} found these ${providers.length} verified supplier(s). ` +
-    `Answer their question in plain text using ONLY this data — summarise counts, names, categories, locations as relevant. NO cards are shown to the user.\n` +
-    formatProvidersForGrounding(providers)
-  );
-}
-
-// ── Hero section (extracted for clarity) ──────────────────────────────────
-interface HeroSectionProps {
-  onSubmit: (query: string) => void;
-  /** Switch the page into chat mode (empty state, no current conversation) */
-  onStartChat: () => void;
-}
-
-function HeroSection({ onSubmit, onStartChat }: HeroSectionProps) {
+function Hero({ onSubmit }: { onSubmit: (q: string) => void }) {
+  const { t, messages, lang } = useI18n();
   const [query, setQuery] = React.useState('');
+  const { data: cats } = useCategoriesQuery({ fetchPolicy: 'cache-first' });
+  const icons = [ShieldCheck, MapIcon, Star];
 
-  const handleSubmit = () => {
-    if (!query.trim()) return;
-    onSubmit(query.trim());
-  };
+  const submit = () => query.trim() && onSubmit(query.trim());
 
   return (
     <Box position="relative" minHeight="100vh" bg={solvoColors.bg} overflow="hidden">
-      {/* Atmospheric blurred gradients */}
       <Box
         position="absolute"
-        top="-200px"
-        right="-200px"
-        width="980px"
-        height="980px"
-        borderRadius="full"
-        style={{
-          background: `radial-gradient(circle, ${solvoGlows.brand}, transparent 70%)`,
-          filter: 'blur(70px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-      <Box
-        position="absolute"
-        bottom="-200px"
-        left="-200px"
-        width="980px"
-        height="980px"
-        borderRadius="full"
-        style={{
-          background: `radial-gradient(circle, ${solvoGlows.accent}, transparent 70%)`,
-          filter: 'blur(70px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-      {/*
-        Third orb sits behind the hero input rather than at a corner, so the
-        centre of the page carries brand color too instead of fading to a flat
-        canvas between the two corner glows.
-      */}
-      <Box
-        position="absolute"
-        top="180px"
-        left="50%"
+        top="-240px"
+        right="-240px"
         width="900px"
-        height="620px"
+        height="900px"
         borderRadius="full"
-        style={{
-          transform: 'translateX(-50%)',
-          background: `radial-gradient(ellipse, ${solvoGlows.accent}, transparent 70%)`,
-          filter: 'blur(90px)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
+        style={{ background: `radial-gradient(circle, ${solvoGlows.brand}, transparent 70%)`, filter: 'blur(70px)', pointerEvents: 'none' }}
       />
-
-      <SolvoNavBar activePath="/" onNewChat={onStartChat} />
-
       <Box
-        maxWidth="1200px"
-        margin="0 auto"
-        padding={{ base: '32px 20px', md: '56px 24px' }}
-        position="relative"
-        zIndex={1}
-      >
-        {/* Hero */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <Flex direction="column" align="center" gap="20px" textAlign="center" marginBottom="40px">
-            <Flex
-              align="center"
-              gap="8px"
-              padding="6px 14px"
-              bg={solvoColors.surface}
-              borderRadius="full"
-              borderWidth="1px"
-              borderColor={solvoColors.border}
-              fontSize="12px"
-              color={solvoColors.textMuted}
-            >
-              <motion.div
-                animate={{ scale: [1, 1.3, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 9999,
-                  background: solvoColors.emerald,
-                }}
-              />
-              AI concierge · 12,400+ verified providers
-            </Flex>
+        position="absolute"
+        bottom="-240px"
+        left="-240px"
+        width="900px"
+        height="900px"
+        borderRadius="full"
+        style={{ background: `radial-gradient(circle, ${solvoGlows.accent}, transparent 70%)`, filter: 'blur(70px)', pointerEvents: 'none' }}
+      />
+      <SolvoNavBar />
 
-            <Text
-              fontFamily={solvoFonts.display}
-              fontSize={{ base: '40px', md: '72px' }}
-              lineHeight="1.05"
-              fontWeight="500"
-              color={solvoColors.text}
-              maxWidth="900px"
-              letterSpacing="-0.02em"
-            >
-              Ask for anything.
+      <Box maxWidth="1100px" margin="0 auto" padding={{ base: '32px 18px', md: '56px 24px' }} position="relative" zIndex={1}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <Flex direction="column" align="center" gap="18px" textAlign="center" marginBottom="32px">
+            <Flex align="center" gap="8px" padding="6px 14px" bg={solvoColors.surface} borderRadius="full" borderWidth="1px" borderColor={solvoColors.border} fontSize="12px" color={solvoColors.textMuted}>
+              <Box width="8px" height="8px" borderRadius="full" bg={solvoColors.emerald} />
+              {t('home.badge')}
+            </Flex>
+            <Text fontFamily={solvoFonts.display} fontSize={{ base: '38px', md: '66px' }} lineHeight="1.05" fontWeight={500} color={solvoColors.text} maxWidth="880px" letterSpacing="-0.02em">
+              {t('home.titleA')}
               <br />
               <Text
                 as="span"
-                fontWeight="800"
-                fontFamily={solvoFonts.display}
-                style={{
-                  // The logo's own orange-to-purple sweep. Clipped to the
-                  // glyphs so the wordmark and the headline share one gesture.
-                  background: solvoGradients.brand,
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  color: 'transparent',
-                }}
+                fontWeight={800}
+                style={{ background: solvoGradients.brand, WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
               >
-                Solvo finds
+                {t('home.titleB')}
               </Text>{' '}
-              who solves it.
+              {t('home.titleC')}
             </Text>
-
-            <Text
-              fontSize={{ base: 'md', md: 'lg' }}
-              color={solvoColors.textMuted}
-              maxWidth="640px"
-            >
-              Describe what you need in your own words. We match you with the right people, instantly.
+            <Text fontSize={{ base: 'md', md: 'lg' }} color={solvoColors.textMuted} maxWidth="640px">
+              {t('home.subtitle')}
             </Text>
           </Flex>
         </motion.div>
 
-        {/* Input box */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.15 }}
-        >
-          <Box
-            maxWidth="720px"
-            margin="0 auto"
-            bg={solvoColors.surface}
-            borderRadius="24px"
-            padding="20px"
-            boxShadow={solvoShadows.heroInput}
-            borderWidth="1px"
-            borderColor={solvoColors.border}
-          >
-            <Textarea
-              width="100%"
-              minHeight="60px"
-              border="none"
-              outline="none"
-              resize="none"
-              fontSize="md"
-              fontFamily={solvoFonts.sans}
-              color={solvoColors.text}
-              placeholder="I need catering for 40 people this Saturday..."
-              value={query}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setQuery(e.target.value)}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-              style={{ background: 'transparent' }}
-            />
-            <Flex align="center" justify="space-between" marginTop="12px">
-              <Flex gap="14px" align="center" color={solvoColors.textSubtle}>
-                <Box cursor="pointer" _hover={{ color: solvoColors.text }}>
-                  <Paperclip size={18} />
-                </Box>
-                <Box cursor="pointer" _hover={{ color: solvoColors.text }}>
-                  <Mic size={18} />
-                </Box>
-                <Text fontSize="xs" color={solvoColors.textSubtle}>
-                  Press ⏎ to send
-                </Text>
-              </Flex>
-              <Flex
-                as="button"
-                align="center"
-                gap="8px"
-                bg={solvoColors.accent}
-                color={solvoColors.accentFg}
-                padding="10px 18px"
-                borderRadius="14px"
-                fontSize="sm"
-                fontWeight="500"
-                cursor="pointer"
-                onClick={handleSubmit}
-                _hover={{ bg: solvoColors.accentHover }}
-              >
-                Find options
-                <ArrowRight size={14} />
-              </Flex>
-            </Flex>
-          </Box>
-        </motion.div>
-
-        {/* Suggested prompts */}
-        <Flex
-          wrap="wrap"
-          gap="8px"
-          justify="center"
-          marginTop="24px"
-          marginBottom="80px"
-        >
-          {SUGGESTED_PROMPTS.map((prompt, i) => (
-            <motion.div
-              key={prompt}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 + i * 0.05 }}
+        <Box maxWidth="720px" margin="0 auto" bg={solvoColors.surface} borderRadius="24px" padding="18px" borderWidth="1px" borderColor={solvoColors.border} style={{ boxShadow: solvoShadows.heroInput }}>
+          <textarea
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder={t('home.placeholder')}
+            rows={2}
+            style={{ width: '100%', border: 'none', outline: 'none', resize: 'none', background: 'transparent', fontFamily: solvoFonts.sans, fontSize: '16px', color: solvoColors.text }}
+          />
+          <Flex align="center" justify="space-between" marginTop="10px">
+            <Text fontSize="xs" color={solvoColors.textSubtle}>
+              {t('home.hint')}
+            </Text>
+            <button
+              onClick={submit}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', border: 'none', background: solvoColors.accent, color: solvoColors.accentFg, padding: '10px 18px', borderRadius: '14px', fontWeight: 700, cursor: 'pointer', fontSize: '14px' }}
             >
-              <Flex
-                as="button"
-                padding="8px 14px"
-                bg={solvoColors.surface}
-                borderWidth="1px"
-                borderColor={solvoColors.border}
-                borderRadius="full"
-                fontSize="sm"
-                color={solvoColors.textMuted}
-                cursor="pointer"
-                onClick={() => {
-                  const text = prompt.replace(/^[^\s]+\s/, '');
-                  setQuery(text);
-                }}
-                _hover={{ borderColor: solvoColors.indigoBorder, bg: solvoColors.brandSoft }}
-              >
-                {prompt}
-              </Flex>
-            </motion.div>
+              {t('home.cta')} <ArrowRight size={14} />
+            </button>
+          </Flex>
+        </Box>
+
+        <Flex wrap="wrap" gap="8px" justify="center" marginTop="20px">
+          {messages.home.prompts.map((p) => (
+            <button
+              key={p}
+              onClick={() => onSubmit(p.replace(/^\S+\s/, ''))}
+              style={{ padding: '8px 14px', background: solvoColors.surface, border: `1px solid ${solvoColors.border}`, borderRadius: '9999px', fontSize: '14px', color: solvoColors.textMuted, cursor: 'pointer' }}
+            >
+              {p}
+            </button>
           ))}
         </Flex>
 
-        {/* Trust strip */}
-        <Box
-          display="grid"
-          gridTemplateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }}
-          marginBottom="80px"
-          borderTop="1px solid"
-          borderBottom="1px solid"
-          borderColor={solvoColors.border}
-        >
-          {TRUST_ITEMS.map((item, i) => {
-            const Icon = item.icon;
+        <Text textAlign="center" fontSize="sm" color={solvoColors.textSubtle} marginTop="18px">
+          {t('home.loginHint')}
+        </Text>
+
+        <Box display="grid" gridTemplateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} marginTop="56px" borderTop="1px solid" borderBottom="1px solid" borderColor={solvoColors.border}>
+          {messages.home.trust.map((item, i) => {
+            const Icon = icons[i] ?? Sparkles;
             return (
-              <Flex
-                key={item.title}
-                direction="column"
-                gap="8px"
-                padding="32px 24px"
-                borderRight={{ base: 'none', md: i < 2 ? '1px solid' : 'none' }}
-                borderColor={solvoColors.border}
-              >
-                <Box color={solvoColors.indigo}>
+              <Flex key={item.title} direction="column" gap="6px" padding="26px 22px" borderRight={{ base: 'none', md: i < 2 ? '1px solid' : 'none' }} borderColor={solvoColors.border}>
+                <Box color={solvoColors.brand}>
                   <Icon size={20} />
                 </Box>
-                <Text fontWeight="600" color={solvoColors.text}>
+                <Text fontWeight={600} color={solvoColors.text}>
                   {item.title}
                 </Text>
                 <Text fontSize="sm" color={solvoColors.textSubtle}>
-                  {item.subtitle}
+                  {item.sub}
                 </Text>
               </Flex>
             );
           })}
         </Box>
 
-        {/* Categories */}
-        <Box marginBottom="80px">
-          <Text
-            fontFamily={solvoFonts.display}
-            fontSize="3xl"
-            fontWeight="500"
-            color={solvoColors.text}
-            marginBottom="24px"
-          >
-            Browse by category
-          </Text>
-          <Box
-            display="grid"
-            gridTemplateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' }}
-            gap="12px"
-          >
-            {CATEGORIES.map((cat, i) => {
-              const Icon = cat.icon;
-              return (
-                <motion.div
-                  key={cat.label}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.06 }}
-                  whileHover={{ y: -2 }}
+        {(cats?.categories?.length ?? 0) > 0 && (
+          <Box marginTop="56px">
+            <Text fontFamily={solvoFonts.display} fontSize="2xl" fontWeight={600} color={solvoColors.text} marginBottom="18px">
+              {t('home.categoriesTitle')}
+            </Text>
+            <Flex wrap="wrap" gap="8px">
+              {cats!.categories.map((c) => (
+                <button
+                  key={c.categoryId}
+                  onClick={() => onSubmit(categoryName(c, lang))}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: solvoColors.surface, border: `1px solid ${solvoColors.border}`, borderRadius: '14px', fontSize: '14px', color: solvoColors.text, cursor: 'pointer' }}
                 >
-                  <Flex
-                    direction="column"
-                    gap="14px"
-                    padding="20px"
-                    bg={solvoColors.surface}
-                    borderWidth="1px"
-                    borderColor={solvoColors.border}
-                    borderRadius="20px"
-                    cursor="pointer"
-                    _hover={{ borderColor: solvoColors.borderHover }}
-                  >
-                    <Flex
-                      width="48px"
-                      height="48px"
-                      borderRadius="14px"
-                      align="center"
-                      justify="center"
-                      style={{
-                        background: `linear-gradient(135deg, ${cat.from}, ${cat.to})`,
-                      }}
-                      color={solvoColors.text}
-                    >
-                      <Icon size={22} />
-                    </Flex>
-                    <Box>
-                      <Text fontWeight="600" color={solvoColors.text} fontSize="sm">
-                        {cat.label}
-                      </Text>
-                      <Text fontSize="xs" color={solvoColors.textSubtle}>
-                        {cat.count}
-                      </Text>
-                    </Box>
-                  </Flex>
-                </motion.div>
-              );
-            })}
+                  <span>{c.icon}</span> {categoryName(c, lang)}
+                </button>
+              ))}
+            </Flex>
           </Box>
-        </Box>
+        )}
+
+        <Flex justify="center" marginTop="48px" gap="6px" wrap="wrap" fontSize="sm" color={solvoColors.textMuted}>
+          <Text>{t('home.supplierCta')}</Text>
+          <Link href="/register?type=supplier" style={{ color: solvoColors.brandText, fontWeight: 700, textDecoration: 'none' }}>
+            {t('home.supplierCtaLink')} →
+          </Link>
+        </Flex>
       </Box>
 
-      {/* Footer */}
-      <Box
-        borderTop="1px solid"
-        borderColor={solvoColors.border}
-        padding="32px 24px"
-        textAlign="center"
-        position="relative"
-        zIndex={1}
-      >
+      <Box borderTop="1px solid" borderColor={solvoColors.border} padding="28px 24px" textAlign="center" position="relative" zIndex={1}>
         <Text fontSize="sm" color={solvoColors.textSubtle}>
-          © {new Date().getFullYear()} Solvo · Designed in Costa Rica
+          {t('home.footer', { year: new Date().getFullYear() })}
         </Text>
       </Box>
     </Box>
   );
 }
 
-// ── Chat empty state (shown when no conversation is open) ──────────────────
-const CHAT_PROMPTS = [
-  { emoji: '🎂', label: 'Plan a birthday party' },
-  { emoji: '❄️', label: 'Fix my AC' },
-  { emoji: '🎧', label: 'Get a DJ for an event' },
-  { emoji: '📸', label: 'Hire a photographer' },
-  { emoji: '🧽', label: 'Find a cleaning service' },
-  { emoji: '🚚', label: 'Need movers this weekend' },
-];
+// ── Empty chat ───────────────────────────────────────────────────────────
 
-interface ChatEmptyStateProps {
-  onSend: (query: string) => void;
-  onGoHome: () => void;
-}
-
-function ChatEmptyState({ onSend, onGoHome }: ChatEmptyStateProps) {
-  // Featured providers — pulled live from the DB so the user has a one-click
-  // path into a real storefront without typing a query first.
+function ChatEmptyState({ onSend, onGoHome, zoneCode, zoneName }: { onSend: (q: string) => void; onGoHome: () => void; zoneCode: string | null; zoneName: string | null }) {
+  const { t, messages } = useI18n();
   const router = useRouter();
-  const suppliersQuery = useSuppliersQuery({ fetchPolicy: 'cache-and-network' });
-  const featured = (suppliersQuery.data?.suppliers ?? []).slice(0, 6);
+  const { data } = useSuppliersQuery({ variables: { province: zoneCode, limit: 6 }, fetchPolicy: 'cache-and-network' });
+  const list = data?.suppliers ?? [];
 
   return (
-    <Flex
-      direction="column"
-      align="center"
-      justify="center"
-      flex="1"
-      gap="28px"
-      padding={{ base: '24px', md: '48px' }}
-      overflow="auto"
-    >
-      {/* Back to landing */}
-      <button
-        onClick={onGoHome}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: '13px',
-          color: solvoColors.textSubtle,
-          padding: '6px 10px',
-          borderRadius: '8px',
-          alignSelf: 'flex-start',
-        }}
-      >
-        ← Back to homepage
+    <Flex direction="column" align="center" flex="1" gap="24px" padding={{ base: '20px', md: '40px' }} overflow="auto">
+      <button onClick={onGoHome} style={{ alignSelf: 'flex-start', border: 'none', background: 'transparent', color: solvoColors.textSubtle, fontSize: '13px', cursor: 'pointer' }}>
+        {t('chat.backHome')}
       </button>
-
-      {/* Logo + headline */}
-      <Flex direction="column" align="center" gap="12px" textAlign="center">
-        <Flex
-          width="52px"
-          height="52px"
-          borderRadius="16px"
-          bg={solvoColors.indigoLight}
-          color={solvoColors.indigo}
-          align="center"
-          justify="center"
-        >
+      <Flex direction="column" align="center" gap="10px" textAlign="center">
+        <Flex width="52px" height="52px" borderRadius="16px" bg={solvoColors.brandSoft} color={solvoColors.brand} align="center" justify="center">
           <Sparkles size={24} />
         </Flex>
-        <Text
-          fontFamily={solvoFonts.display}
-          fontSize={{ base: '2xl', md: '3xl' }}
-          fontWeight="500"
-          color={solvoColors.text}
-          letterSpacing="-0.01em"
-        >
-          What can Solvo help you with?
+        <Text fontFamily={solvoFonts.display} fontSize={{ base: '2xl', md: '3xl' }} fontWeight={600} color={solvoColors.text}>
+          {t('chat.emptyTitle')}
         </Text>
-        <Text fontSize="sm" color={solvoColors.textMuted} maxWidth="420px">
-          Describe what you need and we'll match you with the best local providers instantly.
+        <Text fontSize="sm" color={solvoColors.textMuted} maxWidth="440px">
+          {t('chat.emptySub')}
         </Text>
       </Flex>
-
-      {/* Suggested prompts */}
-      <Flex wrap="wrap" gap="8px" justify="center" maxWidth="560px">
-        {CHAT_PROMPTS.map((p) => (
-          <motion.button
-            key={p.label}
-            onClick={() => onSend(p.label)}
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.97 }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '9px 16px',
-              borderRadius: '999px',
-              border: `1px solid ${solvoColors.border}`,
-              background: solvoColors.surface,
-              fontSize: '13px',
-              color: solvoColors.textMuted,
-              cursor: 'pointer',
-              fontFamily: solvoFonts.sans,
-            }}
+      <Flex wrap="wrap" gap="8px" justify="center" maxWidth="600px">
+        {messages.home.prompts.map((p) => (
+          <button
+            key={p}
+            onClick={() => onSend(p.replace(/^\S+\s/, ''))}
+            style={{ padding: '8px 14px', borderRadius: '9999px', border: `1px solid ${solvoColors.border}`, background: solvoColors.surface, fontSize: '13px', color: solvoColors.textMuted, cursor: 'pointer' }}
           >
-            {p.emoji} {p.label}
-          </motion.button>
+            {p}
+          </button>
         ))}
       </Flex>
-
-      {/* Browse providers — direct path to a storefront without typing a query */}
-      {featured.length > 0 && (
-        <Flex
-          direction="column"
-          gap="14px"
-          width="100%"
-          maxWidth="720px"
-          marginTop="12px"
-        >
-          <Flex justify="space-between" align="baseline">
-            <Text
-              fontSize="11px"
-              color={solvoColors.textSubtle}
-              letterSpacing="0.08em"
-              fontWeight="600"
-            >
-              BROWSE PROVIDERS
-            </Text>
-            <Text fontSize="11px" color={solvoColors.textSubtle}>
-              {featured.length} listed
-            </Text>
-          </Flex>
-          <Box
-            display="grid"
-            gridTemplateColumns={{ base: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }}
-            gap="10px"
-          >
-            {featured.map((s: any) => {
-              const primary = s.categories?.find((c: any) => c.isPrimary)
-                ?? s.categories?.[0];
-              return (
-                <Box
-                  key={s.supplierId}
-                  onClick={() => router.push(`/providers/${s.supplierId}`)}
-                  padding="14px 16px"
-                  bg={solvoColors.surface}
-                  borderWidth="1px"
-                  borderColor={solvoColors.border}
-                  borderRadius="14px"
-                  cursor="pointer"
-                  _hover={{ borderColor: solvoColors.borderHover }}
-                >
-                  <Flex align="center" gap="10px" marginBottom="6px">
-                    <Flex
-                      width="32px"
-                      height="32px"
-                      borderRadius="10px"
-                      bg={solvoColors.indigoLight}
-                      color={solvoColors.indigo}
-                      align="center"
-                      justify="center"
-                      fontSize="13px"
-                      fontWeight={600}
-                    >
-                      {(s.companyName ?? '?').slice(0, 1)}
-                    </Flex>
-                    <Box minWidth="0" flex="1">
-                      <Flex align="center" gap="6px">
-                        <Text fontWeight={600} fontSize="13px" color={solvoColors.text} truncate>
-                          {s.companyName}
-                        </Text>
-                        {isSponsoredActive(
-                          s.promotionTier,
-                          s.promotionStartDate,
-                          s.promotionEndDate,
-                        ) && (
-                          <Text
-                            fontSize="10px"
-                            fontWeight={600}
-                            color={solvoColors.indigo}
-                            bg={solvoColors.indigoLight}
-                            padding="1px 6px"
-                            borderRadius="full"
-                            flexShrink={0}
-                          >
-                            Sponsored
-                          </Text>
-                        )}
-                      </Flex>
-                      <Text fontSize="11px" color={solvoColors.textSubtle} truncate>
-                        {primary?.category?.categoryName ?? s.city ?? '—'}
-                      </Text>
-                    </Box>
-                  </Flex>
-                  <Flex justify="space-between" align="center">
-                    {s.rating != null ? (
-                      <Flex align="center" gap="3px">
-                        <Text fontSize="11px" color={solvoColors.amberText}>★</Text>
-                        <Text fontSize="11px" fontWeight={500}>
-                          {Number(s.rating).toFixed(1)}
-                        </Text>
-                        {!!s.reviewCount && (
-                          <Text fontSize="11px" color={solvoColors.textSubtle}>
-                            ({s.reviewCount})
-                          </Text>
-                        )}
-                      </Flex>
-                    ) : (
-                      <Text fontSize="11px" color={solvoColors.textSubtle}>New</Text>
-                    )}
-                    <Text fontSize="11px" color={solvoColors.indigo}>
-                      View profile →
-                    </Text>
-                  </Flex>
-                </Box>
-              );
-            })}
+      {list.length > 0 && (
+        <Box width="100%" maxWidth="720px">
+          <Text fontSize="11px" fontWeight={700} letterSpacing="0.08em" color={solvoColors.textSubtle} marginBottom="10px">
+            {t('chat.browse', { zone: (zoneName ?? t('common.allCountry')).toUpperCase() })}
+          </Text>
+          <Box display="grid" gridTemplateColumns={{ base: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }} gap="10px">
+            {list.map((s) => (
+              <Box
+                key={s.supplierId}
+                onClick={() => router.push(`/providers/${s.supplierId}`)}
+                padding="14px"
+                bg={solvoColors.surface}
+                borderWidth="1px"
+                borderColor={s.preferred ? solvoColors.brandBorder : solvoColors.border}
+                borderRadius="14px"
+                cursor="pointer"
+                _hover={{ borderColor: solvoColors.borderHover }}
+              >
+                <Text fontWeight={600} fontSize="14px" color={solvoColors.text} truncate>
+                  {s.companyName}
+                </Text>
+                <Text fontSize="12px" color={solvoColors.textSubtle} truncate>
+                  {[s.city, s.provinceName].filter(Boolean).join(', ')}
+                </Text>
+                <Text fontSize="12px" color={solvoColors.brandText} marginTop="6px">
+                  {t('chat.viewProfile')}
+                </Text>
+              </Box>
+            ))}
           </Box>
-        </Flex>
+        </Box>
       )}
     </Flex>
   );
 }
 
-// ── Main page component ────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────
+
 export default function Home() {
   const router = useRouter();
+  const { t, lang } = useI18n();
+  const { isAuthenticated } = React.useContext(AuthContext);
+
   const [mode, setMode] = React.useState<'hero' | 'chat'>('hero');
   const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
   const [currentConvId, setCurrentConvId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<UiMessage[]>([]);
   const [waitingForAI, setWaitingForAI] = React.useState(false);
-  const [currentModel, setCurrentModel] = React.useState<ModelKey>('claude-haiku');
-  // Drawer state — only meaningful below `lg`; on lg+ panels are inline
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [packageOpen, setPackageOpen] = React.useState(false);
+  const [guestBannerHidden, setGuestBannerHidden] = React.useState(true);
 
-  // When handleSend creates a brand-new conversation, it sets currentConvId
-  // mid-send — which would trigger the "load messages" effect and overwrite
-  // the optimistic user message with the (still empty) DB state. We stamp the
-  // freshly-created id here so that effect skips exactly one fetch; local
-  // state already holds the correct messages for that turn.
-  const skipNextMessageLoadRef = React.useRef<string | null>(null);
-
-  // Controls the in-flight AI turn so the "stop" button can cancel the
-  // underlying network requests (parse / search / generate / send), not just
-  // hide the spinner.
+  const skipNextLoadRef = React.useRef<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
-  // The conversation id of the in-flight turn — handleStop needs it to roll
-  // the aborted turn back server-side (closure-safe; refs don't go stale).
-  const activeTurnConvIdRef = React.useRef<string | null>(null);
-  // Tracks whether the current turn CREATED a new conversation (as opposed to
-  // continuing an existing one). handleStop uses this to decide whether to
-  // delete the whole conversation vs. just rolling back the user message.
-  const wasNewConvThisTurnRef = React.useRef<string | null>(null);
 
-  // ── Request creation (from "Select" on a provider card) ────────────────
-  const { user, isAuthenticated } = React.useContext(AuthContext);
-  const [createRequest, createRequestState] = useCreateRequestMutation();
-  const [createQuote, createQuoteState] = useCreateQuoteMutation();
-  const [searchSuppliers] = useSearchSuppliersLazyQuery({ fetchPolicy: 'network-only' });
 
-  // Device geolocation — requested lazily on the first send so the user
-  // sees the browser permission prompt in the context of a real action,
-  // not as soon as they land on the page. The cached fix is reused for up
-  // to 30 minutes by the hook's internal TTL.
-  const { location: deviceLocation, status: locationStatus, request: requestLocation } =
-    useUserLocation();
-  const [requestError, setRequestError] = React.useState<string | null>(null);
+  // ── Zone: picked province ▸ device location ▸ whole country ─────────────
+  const { data: provincesData } = useProvincesQuery({ fetchPolicy: 'cache-first' });
+  const provinces = React.useMemo(() => provincesData?.provinces ?? [], [provincesData]);
+  const { location: deviceLocation, status: locationStatus, request: requestLocation } = useUserLocation();
+  const [resolveProvince, { data: deviceZone }] = useResolveProvinceLazyQuery({ fetchPolicy: 'cache-first' });
+  const [picked, setPicked] = React.useState<string | null>(null); // code | 'none' | null(=device)
 
-  // Solvo's job ends at the introduction — contact details are already
-  // visible directly on the provider card (no more gating/reveal step), so
-  // selecting a provider no longer creates a Request/Quote or opens a
-  // booking-details modal. It just drops a confirmation into the chat
-  // thread pointing back at the contact info already on the card.
-  // Booking, scheduling, and payment all happen directly between the
-  // customer and supplier from here on.
-  const handleSelectProvider = React.useCallback(
-    (provider: ProviderData) => {
-      const confirmationMsg: UiMessage = provider.isRealSupplier
-        ? {
-            role: 'assistant',
-            content: `Here's how to reach **${provider.name}** directly — tap any option below. Let them know Solvo sent you.`,
-            contactReveal: provider,
-            createdAt: new Date().toISOString(),
-          }
-        : {
-            role: 'assistant',
-            content: `**${provider.name}** is an AI-generated suggestion, not a verified Solvo supplier, so there's no real contact info for them yet. Try one of the verified "In our network" results instead.`,
-            createdAt: new Date().toISOString(),
-          };
-      setMessages((prev) => [...prev, confirmationMsg]);
-    },
-    [setMessages],
-  );
-
-  // Resolve the active customerId — auth first, falling back to a
-  // localStorage / prompt value for testing. Sets `requestError` and returns
-  // null when it can't resolve one. Shared by the single- and multi-quote flows.
-  const resolveCustomerId = React.useCallback((): number | null => {
-    let customerId = user?.customerId ?? null;
-    if (!customerId) {
-      if (isAuthenticated && user && !user.isCustomer) {
-        setRequestError(
-          'Your account is registered as a supplier — switch to a customer account to create requests.',
-        );
-        return null;
-      }
-      let customerIdStr =
-        typeof window !== 'undefined'
-          ? window.localStorage.getItem('solvo.test.customerId')
-          : null;
-      if (!customerIdStr) {
-        customerIdStr =
-          window.prompt('Enter your customer ID (or sign in to skip this prompt):') ?? '';
-        if (!customerIdStr.trim()) return null;
-        window.localStorage.setItem('solvo.test.customerId', customerIdStr.trim());
-      }
-      customerId = Number(customerIdStr);
-      if (!Number.isFinite(customerId) || customerId <= 0) {
-        setRequestError('Invalid customer ID');
-        return null;
-      }
+  React.useEffect(() => {
+    try {
+      setPicked(localStorage.getItem(ZONE_STORAGE_KEY));
+      setGuestBannerHidden(localStorage.getItem(GUEST_BANNER_KEY) === '1');
+    } catch {
+      /* storage blocked */
     }
-    return customerId;
-  }, [user, isAuthenticated]);
+    // Solvo is location-first: ask for the device position up front. The
+    // user can always override it with the "Zona" selector.
+    requestLocation().catch(() => undefined);
+  }, [requestLocation]);
 
-  // ── Package builder ────────────────────────────────────────────────────
-  const [pkgState, setPkgState] = useAtom(packageAtom);
-  const packageKeys = React.useMemo(
-    () => new Set(pkgState.items.map((i) => i.packageKey)),
-    [pkgState.items],
-  );
+  React.useEffect(() => {
+    if (deviceLocation) resolveProvince({ variables: { lat: deviceLocation.lat, lng: deviceLocation.lng } });
+  }, [deviceLocation, resolveProvince]);
 
-  const handleTogglePackage = React.useCallback(
-    (provider: ProviderData) => {
-      const key = packageKey(provider);
-      setPkgState((prev) => {
-        const exists = prev.items.some((i) => i.packageKey === key);
-        return {
-          items: exists
-            ? prev.items.filter((i) => i.packageKey !== key)
-            : [...prev.items, { ...provider, packageKey: key }],
-        };
-      });
-    },
-    [setPkgState],
-  );
+  const zone: ZoneState = React.useMemo(() => {
+    if (picked && picked !== 'none') {
+      return { mode: 'picked', code: picked, name: provinces.find((p) => p.code === picked)?.name ?? picked };
+    }
+    if (picked === 'none') return { mode: 'none' };
+    if (deviceZone?.resolveProvince) {
+      return { mode: 'device', code: deviceZone.resolveProvince.code, name: deviceZone.resolveProvince.name };
+    }
+    return { mode: 'none', locating: locationStatus === 'requesting', denied: locationStatus === 'denied' };
+  }, [picked, provinces, deviceZone, locationStatus]);
 
-  const handleRemovePackageItem = React.useCallback(
-    (key: string) => {
-      setPkgState((prev) => ({
-        items: prev.items.filter((i) => i.packageKey !== key),
-      }));
-    },
-    [setPkgState],
-  );
+  const pickZone = (code: string | null) => {
+    const value = code ?? 'none';
+    setPicked(value);
+    try {
+      localStorage.setItem(ZONE_STORAGE_KEY, value);
+    } catch {
+      /* ignore */
+    }
+  };
+  const selectDeviceZone = () => {
+    setPicked(null);
+    try {
+      localStorage.removeItem(ZONE_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    requestLocation().catch(() => undefined);
+  };
 
-  const handleClearPackage = React.useCallback(() => {
-    setPkgState({ items: [] });
-  }, [setPkgState]);
-
-  // ── Multi-quote: package → one request + quote per supplier ───────────────
-  const [packageQuoteOpen, setPackageQuoteOpen] = React.useState(false);
-  const [submittingPackage, setSubmittingPackage] = React.useState(false);
-  const [packageResult, setPackageResult] = React.useState<{
-    requestCount: number;
-    quoteCount: number;
-  } | null>(null);
-
-  const handleConfirmPackageQuotes = React.useCallback(
-    async (form: MultiQuoteFormData) => {
-      setRequestError(null);
-      const items = pkgState.items;
-      if (items.length === 0) return;
-
-      const customerId = resolveCustomerId();
-      if (!customerId) return;
-
-      if (!form.serviceDate) {
-        setRequestError('Pick a service date so suppliers can confirm availability.');
-        return;
-      }
-
-      // Every provider needs a budget — that amount becomes the supplier's
-      // individual quote price.
-      const missingBudget = items.find((it) => {
-        const v = Number(form.budgets[it.packageKey]);
-        return !Number.isFinite(v) || v <= 0;
-      });
-      if (missingBudget) {
-        setRequestError(`Enter a budget for ${missingBudget.name}.`);
-        return;
-      }
-
-      const guestCount = form.guestCount ? Number(form.guestCount) : null;
-      const city = form.city.trim() || null;
-      const baseQuery = form.rawQuery.trim();
-
-      setSubmittingPackage(true);
-      let quoteCount = 0;
-      const requestIds: number[] = [];
-      try {
-        // One request (and, for real suppliers, one quote) per provider. The
-        // shared event details are reused across all of them; only the budget
-        // differs per supplier.
-        for (const item of items) {
-          const budget = Number(form.budgets[item.packageKey]);
-          const rawQuery = baseQuery
-            ? `${baseQuery} — ${item.name}`
-            : `Interested in ${item.name}`;
-
-          const { data } = await createRequest({
-            variables: {
-              data: {
-                customerId,
-                rawQuery,
-                city,
-                serviceDate: form.serviceDate,
-                guestCount,
-                budgetMin: budget,
-                budgetMax: budget,
-              } as any,
-            },
-          });
-          const requestId = data?.createRequest.requestId;
-          if (!requestId) continue;
-          requestIds.push(requestId);
-
-          if (currentConvId) {
-            linkConversationToRequest(currentConvId, requestId).catch(() => {
-              /* non-critical — request exists, link is just a convenience */
-            });
-          }
-
-          // Auto-create the quote only for real DB suppliers — the per-supplier
-          // budget becomes that quote's total price.
-          if (item.isRealSupplier && item.id > 0) {
-            const validUntil = new Date();
-            validUntil.setDate(validUntil.getDate() + 14);
-            await createQuote({
-              variables: {
-                data: {
-                  requestId,
-                  supplierId: item.id,
-                  totalPrice: budget,
-                  currency: 'CRC',
-                  message: form.message || `Quote for "${rawQuery}".`,
-                  validUntil: validUntil.toISOString(),
-                } as any,
-              },
-            })
-              .then(() => {
-                quoteCount += 1;
-              })
-              .catch(() => {
-                /* non-fatal — request is created, supplier can quote manually */
-              });
-          }
-        }
-
-        if (requestIds.length === 0) {
-          throw new Error('No requests were created');
-        }
-
-        setPackageResult({ requestCount: requestIds.length, quoteCount });
-        setPackageQuoteOpen(false);
-        handleClearPackage();
-      } catch (err: any) {
-        setRequestError(err?.message ?? 'Failed to request quotes');
-      } finally {
-        setSubmittingPackage(false);
-      }
-    },
-    [
-      pkgState.items,
-      resolveCustomerId,
-      createRequest,
-      createQuote,
-      currentConvId,
-      handleClearPackage,
-    ],
-  );
-
-  // ── Load conversations on mount + whenever auth state flips ───────────
-  // Re-running on `isAuthenticated` change is what makes login show the
-  // user's chats (which are scoped server-side by userId) and logout fall
-  // back to the device-scoped guest list.
+  // ── Conversations ──────────────────────────────────────────────────────
   React.useEffect(() => {
     listConversations()
       .then((convs) => {
@@ -1289,1002 +341,220 @@ export default function Home() {
           setCurrentConvId(null);
         }
       })
-      .catch((err) => {
-        // Surface to console so a misconfigured backend / GraphQL error
-        // doesn't silently leave the user looking at an empty sidebar.
-        console.error('[chat] failed to load conversations:', err);
-      });
+      .catch((err) => console.error('[chat] failed to load conversations:', err));
   }, [isAuthenticated]);
 
-  // ── Load messages when conversation changes ────────────────────────────
   React.useEffect(() => {
     if (!currentConvId) {
       setMessages([]);
       return;
     }
-    // Skip exactly one fetch for a conversation we just created mid-send —
-    // its messages already live in local state (the optimistic user message
-    // + the AI reply). Fetching here would race the persistence and wipe the
-    // user's first message from the UI.
-    if (skipNextMessageLoadRef.current === currentConvId) {
-      skipNextMessageLoadRef.current = null;
+    if (skipNextLoadRef.current === currentConvId) {
+      skipNextLoadRef.current = null;
       return;
     }
     getConversation(currentConvId)
-      .then((conv) => {
+      .then((conv) =>
         setMessages(
           conv.messages.map((m) => ({
             messageId: m.messageId,
-            role: m.role as 'user' | 'assistant',
+            role: m.role,
             content: m.content,
             model: m.model,
             createdAt: m.createdAt,
-            // Restore provider cards that were persisted to DB
-            providers:
-              m.role === 'assistant' && m.providersJson
-                ? (() => {
-                    try {
-                      return JSON.parse(m.providersJson);
-                    } catch {
-                      return undefined;
-                    }
-                  })()
-                : undefined,
+            suppliers: m.role === 'assistant' ? fromStoredJson(m.providersJson) : undefined,
           })),
-        );
-      })
-      .catch((err) => {
-        console.error('[chat] failed to load conversation messages:', err);
-      });
+        ),
+      )
+      .catch((err) => console.error('[chat] failed to load messages:', err));
   }, [currentConvId]);
 
-  // ── Send message ───────────────────────────────────────────────────────
+  const bumpConversation = (convId: string) =>
+    setConversations((prev) =>
+      prev
+        .map((c) => (c.conversationId === convId ? { ...c, updatedAt: new Date().toISOString() } : c))
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    );
+
+  /**
+   * One turn = one chatTurn call. The API parses the message, searches the
+   * DB in one province, grounds the reply on those suppliers and saves the
+   * turn (see dne-backend src/api/assistant). We only send the message and
+   * where the user is.
+   */
   const handleSend = React.useCallback(
     async (content: string) => {
       if (!content.trim() || waitingForAI) return;
-
-      // Capture current messages before the state update
-      const currentMessages = messages;
-
-      // For the parser: only pass the last 2 user messages + the current one.
-      // Sending the full history causes the parser to pick up stale service/
-      // location fields from earlier turns (e.g. it extracts "catering" when
-      // the user is now asking about DJs they just saw on screen).
-      //
-      // EXCEPTION — context reset: "never mind", "forget that", etc. signal
-      // that the user is starting a completely fresh request. In that case we
-      // drop previous messages entirely so the parser doesn't blend the old
-      // service ("DJ") into the new one ("AC repair").
-      //
-      // ADDITIVE FOLLOW-UPS ("I also need cleaning") also drop prior context —
-      // otherwise the parser sees ["I need DJ+catering+photo", "I also need
-      // cleaning"], joins them into one super-string, splits into 4 subrequests
-      // capped at 3, and re-serves the OLD topics while dropping the new one.
-      // Parsing the additive turn alone gives us just the new service.
-      const isClearingContext = CONTEXT_CLEAR_RE.test(content);
-      const isAdditiveTurn = isAdditiveFollowupRequest(content);
-      const recentUserMsgs = isClearingContext || isAdditiveTurn
-        ? []
-        : currentMessages
-            .filter((m) => m.role === 'user')
-            .slice(-2)
-            .map((m) => m.content);
-      const contextQuery = [...recentUserMsgs, content]
-        .filter(Boolean)
-        .join('. ');
-
-      // Grounding from the most recent assistant message that carried cards.
-      // Computed once and passed to every intent branch so the AI always knows
-      // what was on screen, regardless of whether new cards are produced.
-      const recentGrounding = buildProviderGrounding(currentMessages);
-
-      // Optimistic user message
-      const nowStr = new Date().toISOString();
-      setMessages((prev) => [
-        ...prev,
-        { role: 'user', content, createdAt: nowStr },
-      ]);
+      setMessages((prev) => [...prev, { role: 'user', content, createdAt: new Date().toISOString() }]);
       setWaitingForAI(true);
-
-      // Switch to chat mode immediately
       setMode('chat');
 
-      // Kick off geolocation in parallel with the chat round-trip. We use
-      // whatever fix we already have for THIS round (no awaiting) so the
-      // user never waits on the geolocation prompt — but the next turn
-      // will benefit from the resolved coordinates.
-      const locationForThisTurn = deviceLocation;
-      if (!deviceLocation && locationStatus !== 'denied' && locationStatus !== 'requesting') {
-        requestLocation().catch(() => {});
-      }
-
-      // Fresh AbortController for this turn — the "stop" button aborts it,
-      // which cancels every in-flight request that was handed `signal`.
       const controller = new AbortController();
       abortRef.current = controller;
-      const signal = controller.signal;
 
       try {
-        // Create conversation if needed
-        let convId = currentConvId;
-        if (!convId) {
-          const title =
-            content.length > 60 ? `${content.slice(0, 57)}…` : content;
-          const conv = await createConversation(title, currentModel);
-          convId = conv.conversationId;
-
-          // If the user hit "stop" while createConversation was in flight,
-          // the signal is already aborted. The conversation now exists in the
-          // DB but we're about to bail — delete it so no orphan is left behind.
-          if (signal.aborted) {
-            apiDeleteConversation(convId).catch(() => {/* best-effort */});
-            return;
-          }
-
-          // Tell the load-messages effect to skip this id's fetch — local
-          // state already holds the optimistic user message for this turn,
-          // and the AI reply is appended below. Without this, the effect
-          // races persistence and the user's first message disappears.
-          skipNextMessageLoadRef.current = convId;
-          setCurrentConvId(convId);
-          setConversations((prev) => [conv, ...prev]);
-          // Mark this as a fresh conversation so handleStop knows to delete the
-          // whole thing (not just rollback one message) if the user cancels.
-          wasNewConvThisTurnRef.current = convId;
-        }
-        // Record the turn's conversation id so handleStop can roll it back.
-        activeTurnConvIdRef.current = convId;
-
-        // Total provider cards we ever want to show per turn.
-        const TOTAL_CARDS = 5;
-
-        // ── Step 1: parse intent + fields FIRST ──────────────────────────
-        // Everything downstream (whether to search, whether to ground the
-        // chat AI in DB results) depends on this, so it can't run in
-        // parallel with the chat call anymore.
-        const parseResult = await parseQueryWithAi(
-          contextQuery,
-          currentModel,
-          locationForThisTurn,
-          signal,
+        const turn = await runChatTurn(
+          {
+            conversationId: currentConvId,
+            message: content,
+            deviceId: getOrCreateDeviceId(),
+            province: zone.mode === 'picked' ? zone.code : null,
+            lat: zone.mode === 'device' && deviceLocation ? deviceLocation.lat : null,
+            lng: zone.mode === 'device' && deviceLocation ? deviceLocation.lng : null,
+          },
+          controller.signal,
         );
-        const parsed = parseResult.parsed;
 
-        // ── Post-parse override: chat ↔ service_request when providers shown ──
-        // Layer 1 (upgrade): if the user explicitly asks for results or to
-        // search outside the network, force service_request regardless of what
-        // the LLM said. parseQueryWithAi already does this deterministically,
-        // but this is a second safety net for any that slipped through.
-        if (
-          wantsMoreResults(content) ||
-          wantsOutsideNetwork(content) ||
-          isAdditiveFollowupRequest(content)
-        ) {
-          if (parsed.intent !== 'service_request') {
-            parsed.intent = 'service_request';
-            // eslint-disable-next-line no-console
-            console.log('[intent] overridden → service_request (explicit results/outside-network/additive-followup request)');
-          }
-        } else if (recentGrounding && parsed.intent === 'service_request') {
-          // Layer 2 (downgrade): once providers are on screen, most follow-ups
-          // are conversational. BUT only downgrade when the message contains NO
-          // action verb — "look inside Costa Rica", "find me options", "show me
-          // DJs" are new searches and must stay as service_request. Purely
-          // conversational phrasing ("which is cheapest?", "tell me more about
-          // it") contains no such verb and is safe to downgrade.
-          if (!SEARCH_ACTION_RE.test(content)) {
-            parsed.intent = 'chat';
-            // eslint-disable-next-line no-console
-            console.log('[intent] overridden → chat (conversational follow-up — no action verb)');
-          } else {
-            // eslint-disable-next-line no-console
-            console.log('[intent] kept service_request (action verb present despite recentGrounding)');
-          }
-        }
-
-        let aiResult: Awaited<ReturnType<typeof apiSendMessage>>;
-        let provData: { parsed: ParsedQuery; providers: ProviderData[] } | null =
-          null;
-
-        if (parsed.intent === 'chat') {
-          // ── Conversational turn ────────────────────────────────────────
-          // No cards. Ground the AI in the most recently shown providers
-          // so it can answer follow-ups ("where is PikiTiki?", "which of
-          // those are in our network?") factually. When no structured
-          // grounding is available, tell the AI to use conversation history.
-          // eslint-disable-next-line no-console
-          console.log('[intent] chat — no provider generation');
-          const chatContext = recentGrounding
-            ? groundingContext(recentGrounding)
-            : '## Conversation\nAnswer using the full conversation history above. If the user references providers discussed earlier in this conversation, refer to what was said. Ask a clarifying question only if genuinely needed.';
-          aiResult = await apiSendMessage(
-            convId,
-            content,
-            currentModel,
-            chatContext,
-            signal,
-            SOLVO_CHAT_SYSTEM_PROMPT,
-          );
-        } else if (parsed.intent === 'network_inquiry') {
-          // ── Network lookup ─────────────────────────────────────────────
-          // The user is asking ABOUT the supplier network ("are there
-          // suppliers in our network?", "do you have DJs in Heredia?"). We
-          // search the DB and let the AI answer in text — but show NO cards;
-          // this is informational, not a pick-a-provider flow.
-          const rawLocation = (parsed.location || '').trim();
-          const normalizedCity = rawLocation
-            .split(',')[0]
-            .replace(/^(in|at|near|around)\s+/i, '')
-            .trim();
-          const searchVars = {
-            serviceQuery: parsed.service?.trim() || null,
-            city: normalizedCity || null,
-            guestCount: null,
-            // Pull a wider set than the card cap — this is reference data for
-            // the AI to summarise, not a list of cards.
-            limit: 10,
-          };
-          // eslint-disable-next-line no-console
-          console.log('[intent] network_inquiry — searchSuppliers:', searchVars);
-
-          let dbSuppliers: any[] = [];
-          try {
-            const res = await searchSuppliers({
-              variables: { data: searchVars as any },
-              context: { fetchOptions: { signal } },
-            });
-            dbSuppliers = res?.data?.searchSuppliers ?? [];
-          } catch (dbErr) {
-            if (!signal.aborted) {
-              // eslint-disable-next-line no-console
-              console.error('[DB] network_inquiry search ERROR:', dbErr);
-            }
-          }
-
-          const dbProviders = dbSuppliers.map((s, i) =>
-            dbSupplierToProviderData(s, i),
-          );
-          // eslint-disable-next-line no-console
-          console.log(
-            `[intent] network_inquiry — ${dbProviders.length} suppliers found, no cards`,
-          );
-
-          // Combine the network-lookup block with any providers already on
-          // screen so the AI can cross-reference ("yes, 3 of those 5 are
-          // in our network") without losing the thread.
-          const networkCtx = networkInquiryContext(dbProviders, parsed)
-            + (recentGrounding
-              ? `\n\n## Previously shown to the user (reference only — do NOT render cards for these):\n${recentGrounding}`
-              : '');
-          aiResult = await apiSendMessage(
-            convId,
-            content,
-            currentModel,
-            networkCtx,
-            signal,
-            SOLVO_CHAT_SYSTEM_PROMPT,
-          );
-          // provData stays null — informational answer, no cards rendered.
-        } else {
-          // ── Service request ────────────────────────────────────────────
-
-          // Multi-topic branch. When the parser detected the user asked for
-          // several distinct services in one message ("cleaning on Saturday
-          // AND catering on Sunday"), run a separate search + AI reply per
-          // sub-topic and push them as sequential assistant messages. Each
-          // reply is grounded ONLY on its own topic's cards, so the AI
-          // can't accidentally recommend one supplier as good at both.
-          if (parsed.subrequests && parsed.subrequests.length >= 2) {
-            const subs = parsed.subrequests.slice(0, 3);
-            // eslint-disable-next-line no-console
-            console.log(
-              `[intent] multi-topic — ${subs.length} sub-requests:`,
-              subs.map((s) => s.service).join(' | '),
-            );
-            const outsideNetworkAll = wantsOutsideNetwork(content);
-
-            for (const sub of subs) {
-              if (signal.aborted) break;
-
-              // Each sub-request inherits missing fields from the top-level
-              // parse. E.g. if the user said "cleaning and catering on
-              // Saturday", both inherit `when=Saturday`.
-              const subParsed: ParsedQuery = {
-                intent: 'service_request',
-                service: sub.service,
-                people: sub.people ?? parsed.people,
-                location: sub.location ?? parsed.location,
-                budget: sub.budget ?? parsed.budget,
-                when: sub.when ?? parsed.when,
-                dietary: sub.dietary ?? parsed.dietary,
-              };
-
-              const subLocation = (subParsed.location || '').trim();
-              const subCity = subLocation
-                .split(',')[0]
-                .replace(/^(in|at|near|around)\s+/i, '')
-                .trim();
-              const subGuests = subParsed.people
-                ? parseInt(subParsed.people.replace(/\D/g, ''), 10)
-                : NaN;
-
-              // DB search for this topic only.
-              let subDb: ProviderData[] = [];
-              if (!outsideNetworkAll) {
-                try {
-                  const res = await searchSuppliers({
-                    variables: {
-                      data: {
-                        serviceQuery: subParsed.service?.trim() || null,
-                        city: subCity || null,
-                        guestCount:
-                          Number.isFinite(subGuests) && subGuests > 0
-                            ? subGuests
-                            : null,
-                        limit: TOTAL_CARDS,
-                      } as any,
-                    },
-                    context: { fetchOptions: { signal } },
-                  });
-                  subDb = (res?.data?.searchSuppliers ?? []).map(
-                    (s: any, i: number) => dbSupplierToProviderData(s, i),
-                  );
-                } catch (dbErr) {
-                  if (!signal.aborted) {
-                    // eslint-disable-next-line no-console
-                    console.error(
-                      `[DB] sub-request ${sub.service} search ERROR:`,
-                      dbErr,
-                    );
-                  }
-                }
-              }
-
-              // AI top-up per topic.
-              const subNeedAi = outsideNetworkAll
-                ? TOTAL_CARDS
-                : Math.max(0, TOTAL_CARDS - subDb.length);
-              let subFill: Awaited<
-                ReturnType<typeof generateProvidersWithAi>
-              > | null = null;
-              if (subNeedAi > 0) {
-                try {
-                  subFill = await generateProvidersWithAi(
-                    subParsed,
-                    currentModel,
-                    locationForThisTurn,
-                    subNeedAi,
-                    signal,
-                    outsideNetworkAll,
-                  );
-                } catch (err) {
-                  if (!signal.aborted) {
-                    // eslint-disable-next-line no-console
-                    console.error(
-                      `[AI] sub-request ${sub.service} generate ERROR:`,
-                      err,
-                    );
-                  }
-                }
-              }
-
-              const subAi = subFill?.providers ?? [];
-              const subDbNames = new Set(
-                subDb.map((p) => p.name.toLowerCase()),
-              );
-              const subDedupedAi = subAi
-                .filter((p) => !subDbNames.has(p.name.toLowerCase()))
-                .map((p, i) => ({
-                  ...p,
-                  id: -1000 - i,
-                  isRealSupplier: false,
-                }));
-              const subMerged = [...subDb, ...subDedupedAi]
-                .slice(0, TOTAL_CARDS)
-                .map((p, i) => ({ ...p, recommended: i === 0 }));
-
-              // Ground the AI reply on this topic only. Prefix the user's
-              // original message with a hint of which sub-topic this reply
-              // covers so the model doesn't blend them.
-              const subCtx = searchResultContext(
-                subMerged,
-                subParsed,
-                outsideNetworkAll,
-              );
-              const subContent = `For the "${subParsed.service}" part of my request: ${content}`;
-
-              const subResult = await apiSendMessage(
-                convId,
-                subContent,
-                currentModel,
-                subCtx,
-                signal,
-                SOLVO_CHAT_SYSTEM_PROMPT,
-              );
-
-              const subMsg: UiMessage = {
-                messageId: subResult.messageId,
-                role: 'assistant',
-                content: subResult.content,
-                model: subResult.model,
-                parsedQuery: subParsed,
-                providers: subMerged,
-                createdAt: subResult.createdAt,
-              };
-              setMessages((prev) => [...prev, subMsg]);
-
-              if (subResult.messageId && convId) {
-                updateMessageProviders(
-                  convId,
-                  subResult.messageId,
-                  JSON.stringify(subMerged),
-                ).catch(() => {/* non-critical */});
-              }
-            }
-
-            // Bump sidebar once for the whole multi-topic turn.
-            setConversations((prev) =>
-              prev
-                .map((c) =>
-                  c.conversationId === convId
-                    ? { ...c, updatedAt: new Date().toISOString() }
-                    : c,
-                )
-                .sort(
-                  (a, b) =>
-                    new Date(b.updatedAt).getTime() -
-                    new Date(a.updatedAt).getTime(),
-                ),
-            );
-
-            return; // Skip the single-topic push at the bottom of this callback.
-          }
-
-          // Detect "outside network" early — when set we skip the DB entirely
-          // and fill all slots with AI-suggested general-market providers.
-          const outsideNetwork = wantsOutsideNetwork(content);
-
-          const rawLocation = (parsed.location || '').trim();
-          const normalizedCity = rawLocation
-            .split(',')[0]
-            .replace(/^(in|at|near|around)\s+/i, '')
-            .trim();
-          const guests = parsed.people
-            ? parseInt(parsed.people.replace(/\D/g, ''), 10)
-            : NaN;
-
-          // Step 2: DB search — skipped when user explicitly wants results
-          // outside the Solvo network.
-          let dbProviders: ProviderData[] = [];
-          if (!outsideNetwork) {
-            const searchVars = {
-              serviceQuery: parsed.service?.trim() || null,
-              city: normalizedCity || null,
-              guestCount:
-                Number.isFinite(guests) && guests > 0 ? guests : null,
-              limit: TOTAL_CARDS,
-            };
-            // eslint-disable-next-line no-console
-            console.log('[DB] searchSuppliers input:', searchVars);
-
-            // The backend handles location matching: accent-insensitive,
-            // city-matches ranked first, degrades gracefully to service
-            // matches elsewhere — no client-side retry needed.
-            let dbSuppliers: any[] = [];
-            try {
-              const res = await searchSuppliers({
-                variables: { data: searchVars as any },
-                context: { fetchOptions: { signal } },
-              });
-              dbSuppliers = res?.data?.searchSuppliers ?? [];
-            } catch (dbErr) {
-              if (!signal.aborted) {
-                // eslint-disable-next-line no-console
-                console.error('[DB] searchSuppliers ERROR:', dbErr);
-              }
-            }
-            dbProviders = dbSuppliers.map((s, i) =>
-              dbSupplierToProviderData(s, i),
-            );
-          } else {
-            // eslint-disable-next-line no-console
-            console.log('[intent] outside-network request — skipping DB search');
-          }
-
-          // Step 3: AI top-up. For outside-network requests, fill ALL slots.
-          // For normal requests, fill only the gap the DB left.
-          const needFromAi = outsideNetwork
-            ? TOTAL_CARDS
-            : Math.max(0, TOTAL_CARDS - dbProviders.length);
-          // eslint-disable-next-line no-console
-          console.log(
-            `[providers] db=${dbProviders.length} needFromAi=${needFromAi} outsideNetwork=${outsideNetwork}`,
-          );
-
-          let fillRes: Awaited<ReturnType<typeof generateProvidersWithAi>> | null =
-            null;
-          if (needFromAi > 0) {
-            try {
-              fillRes = await generateProvidersWithAi(
-                parsed,
-                currentModel,
-                locationForThisTurn,
-                needFromAi,
-                signal,
-                outsideNetwork,
-              );
-            } catch (err) {
-              // Suppress noise for intentional user-stop — the outer catch
-              // handles the abort case cleanly. Only log genuine failures.
-              if (!signal.aborted) {
-                // eslint-disable-next-line no-console
-                console.error('[AI] generateProvidersWithAi ERROR:', err);
-              }
-              fillRes = null;
-            }
-          }
-
-          // Step 4: merge — DB first, AI fills, dedupe by name, cap, and
-          // flag EXACTLY one card as recommended.
-          const aiProviders: ProviderData[] = fillRes?.providers ?? [];
-          const dbNames = new Set(
-            dbProviders.map((p) => p.name.toLowerCase()),
-          );
-          const dedupedAi = aiProviders
-            .filter((p) => !dbNames.has(p.name.toLowerCase()))
-            // Negative ids so AI cards never collide with real supplierIds.
-            .map((p, i) => ({ ...p, id: -1000 - i, isRealSupplier: false }));
-
-          const merged = [...dbProviders, ...dedupedAi]
-            .slice(0, TOTAL_CARDS)
-            // Single source of truth for the "recommended" ribbon — only the
-            // first card gets it, every other card is explicitly cleared.
-            .map((p, i) => ({ ...p, recommended: i === 0 }));
-
-          provData = { parsed, providers: merged };
-
-          // Step 5: NOW call the chat AI — grounded in the FINAL card set
-          // (count included, even when it's zero). This is what keeps the
-          // reply honest: "Here are 4 options" / "I couldn't find any".
-          // eslint-disable-next-line no-console
-          console.log(
-            `[providers] final card count = ${merged.length}`,
-          );
-          // Previous providers are included as CONTEXT ONLY. The AI kept
-          // re-summarizing them ("here are the 5 DJs again below") when
-          // the user asked for a new service — so the wording here is
-          // deliberately blunt about not re-listing them. Only the NEW
-          // results above are what the user is asking about right now.
-          const resultCtx = searchResultContext(merged, parsed, outsideNetwork)
-            + (recentGrounding
-              ? `\n\n## Previously shown in this conversation (memory only — DO NOT list, recommend, or re-describe these providers; the user is asking about the NEW results above):\n${recentGrounding}`
-              : '');
-          aiResult = await apiSendMessage(
-            convId,
-            content,
-            currentModel,
-            resultCtx,
-            signal,
-            SOLVO_CHAT_SYSTEM_PROMPT,
-          );
-        }
-
-        const aiMsg: UiMessage = {
-          messageId: aiResult.messageId,
-          role: 'assistant',
-          content: aiResult.content,
-          model: aiResult.model,
-          // Store parsedQuery on every AI message with providers — needed for the
-          // Select → createRequest flow. ChatThread only renders the visual
-          // "SOLVO UNDERSTOOD" card on the first message that carries it.
-          parsedQuery: provData?.parsed ?? undefined,
-          providers: provData?.providers ?? undefined,
-          createdAt: aiResult.createdAt,
-        };
-
-        setMessages((prev) => [...prev, aiMsg]);
-
-        // Persist provider cards to DB so they survive conversation reload
-        if (aiResult.messageId && provData?.providers && convId) {
-          updateMessageProviders(
-            convId,
-            aiResult.messageId,
-            JSON.stringify(provData.providers),
-          ).catch(() => {/* non-critical */});
-        }
-
-        // Bump updatedAt in sidebar
-        setConversations((prev) =>
-          prev
-            .map((c) =>
-              c.conversationId === convId
-                ? { ...c, updatedAt: new Date().toISOString() }
-                : c,
-            )
-            .sort(
-              (a, b) =>
-                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-            ),
-        );
-      } catch (_err) {
-        // On an intentional stop, handleStop already rolled the turn back
-        // (local + server) — leave no trace here. Only surface real errors.
-        if (!controller.signal.aborted) {
-          setMessages((prev) => [
-            ...prev,
-            {
+        setMessages((prev) => [
+          ...prev,
+          ...turn.replies.map(
+            (r): UiMessage => ({
+              messageId: r.messageId,
               role: 'assistant',
-              content: '⚠️ Something went wrong. Please try again.',
-              createdAt: new Date().toISOString(),
-            },
+              content: r.content,
+              model: r.model,
+              createdAt: r.createdAt,
+              suppliers: fromStoredJson(r.providersJson),
+              service: r.service ?? undefined,
+              zoneName: r.zoneName ?? null,
+            }),
+          ),
+        ]);
+
+        if (!currentConvId) {
+          skipNextLoadRef.current = turn.conversationId;
+          setCurrentConvId(turn.conversationId);
+          setConversations((prev) => [
+            { conversationId: turn.conversationId, title: turn.title, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messages: [] },
+            ...prev,
           ]);
+        } else {
+          bumpConversation(turn.conversationId);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.error('[chat] turn failed:', err);
+          setMessages((prev) => [...prev, { role: 'assistant', content: t('chat.error'), createdAt: new Date().toISOString() }]);
         }
       } finally {
-        // Only clear the ref if it's still THIS turn's controller — a newer
-        // turn may have replaced it.
         if (abortRef.current === controller) abortRef.current = null;
         setWaitingForAI(false);
       }
     },
-    [
-      currentConvId,
-      messages,
-      waitingForAI,
-      currentModel,
-      deviceLocation,
-      locationStatus,
-      requestLocation,
-      searchSuppliers,
-    ],
+    [currentConvId, waitingForAI, zone, deviceLocation, t],
   );
 
-  // ── Stop the in-flight AI turn ─────────────────────────────────────────
-  // Aborts the controller (cancelling parse / search / generate / send),
-  // drops the spinner, and ROLLS THE TURN BACK — both locally (remove the
-  // optimistic user message) and server-side (delete the persisted user
-  // message, since `sendAiMessage` saves it before calling the model). The
-  // result: stopping leaves no half-finished turn behind.
+  /**
+   * Stop: cancel the request. The API only saves a turn once the reply is
+   * ready and the client is still connected, so nothing needs rolling back.
+   */
   const handleStop = React.useCallback(() => {
-    // Provide a named reason so the AbortError is identifiable in catch
-    // blocks and distinguishable from network failures in logs.
     abortRef.current?.abort(new DOMException('User stopped the response', 'AbortError'));
     abortRef.current = null;
     setWaitingForAI(false);
-
-    // Drop the optimistic user message from local state.
-    setMessages((prev) =>
-      prev.length > 0 && prev[prev.length - 1].role === 'user'
-        ? prev.slice(0, -1)
-        : prev,
-    );
-
-    const convId = activeTurnConvIdRef.current;
-    activeTurnConvIdRef.current = null;
-
-    if (wasNewConvThisTurnRef.current === convId && convId) {
-      // The user cancelled on the VERY FIRST message of a brand-new conversation.
-      // The conversation exists in the DB with a title but no messages —
-      // delete it entirely so it doesn't linger as a ghost in the sidebar.
-      wasNewConvThisTurnRef.current = null;
-      apiDeleteConversation(convId).catch(() => {/* best-effort */});
-      setConversations((prev) => prev.filter((c) => c.conversationId !== convId));
-      setCurrentConvId(null);
-      return;
-    }
-    wasNewConvThisTurnRef.current = null;
-
-    // Existing conversation — just roll back the user message server-side.
-    if (convId) {
-      rollbackLastTurn(convId).catch(() => {/* non-critical */});
-    }
+    setMessages((prev) => (prev.length && prev[prev.length - 1].role === 'user' ? prev.slice(0, -1) : prev));
   }, []);
 
-  // ── "See options" suggestion chip ─────────────────────────────────────
-  // After 2+ assistant replies with no cards, offer a shortcut so the user
-  // doesn't have to type "show me options" manually.
-  const shouldOfferOptions = React.useMemo(() => {
-    if (waitingForAI) return false;
-    const assistantMsgs = messages.filter((m) => m.role === 'assistant');
-    if (assistantMsgs.length < 2) return false;
-    const lastMsg = assistantMsgs[assistantMsgs.length - 1];
-    if (lastMsg.providers && lastMsg.providers.length > 0) return false;
-    // Suppress when the user's last message was already an explicit results
-    // request or an outside-network search — showing the chip again would
-    // create a confusing "ask → nothing → chip → ask" loop.
-    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-    if (!lastUserMsg) return true;
-    if (wantsMoreResults(lastUserMsg.content)) return false;
-    if (wantsOutsideNetwork(lastUserMsg.content)) return false;
-    return true;
-  }, [messages, waitingForAI]);
+  /** "Contact": log the lead and show the supplier's contact links inline. */
+  const handleContact = React.useCallback(
+    (s: ChatSupplier) => {
+      logSupplierContact(s.supplierId, ContactChannel.ChatContact, 'chat');
+      const hasAny = !!(s.businessPhone || s.whatsappNumber || s.businessEmail || s.websiteUrl);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: t(hasAny ? 'chat.contactIntro' : 'chat.noContact', { name: s.companyName }),
+          contactFor: hasAny ? s : undefined,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    },
+    [t],
+  );
 
-  const handleShowOptions = React.useCallback(() => {
-    // Send a phrase that wantsMoreResults() unambiguously matches, so the
-    // post-parse override correctly routes this to service_request.
-    handleSend('show me options');
-  }, [handleSend]);
-
-  // ── Go back to hero landing ────────────────────────────────────────────
-  const handleGoHome = React.useCallback(() => {
+  const goHome = () => {
     setMode('hero');
     setCurrentConvId(null);
     setMessages([]);
-  }, []);
-
-  // ── New conversation ───────────────────────────────────────────────────
-  const handleNewChat = React.useCallback(() => {
+  };
+  const newChat = () => {
     setCurrentConvId(null);
     setMessages([]);
-    setMode('chat'); // also switches us in from hero mode
-  }, []);
+    setMode('chat');
+  };
+  const deleteChat = async (id: string) => {
+    await apiDeleteConversation(id).catch(() => undefined);
+    setConversations((prev) => {
+      const rest = prev.filter((c) => c.conversationId !== id);
+      if (currentConvId === id) setCurrentConvId(rest[0]?.conversationId ?? null);
+      return rest;
+    });
+  };
 
-  // ── Delete conversation ────────────────────────────────────────────────
-  const handleDelete = React.useCallback(
-    async (id: string) => {
-      try {
-        await apiDeleteConversation(id);
-      } catch {
-        /* ignore */
-      }
-      setConversations((prev) => {
-        const remaining = prev.filter((c) => c.conversationId !== id);
-        if (currentConvId === id) {
-          if (remaining.length > 0) {
-            setCurrentConvId(remaining[0].conversationId);
-          } else {
-            setCurrentConvId(null);
-            setMode('hero');
-          }
-        }
-        return remaining;
-      });
-    },
-    [currentConvId],
-  );
-
-  // ── Select conversation ────────────────────────────────────────────────
-  const handleSelectConv = React.useCallback((id: string) => {
-    setCurrentConvId(id);
-  }, []);
-
-  // ── Render ─────────────────────────────────────────────────────────────
-
-  const feedbackBanner = (
-    <>
-      {createRequestState.loading && (
-        <Box
-          position="fixed"
-          top="80px"
-          right="24px"
-          padding="10px 16px"
-          borderRadius="10px"
-          bg={solvoColors.accent}
-          color={solvoColors.accentFg}
-          fontSize="sm"
-          zIndex={1000}
-          style={{ boxShadow: solvoShadows.floatingPanel }}
-        >
-          Creating request…
-        </Box>
-      )}
-      {requestError && (
-        <Box
-          position="fixed"
-          top="80px"
-          right="24px"
-          padding="12px 16px"
-          borderRadius="10px"
-          bg={solvoColors.roseLight}
-          color={solvoColors.roseText}
-          maxWidth="360px"
-          zIndex={1000}
-          style={{ boxShadow: solvoShadows.floatingPanel }}
-        >
-          <Text fontSize="sm" fontWeight={600} marginBottom="4px">
-            Couldn't create request
-          </Text>
-          <Text fontSize="xs">{requestError}</Text>
-          <Text
-            as="span"
-            fontSize="xs"
-            color={solvoColors.roseText}
-            cursor="pointer"
-            onClick={() => setRequestError(null)}
-            marginTop="6px"
-            display="inline-block"
-          >
-            Dismiss
-          </Text>
-        </Box>
-      )}
-
-      {/* Multi-quote modal — opened from the package panel's "Request quotes" */}
-      {packageQuoteOpen && (
-        <MultiQuoteModal
-          items={pkgState.items}
-          defaultRawQuery={
-            messages.filter((m) => m.role === 'user').slice(-1)[0]?.content ?? ''
-          }
-          submitting={submittingPackage}
-          error={requestError}
-          onConfirm={handleConfirmPackageQuotes}
-          onClose={() => !submittingPackage && setPackageQuoteOpen(false)}
-        />
-      )}
-
-      {/* Multi-quote success toast */}
-      {packageResult && (
-        <Box
-          position="fixed"
-          top="80px"
-          right="24px"
-          padding="14px 18px"
-          borderRadius="12px"
-          bg={solvoColors.surface}
-          border={`1px solid ${solvoColors.emerald}`}
-          maxWidth="360px"
-          zIndex={1000}
-          style={{ boxShadow: solvoShadows.floatingPanel }}
-        >
-          <Text fontSize="sm" fontWeight={600} color={solvoColors.text} marginBottom="4px">
-            {packageResult.requestCount} request
-            {packageResult.requestCount === 1 ? '' : 's'} created
-          </Text>
-          <Text fontSize="xs" color={solvoColors.textMuted} marginBottom="10px">
-            {packageResult.quoteCount} quote{packageResult.quoteCount === 1 ? '' : 's'} sent
-            to suppliers. Track replies under your requests.
-          </Text>
-          <Flex gap="10px">
-            <Link href="/requests" style={{ textDecoration: 'none' }}>
-              <Text
-                as="span"
-                fontSize="xs"
-                fontWeight={600}
-                color={solvoColors.indigo}
-                cursor="pointer"
-              >
-                View requests →
-              </Text>
-            </Link>
-            <Text
-              as="span"
-              fontSize="xs"
-              color={solvoColors.textSubtle}
-              cursor="pointer"
-              onClick={() => setPackageResult(null)}
-            >
-              Dismiss
-            </Text>
-          </Flex>
-        </Box>
-      )}
-    </>
-  );
-
-  if (mode === 'hero') {
-    return (
-      <>
-        <motion.div
-          key="hero"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-        >
-          <HeroSection onSubmit={handleSend} onStartChat={handleNewChat} />
-        </motion.div>
-        {feedbackBanner}
-      </>
-    );
-  }
+  if (mode === 'hero') return <Hero onSubmit={handleSend} />;
 
   return (
-    <>
-    <motion.div
-      key="chat"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-      style={{ height: '100vh', display: 'flex', overflow: 'hidden' }}
-    >
-      {/* Left: conversation history */}
+    <div style={{ height: '100vh', display: 'flex', overflow: 'hidden' }} lang={lang}>
       <ChatSidebar
         conversations={conversations}
         currentConvId={currentConvId}
-        onSelect={handleSelectConv}
-        onNew={handleNewChat}
-        onDelete={handleDelete}
-        onGoHome={handleGoHome}
+        onSelect={setCurrentConvId}
+        onNew={newChat}
+        onDelete={deleteChat}
+        onGoHome={goHome}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
+      <Flex direction="column" flex="1" minWidth={0} height="100vh" overflow="hidden">
+        <SolvoNavBar onGoHome={goHome} onNewChat={newChat} hideLogo onMenuClick={() => setSidebarOpen(true)} />
 
-      {/* Center: nav + thread (or empty state) + composer */}
-      <Flex direction="column" flex="1" minWidth={0} overflow="hidden" height="100vh">
-        <SolvoNavBar
-          activePath="/"
-          onGoHome={handleGoHome}
-          onNewChat={handleNewChat}
-          hideLogo
-          onMenuClick={() => setSidebarOpen(true)}
-        />
+        {!isAuthenticated && !guestBannerHidden && (
+          <Flex align="center" justify="center" gap="10px" padding="8px 16px" bg={solvoColors.brandSoft} color={solvoColors.brandText} fontSize="13px" wrap="wrap">
+            <Text>{t('chat.guestBanner')}</Text>
+            <Link href="/login" style={{ fontWeight: 700, color: solvoColors.brandText }}>
+              {t('chat.guestBannerCta')}
+            </Link>
+            <button
+              onClick={() => {
+                setGuestBannerHidden(true);
+                try {
+                  localStorage.setItem(GUEST_BANNER_KEY, '1');
+                } catch {
+                  /* ignore */
+                }
+              }}
+              aria-label={t('chat.dismiss')}
+              style={{ border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', display: 'flex' }}
+            >
+              <X size={14} />
+            </button>
+          </Flex>
+        )}
+
         <Flex flex="1" minWidth={0} overflow="hidden">
           {currentConvId === null && messages.length === 0 ? (
-            <ChatEmptyState onSend={handleSend} onGoHome={handleGoHome} />
+            <ChatEmptyState onSend={handleSend} onGoHome={goHome} zoneCode={zone.code ?? null} zoneName={zone.name ?? null} />
           ) : (
             <ChatThread
               messages={messages}
               waitingForAI={waitingForAI}
-              packageKeys={packageKeys}
-              onTogglePackage={handleTogglePackage}
-              onSelectProvider={handleSelectProvider}
-              onViewProfile={(p) => {
-                // Only real suppliers have a real DB id we can navigate to.
-                if (p.id > 0) router.push(`/providers/${p.id}`);
-              }}
-            />
-          )}
-
-          {/* Right: package panel — only beside active threads, not empty state */}
-          {(currentConvId !== null || messages.length > 0) && (
-            <PackagePanel
-              items={pkgState.items}
-              onRemove={handleRemovePackageItem}
-              onClear={handleClearPackage}
-              onRequestQuotes={() => {
-                // A package needs at least two providers — a single one is just
-                // a normal quote via the provider card's "Select".
-                if (pkgState.items.length < 2) return;
-                setRequestError(null);
-                setPackageQuoteOpen(true);
-              }}
-              isOpen={packageOpen}
-              onClose={() => setPackageOpen(false)}
+              onContact={handleContact}
+              onViewProfile={(s) => router.push(`/providers/${s.supplierId}`)}
             />
           )}
         </Flex>
+
         <ChatComposer
           onSend={handleSend}
           onStop={handleStop}
           disabled={waitingForAI}
-          model={currentModel}
-          onModelChange={setCurrentModel}
-          onShowOptions={shouldOfferOptions ? handleShowOptions : undefined}
+          zone={zone}
+          provinces={provinces}
+          onPickZone={pickZone}
+          onUseDeviceZone={selectDeviceZone}
         />
       </Flex>
-
-      {/* Floating "Package (N)" chip — only below lg, only when there's content */}
-      {(currentConvId !== null || messages.length > 0) && pkgState.items.length > 0 && (
-        <Box
-          display={{ base: 'flex', lg: 'none' }}
-          as="button"
-          position="fixed"
-          bottom="84px"
-          right="16px"
-          zIndex={900}
-          alignItems="center"
-          gap="6px"
-          padding="10px 14px"
-          borderRadius="9999px"
-          bg={solvoColors.accent}
-          color={solvoColors.accentFg}
-          cursor="pointer"
-          style={{
-            border: 'none',
-            boxShadow: solvoShadows.floatingPanel,
-            fontFamily: solvoFonts.sans,
-            fontSize: '13px',
-            fontWeight: 600,
-          }}
-          onClick={() => setPackageOpen(true)}
-          aria-label={`Open package (${pkgState.items.length} items)`}
-        >
-          <Sparkles size={14} />
-          Package ({pkgState.items.length})
-        </Box>
-      )}
-    </motion.div>
-    {feedbackBanner}
-    </>
+    </div>
   );
 }

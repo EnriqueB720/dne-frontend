@@ -4,6 +4,7 @@ import { FcGoogle } from 'react-icons/fc';
 import { FaGithub } from 'react-icons/fa';
 
 import { solvoColors, solvoFonts } from '@constants';
+import { useI18n } from '@/shared/i18n';
 
 type Provider = 'google' | 'github';
 
@@ -35,6 +36,7 @@ const SocialAuthButtons: React.FC<SocialAuthButtonsProps> = ({
   callbackUrl = '/',
   disabled = false,
 }) => {
+  const { t } = useI18n();
   const [pending, setPending] = useState<Provider | null>(null);
 
   const handle = (provider: Provider) => {
@@ -52,7 +54,7 @@ const SocialAuthButtons: React.FC<SocialAuthButtonsProps> = ({
         style={{ ...buttonStyle, opacity: disabled || pending ? 0.6 : 1 }}
       >
         <FcGoogle size={18} />
-        {pending === 'google' ? 'Connecting…' : 'Continue with Google'}
+        {pending === 'google' ? t('auth.connecting') : t('auth.continueGoogle')}
       </button>
 
       <button
@@ -62,7 +64,7 @@ const SocialAuthButtons: React.FC<SocialAuthButtonsProps> = ({
         style={{ ...buttonStyle, opacity: disabled || pending ? 0.6 : 1 }}
       >
         <FaGithub size={18} color={solvoColors.text} />
-        {pending === 'github' ? 'Connecting…' : 'Continue with GitHub'}
+        {pending === 'github' ? t('auth.connecting') : t('auth.continueGithub')}
       </button>
     </div>
   );

@@ -1,0 +1,132 @@
+# Card-sized supplier: chat results, browse list.
+fragment SupplierCard on Supplier {
+  supplierId
+  companyName
+  tagline
+  description
+  skills
+  city
+  province
+  provinceName
+  serviceProvinces
+  serviceProvinceNames
+  rating
+  reviewCount
+  verified
+  preferred
+  businessPhone
+  businessPhoneAlt
+  whatsappNumber
+  businessEmail
+  businessEmailAlt
+  websiteUrl
+  categories {
+    isPrimary
+    category {
+      categoryId
+      slug
+      nameEs
+      nameEn
+      icon
+    }
+  }
+  services {
+    serviceId
+    name
+    priceFrom
+    priceUnit
+    currency
+  }
+}
+
+# Everything the public profile and the owner's editor need.
+fragment SupplierFull on Supplier {
+  ...SupplierCard
+  address
+  verifiedAt
+  createdAt
+  services {
+    serviceId
+    name
+    description
+    priceFrom
+    priceUnit
+    currency
+  }
+}
+
+query searchSuppliers($data: SupplierSearchInput!) {
+  searchSuppliers(data: $data) {
+    province {
+      code
+      name
+      source
+    }
+    suppliers {
+      ...SupplierCard
+    }
+  }
+}
+
+query suppliers($province: String, $limit: Int) {
+  suppliers(province: $province, limit: $limit) {
+    ...SupplierCard
+  }
+}
+
+query supplier($supplierId: Int!) {
+  supplier(supplierId: $supplierId) {
+    ...SupplierFull
+  }
+}
+
+query mySupplier {
+  mySupplier {
+    ...SupplierFull
+  }
+  mySupplierStats {
+    contactsLast30Days
+    contactsTotal
+    contactsByChannel {
+      channel
+      count
+    }
+    reviewCount
+    rating
+  }
+}
+
+mutation updateMySupplier($data: SupplierUpdateInput!) {
+  updateMySupplier(data: $data) {
+    ...SupplierFull
+  }
+}
+
+mutation setMySupplierCategories($data: SupplierCategoriesInput!) {
+  setMySupplierCategories(data: $data)
+}
+
+mutation setMySupplierSkills($skills: [String!]!) {
+  setMySupplierSkills(skills: $skills)
+}
+
+query suggestMySupplierSkills {
+  suggestMySupplierSkills
+}
+
+mutation saveMyService($data: ServiceInput!) {
+  saveMyService(data: $data) {
+    serviceId
+    name
+    description
+    priceFrom
+    priceUnit
+    currency
+  }
+}
+
+mutation deleteMyService($serviceId: Int!) {
+  deleteMyService(serviceId: $serviceId)
+}
+
+

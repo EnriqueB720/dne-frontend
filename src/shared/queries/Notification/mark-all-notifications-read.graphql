@@ -1,3 +1,0 @@
-mutation markAllNotificationsAsRead($data: NotificationsMarkAllReadInput!) {
-  markAllNotificationsAsRead(data: $data)
-}

@@ -1,0 +1,79 @@
+query adminOverview($days: Int) {
+  adminOverview(days: $days) {
+    days
+    totals {
+      suppliers
+      verifiedSuppliers
+      pendingVerification
+      preferredSuppliers
+      customers
+      newSuppliers
+      newCustomers
+      contacts
+      uniqueContacters
+      chats
+    }
+    daily {
+      day
+      newSuppliers
+      newCustomers
+      contacts
+    }
+    contactsByChannel {
+      key
+      label
+      count
+    }
+    suppliersByProvince {
+      key
+      label
+      count
+    }
+    topSuppliers {
+      supplierId
+      companyName
+      provinceName
+      contacts
+      rating
+    }
+  }
+}
+
+query adminSuppliers($filter: AdminSupplierFilter) {
+  adminSuppliers(filter: $filter) {
+    total
+    rows {
+      supplierId
+      companyName
+      tagline
+      description
+      city
+      province
+      provinceName
+      categories
+      businessPhone
+      whatsappNumber
+      businessEmail
+      websiteUrl
+      ownerName
+      ownerEmail
+      source
+      verifiedAt
+      preferredAt
+      preferredUntil
+      preferred
+      rating
+      reviewCount
+      contactsLast30Days
+      createdAt
+    }
+  }
+}
+
+mutation adminSetSupplierVerified($supplierId: Int!, $verified: Boolean!) {
+  adminSetSupplierVerified(supplierId: $supplierId, verified: $verified)
+}
+
+mutation adminSetSupplierPreferred($data: AdminPreferredInput!) {
+  adminSetSupplierPreferred(data: $data)
+}

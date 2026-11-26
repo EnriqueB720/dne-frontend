@@ -1,6 +1,6 @@
 import * as React from 'react';
 import _ from 'lodash';
-import { Flex, Image, Text } from '@atoms';
+import { Flex, Text } from '@atoms';
 import { solvoColors, solvoFonts } from '@constants';
 
 export interface LogoProps {
@@ -35,15 +35,12 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, onClick }) =>
       cursor={onClick ? 'pointer' : 'default'}
       onClick={onClick}
     >
-      <Image
+      <img
         src={MARK_SRC}
         alt="Solvo"
-        width={dim.mark}
-        height={dim.mark}
-        objectFit="contain"
-        // The emblem's radiating rays read as noise below ~24px, so the mark
-        // is never scaled under the guidelines' floor.
-        minWidth={dim.mark}
+        width={parseInt(String(dim.mark), 10) || 32}
+        height={parseInt(String(dim.mark), 10) || 32}
+        style={{ objectFit: 'contain', minWidth: dim.mark }}
       />
       {showText && (
         <Text

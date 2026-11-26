@@ -1,8 +1,0 @@
-mutation toggleFavorite($data: FavoriteToggleInput!) {
-  toggleFavorite(data: $data) {
-    favoriteId
-    customerId
-    supplierId
-    wasAdded
-  }
-}

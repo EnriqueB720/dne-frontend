@@ -1,3 +1,0 @@
-mutation rollbackLastAiTurn($conversationId: String!, $deviceId: String) {
-  rollbackLastAiTurn(conversationId: $conversationId, deviceId: $deviceId)
-}

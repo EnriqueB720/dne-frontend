@@ -1,4 +1,4 @@
-import React, { FC, useCallback, useEffect, useState } from 'react';
+import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { useApolloClient } from '@apollo/client';
 import { signOut } from 'next-auth/react';
 
@@ -9,8 +9,10 @@ import { AuthService } from '@services';
 import { AuthProviderProps } from '@types';
 import { useLoginLazyQuery, useSignupMutation, useRefreshUserLazyQuery } from '@generated';
 import { StorageService } from '@services';
-import { useTranslation } from '@hooks';
-import { mergeGuestConversations } from '@/shared/services/conversation.service';
+import { mergeGuestData } from '@/shared/services/conversation.service';
+
+/** Well inside the API's one-hour token lifetime. */
+const TOKEN_RENEW_INTERVAL_MS = 15 * 60 * 1000;
 
 
 const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
@@ -25,12 +27,12 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     fetchPolicy: 'cache-and-network'
   });
 
+  // Never from cache: every call must mint a new token.
   const [refreshUser] = useRefreshUserLazyQuery({
-    fetchPolicy: 'cache-and-network'
+    fetchPolicy: 'network-only'
   })
 
   const [signupQuery] = useSignupMutation();
-  const { setLanguage } = useTranslation();
 
 
   useEffect(() => {
@@ -64,9 +66,6 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       }
 
 
-      StorageService.setLanguage(data?.login.user.language!);
-      setLanguage(data?.login.user.language!);
-
       StorageService.setJwtToken(data?.login!.access_token!);
 
       const user = new User(data?.login!.user! as any);
@@ -76,7 +75,7 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
 
       // Best-effort: claim any chats the user started as a guest on this
       // device. Non-blocking — login succeeds even if this fails.
-      mergeGuestConversations().catch(() => {});
+      mergeGuestData().catch(() => {});
 
       return true;
 
@@ -123,25 +122,33 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(false);
   };
 
+  // Guest chats only need claiming once per page load, not on every renewal.
+  const guestChatsMerged = useRef(false);
+
   const refreshUserToken = useCallback(async () => {
     try {
 
       let token = await StorageService.getJwtToken();
+      if (!token) return;
 
-
-      let { data } = await refreshUser({
+      let { data, error } = await refreshUser({
         variables: {
           data: token
         }
       });
 
-      if (data) {
-        StorageService.setLanguage(data?.refreshUser.user.language!);
-        setLanguage(data?.refreshUser.user.language!);
+      // A network blip isn't a verdict on the session — keep the current
+      // state and let the next renewal try again.
+      if (error?.networkError && !data) return;
 
-        StorageService.setJwtToken(data?.refreshUser!.access_token!);
+      // An expired or invalid token comes back as a GraphQL error (the API
+      // returns null for a non-null field), so anything but a token here
+      // means the session is over.
+      const refreshed = data?.refreshUser;
+      if (refreshed) {
+        StorageService.setJwtToken(refreshed.access_token!);
 
-        const user = new User(data?.refreshUser!.user! as any);
+        const user = new User(refreshed.user as any);
         setUser(user);
 
         setIsAuthenticated(true);
@@ -149,8 +156,12 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
         // Also claim guest chats on refresh — covers the case where the
         // user authenticated in another tab or restored a session via
         // localStorage without going through the login flow.
-        mergeGuestConversations().catch(() => {});
+        if (!guestChatsMerged.current) {
+          guestChatsMerged.current = true;
+          mergeGuestData().catch(() => {});
+        }
       } else {
+        await StorageService.removeJwtToken();
         setIsAuthenticated(false);
         setUser(undefined);
       }
@@ -159,6 +170,27 @@ const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       console.log(error.message)
     }
   }, [refreshUser, setIsAuthenticated, setUser]);
+
+  // Tokens live one hour, so renew them while the app is open: every few
+  // minutes, plus right away when a backgrounded tab comes back (browsers
+  // throttle timers in hidden tabs). Only an hour of no use signs you out.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const timer = setInterval(() => {
+      refreshUserToken();
+    }, TOKEN_RENEW_INTERVAL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshUserToken();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [isAuthenticated, refreshUserToken]);
 
   return (
     <AuthContext.Provider

@@ -1,862 +1,456 @@
-import { useContext, useMemo, useState } from 'react';
+import * as React from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import {
-  Activity,
-  CalendarClock,
-  DollarSign,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  TrendingUp,
-  Users,
-} from 'lucide-react';
+import { ShieldCheck, Star } from 'lucide-react';
 
-import AuthContext from '@/shared/contexts/auth.context';
-import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar } from '@components';
-import { solvoColors, solvoFonts, solvoShadows } from '@constants';
+import { Box, Btn, Card, Chip, Flex, Notice, PageTitle, SectionTitle, SolvoNavBar, Text, inputStyle } from '@components';
+import { solvoColors, solvoFonts } from '@constants';
 import {
-  PromotionTier,
-  useAdminStatsQuery,
+  AdminSupplierStatus,
+  useAdminOverviewQuery,
+  useAdminSetSupplierPreferredMutation,
+  useAdminSetSupplierVerifiedMutation,
   useAdminSuppliersQuery,
-  useAiUsageBreakdownQuery,
-  useRevenueByDayQuery,
-  useSetSupplierPromotionMutation,
-  useTopSuppliersQuery,
+  useProvincesQuery,
+  type AdminOverviewQuery,
 } from '@generated';
+import AuthContext from '@/shared/contexts/auth.context';
+import { useI18n } from '@/shared/i18n';
 
-// ── Helpers ─────────────────────────────────────────────────────────────
+type Tab = 'analytics' | 'verification' | 'preferred';
+const RANGES = [7, 30, 90];
+const PAGE_SIZE = 20;
 
-const formatMoney = (value: string | number | null | undefined, currency = 'CRC'): string => {
-  const n = typeof value === 'string' ? Number(value) : (value ?? 0);
-  if (!Number.isFinite(n)) return `${currency} 0`;
-  const symbol = currency === 'USD' ? '$' : currency === 'CRC' ? '₡' : `${currency} `;
-  return `${symbol}${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-};
-
-const formatInt = (n: number | null | undefined): string =>
-  (n ?? 0).toLocaleString();
-
-const isPromotionActive = (
-  tier: PromotionTier,
-  start?: string | null,
-  end?: string | null,
-): boolean => {
-  if (tier !== PromotionTier.Featured) return false;
-  const now = Date.now();
-  if (start && new Date(start).getTime() > now) return false;
-  if (end && new Date(end).getTime() < now) return false;
-  return true;
-};
-
-// ── Page ────────────────────────────────────────────────────────────────
-
+/**
+ * Admin (users with is_admin):
+ *  - Analytics: supplier sign-ups, customer sign-ups and customer→supplier
+ *    contacts over time, by channel, by province, top suppliers.
+ *  - Verification: queue of unverified suppliers → Verify.
+ *  - Preferred: pin suppliers to the top of chat results (optional end date).
+ */
 export default function AdminPage() {
-  const { user, isAuthenticated, isLoading } = useContext(AuthContext);
-  const adminUserId = user?.userId ?? 0;
-  const isAdmin = !!user?.isAdmin;
+  const { t } = useI18n();
+  const { user, isAuthenticated } = React.useContext(AuthContext);
+  const [tab, setTab] = React.useState<Tab>('analytics');
 
-  // Skip every query until we know the caller is an admin — keeps the
-  // backend from being hit with auth failures and stops the UI from
-  // flashing partial data on non-admin viewers.
-  const skip = !isAdmin || !adminUserId;
-  const statsQuery = useAdminStatsQuery({ variables: { adminUserId }, skip, fetchPolicy: 'cache-and-network' });
-  const topQuery = useTopSuppliersQuery({ variables: { adminUserId, limit: 10 }, skip, fetchPolicy: 'cache-and-network' });
-  const [aiWindow, setAiWindow] = useState<number>(30);
-  const aiQuery = useAiUsageBreakdownQuery({ variables: { adminUserId, daysBack: aiWindow }, skip, fetchPolicy: 'cache-and-network' });
-  const [revenueWindow, setRevenueWindow] = useState<number>(30);
-  const revenueQuery = useRevenueByDayQuery({ variables: { adminUserId, daysBack: revenueWindow }, skip, fetchPolicy: 'cache-and-network' });
-  const suppliersQuery = useAdminSuppliersQuery({ skip, fetchPolicy: 'cache-and-network' });
-
-  const [setPromotion, { loading: setPromotionLoading }] = useSetSupplierPromotionMutation({
-    refetchQueries: ['adminSuppliers', 'topSuppliers'],
-    awaitRefetchQueries: true,
-  });
-
-  const [pendingId, setPendingId] = useState<number | null>(null);
-  const [endDateInputs, setEndDateInputs] = useState<Record<number, string>>({});
-
-  const stats = statsQuery.data?.adminStats;
-  const top = topQuery.data?.topSuppliers ?? [];
-  const aiRows = aiQuery.data?.aiUsageBreakdown ?? [];
-  const suppliers = suppliersQuery.data?.suppliers ?? [];
-  const revenueRows = revenueQuery.data?.revenueByDay ?? [];
-
-  const revenueTotals = useMemo(() => {
-    const total = revenueRows.reduce((acc, r) => acc + Number(r.platformFee), 0);
-    const bookings = revenueRows.reduce((acc, r) => acc + r.bookings, 0);
-    const peak = revenueRows.reduce(
-      (acc, r) => Math.max(acc, Number(r.platformFee)),
-      0,
-    );
-    return { total, bookings, peak };
-  }, [revenueRows]);
-
-  const aiTotals = useMemo(() => {
-    return aiRows.reduce(
-      (acc, r) => {
-        acc.requests += r.requests;
-        acc.inputTokens += r.inputTokens;
-        acc.outputTokens += r.outputTokens;
-        acc.costUsd += Number(r.costUsd);
-        return acc;
-      },
-      { requests: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 },
-    );
-  }, [aiRows]);
-
-  // ── Gates ───────────────────────────────────────────────────────────
-  if (isLoading) {
-    return (
-      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-        <AtmosphericGlow />
-        <SolvoNavBar activePath="/admin" />
-      </Box>
-    );
-  }
-
-  if (!isAuthenticated || !user) {
-    return (
-      <GateCard
-        title="Sign in to continue"
-        body="The admin console requires an authenticated session."
-        ctaHref="/login"
-        ctaLabel="Sign in"
-      />
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <GateCard
-        title="Admins only"
-        body="Your account doesn't have admin privileges. If this is a mistake, contact the platform owner."
-        ctaHref="/dashboard"
-        ctaLabel="Go to dashboard"
-      />
-    );
-  }
-
-  // ── Handlers ────────────────────────────────────────────────────────
-  const onToggleFeatured = async (supplierId: number, currentTier: PromotionTier) => {
-    const nextTier =
-      currentTier === PromotionTier.Featured ? PromotionTier.None : PromotionTier.Featured;
-    const endDate = endDateInputs[supplierId];
-    setPendingId(supplierId);
-    try {
-      await setPromotion({
-        variables: {
-          data: {
-            adminUserId,
-            supplierId,
-            tier: nextTier,
-            endDate:
-              nextTier === PromotionTier.Featured && endDate ? new Date(endDate) : undefined,
-          },
-        },
-      });
-    } finally {
-      setPendingId(null);
-    }
-  };
-
-  // ── Render ──────────────────────────────────────────────────────────
   return (
-    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-      <AtmosphericGlow />
-      <SolvoNavBar activePath="/admin" />
-
-      <Box maxWidth="1200px" margin="0 auto" padding={{ base: '24px 16px', md: '40px 24px' }}>
-        {/* Header */}
-        <Flex justify="space-between" align="flex-end" wrap="wrap" gap="16px" marginBottom="28px">
-          <Box>
-            <Text
-              fontSize="xs"
-              fontWeight={600}
-              letterSpacing="0.14em"
-              color={solvoColors.indigo}
-              textTransform="uppercase"
-            >
-              Admin console
-            </Text>
-            <Text
-              fontFamily={solvoFonts.display}
-              fontSize={{ base: '32px', md: '40px' }}
-              color={solvoColors.text}
-              lineHeight="1.1"
-              marginTop="4px"
-            >
-              Solvo control center
-            </Text>
-            <Text color={solvoColors.textMuted} marginTop="8px" fontSize="sm">
-              Signed in as {user.name} · {user.email}
-            </Text>
-          </Box>
-        </Flex>
-
-        {/* Stats */}
-        <Box
-          display="grid"
-          gridTemplateColumns={{ base: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }}
-          gap="16px"
-          marginBottom="40px"
-        >
-          <StatCard
-            icon={<Users size={18} />}
-            tone="indigo"
-            label="Total users"
-            value={formatInt(stats?.totalUsers)}
-            sub={`${formatInt(stats?.totalCustomers)} customers`}
-            loading={statsQuery.loading && !stats}
-          />
-          <StatCard
-            icon={<ShieldCheck size={18} />}
-            tone="emerald"
-            label="Suppliers"
-            value={formatInt(stats?.totalSuppliers)}
-            sub="active providers"
-            loading={statsQuery.loading && !stats}
-          />
-          <StatCard
-            icon={<CalendarClock size={18} />}
-            tone="amber"
-            label="Total bookings"
-            value={formatInt(stats?.totalBookings)}
-            sub="all time"
-            loading={statsQuery.loading && !stats}
-          />
-          <StatCard
-            icon={<DollarSign size={18} />}
-            tone="rose"
-            label="Revenue (MTD)"
-            value={formatMoney(stats?.mtdRevenue, stats?.currency ?? 'CRC')}
-            sub={`${formatMoney(stats?.allTimeRevenue, stats?.currency ?? 'CRC')} all time`}
-            loading={statsQuery.loading && !stats}
-          />
-        </Box>
-
-        {/* Revenue trend chart */}
-        <Box marginBottom="20px">
-          <Panel
-            title="Revenue trend"
-            icon={<TrendingUp size={16} color={solvoColors.indigo} />}
-            right={
-              <Flex gap="6px">
-                {[7, 30, 90].map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setRevenueWindow(d)}
-                    style={{
-                      background:
-                        revenueWindow === d ? solvoColors.text : 'transparent',
-                      color:
-                        revenueWindow === d ? solvoColors.surface : solvoColors.textMuted,
-                      border: `1px solid ${revenueWindow === d ? solvoColors.text : solvoColors.border}`,
-                      borderRadius: '999px',
-                      padding: '4px 10px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {d}d
-                  </button>
-                ))}
-              </Flex>
-            }
-          >
-            <Flex justify="space-between" align="baseline" wrap="wrap" gap="12px" marginBottom="14px">
-              <Box>
-                <Text
-                  fontSize="xs"
-                  color={solvoColors.textSubtle}
-                  textTransform="uppercase"
-                  letterSpacing="0.1em"
+    <Box minHeight="100vh" bg={solvoColors.bg}>
+      <SolvoNavBar />
+      <Box maxWidth="1180px" margin="0 auto" padding={{ base: '20px 16px 60px', md: '32px 24px 80px' }}>
+        <PageTitle title={t('admin.title')} />
+        {!isAuthenticated || !user?.isAdmin ? (
+          <Notice tone="warn">
+            {t('admin.notAdmin')}{' '}
+            {!isAuthenticated && (
+              <Link href="/login?next=/admin" style={{ fontWeight: 700, color: 'inherit' }}>
+                {t('common.signIn')}
+              </Link>
+            )}
+          </Notice>
+        ) : (
+          <>
+            <Flex gap="4px" borderBottom="1px solid" borderColor={solvoColors.border} marginBottom="20px">
+              {(['analytics', 'verification', 'preferred'] as Tab[]).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setTab(k)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    padding: '10px 14px',
+                    fontSize: '14px',
+                    fontWeight: tab === k ? 700 : 500,
+                    color: tab === k ? solvoColors.text : solvoColors.textMuted,
+                    borderBottom: `2px solid ${tab === k ? solvoColors.accent : 'transparent'}`,
+                    cursor: 'pointer',
+                    marginBottom: '-1px',
+                  }}
                 >
-                  Platform fees · last {revenueWindow}d
-                </Text>
-                <Text fontFamily={solvoFonts.display} fontSize="28px" color={solvoColors.text}>
-                  {formatMoney(revenueTotals.total, stats?.currency ?? 'CRC')}
-                </Text>
-              </Box>
-              <Box textAlign="right">
-                <Text fontSize="xs" color={solvoColors.textSubtle}>
-                  {formatInt(revenueTotals.bookings)} bookings
-                </Text>
-                <Text fontSize="xs" color={solvoColors.textSubtle}>
-                  peak day {formatMoney(revenueTotals.peak, stats?.currency ?? 'CRC')}
-                </Text>
-              </Box>
+                  {t(`admin.tabs.${k}`)}
+                </button>
+              ))}
             </Flex>
-            <RevenueBars rows={revenueRows} loading={revenueQuery.loading && revenueRows.length === 0} />
-          </Panel>
-        </Box>
-
-        {/* Two-column: Top suppliers + AI usage */}
-        <Box
-          display="grid"
-          gridTemplateColumns={{ base: '1fr', lg: '3fr 2fr' }}
-          gap="20px"
-          marginBottom="40px"
-        >
-          {/* Top suppliers leaderboard */}
-          <Panel title="Top suppliers" icon={<TrendingUp size={16} color={solvoColors.indigo} />}>
-            {topQuery.loading && top.length === 0 ? (
-              <Text color={solvoColors.textMuted} fontSize="sm" padding="8px 0">
-                Loading…
-              </Text>
-            ) : top.length === 0 ? (
-              <Text color={solvoColors.textMuted} fontSize="sm" padding="8px 0">
-                No suppliers yet.
-              </Text>
-            ) : (
-              <Box>
-                {top.map((row, i) => (
-                  <Flex
-                    key={row.supplierId}
-                    align="center"
-                    justify="space-between"
-                    padding="12px 4px"
-                    borderTop={i === 0 ? undefined : `1px solid ${solvoColors.border}`}
-                    gap="12px"
-                  >
-                    <Flex align="center" gap="12px" minWidth={0}>
-                      <Box
-                        width="28px"
-                        height="28px"
-                        borderRadius="full"
-                        bg={solvoColors.bg}
-                        borderWidth="1px"
-                        borderStyle="solid"
-                        borderColor={solvoColors.border}
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                        flexShrink={0}
-                      >
-                        <Text fontSize="xs" fontWeight={600} color={solvoColors.textMuted}>
-                          {i + 1}
-                        </Text>
-                      </Box>
-                      <Box minWidth={0}>
-                        <Text fontWeight={600} color={solvoColors.text} fontSize="sm">
-                          {row.companyName}
-                        </Text>
-                        <Text fontSize="xs" color={solvoColors.textSubtle}>
-                          {row.city ?? '—'}
-                          {row.rating ? ` · ★ ${row.rating}` : ''}
-                        </Text>
-                      </Box>
-                    </Flex>
-                    <Flex align="center" gap="20px" flexShrink={0}>
-                      <Box textAlign="right">
-                        <Text fontSize="xs" color={solvoColors.textSubtle}>
-                          Bookings
-                        </Text>
-                        <Text fontSize="sm" fontWeight={600} color={solvoColors.text}>
-                          {row.bookingCount}
-                        </Text>
-                      </Box>
-                      <Box textAlign="right">
-                        <Text fontSize="xs" color={solvoColors.textSubtle}>
-                          Gross
-                        </Text>
-                        <Text fontSize="sm" fontWeight={600} color={solvoColors.text}>
-                          {formatMoney(row.grossRevenue)}
-                        </Text>
-                      </Box>
-                    </Flex>
-                  </Flex>
-                ))}
-              </Box>
-            )}
-          </Panel>
-
-          {/* AI usage panel */}
-          <Panel
-            title="AI usage"
-            icon={<Sparkles size={16} color={solvoColors.indigo} />}
-            right={
-              <Flex gap="6px">
-                {[7, 30, 90].map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setAiWindow(d)}
-                    style={{
-                      background: aiWindow === d ? solvoColors.text : 'transparent',
-                      color: aiWindow === d ? solvoColors.surface : solvoColors.textMuted,
-                      border: `1px solid ${aiWindow === d ? solvoColors.text : solvoColors.border}`,
-                      borderRadius: '999px',
-                      padding: '4px 10px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {d}d
-                  </button>
-                ))}
-              </Flex>
-            }
-          >
-            <Flex justify="space-between" align="baseline" marginBottom="14px">
-              <Box>
-                <Text fontSize="xs" color={solvoColors.textSubtle} textTransform="uppercase" letterSpacing="0.1em">
-                  Total spend
-                </Text>
-                <Text fontFamily={solvoFonts.display} fontSize="28px" color={solvoColors.text}>
-                  {formatMoney(aiTotals.costUsd, 'USD')}
-                </Text>
-              </Box>
-              <Box textAlign="right">
-                <Text fontSize="xs" color={solvoColors.textSubtle}>
-                  {formatInt(aiTotals.requests)} requests
-                </Text>
-                <Text fontSize="xs" color={solvoColors.textSubtle}>
-                  {formatInt(aiTotals.inputTokens + aiTotals.outputTokens)} tokens
-                </Text>
-              </Box>
-            </Flex>
-            {aiQuery.loading && aiRows.length === 0 ? (
-              <Text color={solvoColors.textMuted} fontSize="sm">
-                Loading…
-              </Text>
-            ) : aiRows.length === 0 ? (
-              <Text color={solvoColors.textMuted} fontSize="sm">
-                No AI requests in this window.
-              </Text>
-            ) : (
-              <Box>
-                {aiRows.map((r, i) => (
-                  <Flex
-                    key={r.modelName}
-                    justify="space-between"
-                    align="center"
-                    padding="10px 0"
-                    borderTop={i === 0 ? undefined : `1px solid ${solvoColors.border}`}
-                  >
-                    <Box minWidth={0}>
-                      <Text fontSize="sm" fontWeight={600} color={solvoColors.text}>
-                        {r.modelName}
-                      </Text>
-                      <Text fontSize="xs" color={solvoColors.textSubtle}>
-                        {formatInt(r.requests)} req · {formatInt(r.inputTokens)} in · {formatInt(r.outputTokens)} out
-                      </Text>
-                    </Box>
-                    <Text fontSize="sm" fontWeight={600} color={solvoColors.indigo}>
-                      {formatMoney(r.costUsd, 'USD')}
-                    </Text>
-                  </Flex>
-                ))}
-              </Box>
-            )}
-          </Panel>
-        </Box>
-
-        {/* Suppliers + Featured toggle table */}
-        <Panel
-          title="Sponsored placement"
-          icon={<Star size={16} color={solvoColors.indigo} />}
-          right={
-            <Text fontSize="xs" color={solvoColors.textSubtle}>
-              {suppliers.length} suppliers · Featured boosts ranking in search
-            </Text>
-          }
-        >
-          {suppliersQuery.loading && suppliers.length === 0 ? (
-            <Text color={solvoColors.textMuted} fontSize="sm" padding="8px 0">
-              Loading suppliers…
-            </Text>
-          ) : suppliers.length === 0 ? (
-            <Text color={solvoColors.textMuted} fontSize="sm" padding="8px 0">
-              No suppliers found.
-            </Text>
-          ) : (
-            <Box overflowX="auto">
-              <Box as="table" width="100%" minWidth="720px" style={{ borderCollapse: 'collapse' }}>
-                <Box as="thead">
-                  <Box as="tr">
-                    {['Supplier', 'City', 'Rating', 'Tier', 'Ends', 'Action'].map((h) => (
-                      <Box
-                        as="th"
-                        key={h}
-                        textAlign="left"
-                        fontSize="xs"
-                        color={solvoColors.textSubtle}
-                        textTransform="uppercase"
-                        letterSpacing="0.08em"
-                        padding="10px 8px"
-                        borderBottom={`1px solid ${solvoColors.border}`}
-                      >
-                        {h}
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-                <Box as="tbody">
-                  {suppliers.map((s) => {
-                    const active = isPromotionActive(
-                      s.promotionTier,
-                      s.promotionStartDate as string | null,
-                      s.promotionEndDate as string | null,
-                    );
-                    const endVal = endDateInputs[s.supplierId] ?? '';
-                    return (
-                      <Box as="tr" key={s.supplierId}>
-                        <Box as="td" padding="12px 8px" borderBottom={`1px solid ${solvoColors.border}`}>
-                          <Flex align="center" gap="8px">
-                            <Text fontWeight={600} color={solvoColors.text} fontSize="sm">
-                              {s.companyName}
-                            </Text>
-                            {s.verified ? <ShieldCheck size={12} color={solvoColors.indigo} /> : null}
-                          </Flex>
-                        </Box>
-                        <Box as="td" padding="12px 8px" borderBottom={`1px solid ${solvoColors.border}`}>
-                          <Text fontSize="sm" color={solvoColors.textMuted}>
-                            {s.city ?? '—'}
-                          </Text>
-                        </Box>
-                        <Box as="td" padding="12px 8px" borderBottom={`1px solid ${solvoColors.border}`}>
-                          <Text fontSize="sm" color={solvoColors.textMuted}>
-                            {s.rating ? `★ ${s.rating}` : '—'}{' '}
-                            <Text as="span" color={solvoColors.textSubtle} fontSize="xs">
-                              ({s.reviewCount ?? 0})
-                            </Text>
-                          </Text>
-                        </Box>
-                        <Box as="td" padding="12px 8px" borderBottom={`1px solid ${solvoColors.border}`}>
-                          {active ? (
-                            <Box
-                              display="inline-flex"
-                              alignItems="center"
-                              gap="6px"
-                              padding="3px 10px"
-                              borderRadius="full"
-                              bg={solvoColors.indigoLight}
-                              color={solvoColors.indigo}
-                              fontSize="xs"
-                              fontWeight={600}
-                            >
-                              <Sparkles size={12} /> Featured
-                            </Box>
-                          ) : (
-                            <Text fontSize="xs" color={solvoColors.textSubtle}>
-                              Standard
-                            </Text>
-                          )}
-                        </Box>
-                        <Box as="td" padding="12px 8px" borderBottom={`1px solid ${solvoColors.border}`}>
-                          <input
-                            type="date"
-                            value={endVal}
-                            onChange={(e) =>
-                              setEndDateInputs((prev) => ({
-                                ...prev,
-                                [s.supplierId]: e.target.value,
-                              }))
-                            }
-                            style={{
-                              border: `1px solid ${solvoColors.border}`,
-                              borderRadius: '8px',
-                              padding: '4px 8px',
-                              fontSize: '12px',
-                              color: solvoColors.text,
-                              background: solvoColors.surface,
-                            }}
-                          />
-                          {s.promotionEndDate ? (
-                            <Text fontSize="xs" color={solvoColors.textSubtle} marginTop="4px">
-                              currently:{' '}
-                              {new Date(s.promotionEndDate as string).toLocaleDateString()}
-                            </Text>
-                          ) : null}
-                        </Box>
-                        <Box as="td" padding="12px 8px" borderBottom={`1px solid ${solvoColors.border}`}>
-                          <button
-                            type="button"
-                            disabled={setPromotionLoading && pendingId === s.supplierId}
-                            onClick={() => onToggleFeatured(s.supplierId, s.promotionTier)}
-                            style={{
-                              background: active ? solvoColors.surface : solvoColors.text,
-                              color: active ? solvoColors.text : solvoColors.surface,
-                              border: `1px solid ${active ? solvoColors.border : solvoColors.text}`,
-                              borderRadius: '10px',
-                              padding: '6px 12px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              opacity:
-                                setPromotionLoading && pendingId === s.supplierId ? 0.6 : 1,
-                            }}
-                          >
-                            {setPromotionLoading && pendingId === s.supplierId
-                              ? '…'
-                              : active
-                                ? 'Clear'
-                                : 'Feature'}
-                          </button>
-                        </Box>
-                      </Box>
-                    );
-                  })}
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </Panel>
+            {tab === 'analytics' && <Analytics />}
+            {tab === 'verification' && <SupplierTable mode="verification" />}
+            {tab === 'preferred' && <SupplierTable mode="preferred" />}
+          </>
+        )}
       </Box>
     </Box>
   );
 }
 
-// ── Subcomponents ───────────────────────────────────────────────────────
+// ── Analytics ────────────────────────────────────────────────────────────
 
-type Tone = 'indigo' | 'emerald' | 'amber' | 'rose';
+function Analytics() {
+  const { t } = useI18n();
+  const [days, setDays] = React.useState(30);
+  const { data, loading, error } = useAdminOverviewQuery({ variables: { days }, fetchPolicy: 'cache-and-network' });
+  const o = data?.adminOverview;
 
-const toneStyles: Record<Tone, { bg: string; color: string }> = {
-  indigo: { bg: solvoColors.brandSoft, color: solvoColors.brandText },
-  emerald: { bg: solvoColors.emeraldLight, color: solvoColors.emeraldText },
-  amber: { bg: solvoColors.amberLight, color: solvoColors.amberText },
-  rose: { bg: solvoColors.roseLight, color: solvoColors.roseText },
-};
+  if (error) return <Notice tone="error">{error.message}</Notice>;
+  if (!o) return <Text color={solvoColors.textSubtle}>{loading ? t('common.loading') : t('admin.none')}</Text>;
 
-function StatCard({
-  icon,
-  tone,
-  label,
-  value,
-  sub,
-  loading,
-}: {
-  icon: React.ReactNode;
-  tone: Tone;
-  label: string;
-  value: string;
-  sub?: string;
-  loading?: boolean;
-}) {
-  const s = toneStyles[tone];
+  const k = o.totals;
+  const tiles: Array<[string, number, string?]> = [
+    [t('admin.kpi.newSuppliers'), k.newSuppliers, t('admin.lastDays', { n: days })],
+    [t('admin.kpi.newCustomers'), k.newCustomers, t('admin.lastDays', { n: days })],
+    [t('admin.kpi.contacts'), k.contacts, t('admin.lastDays', { n: days })],
+    [t('admin.kpi.uniqueContacters'), k.uniqueContacters, t('admin.lastDays', { n: days })],
+    [t('admin.kpi.suppliers'), k.suppliers],
+    [t('admin.kpi.pending'), k.pendingVerification],
+    [t('admin.kpi.preferred'), k.preferredSuppliers],
+    [t('admin.kpi.chats'), k.chats, t('admin.lastDays', { n: days })],
+  ];
+
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-      <Box
-        bg={solvoColors.surface}
-        borderWidth="1px"
-        borderStyle="solid"
-        borderColor={solvoColors.border}
-        borderRadius="16px"
-        padding="18px"
-        minHeight="120px"
-      >
-        <Flex justify="space-between" align="flex-start">
-          <Box
-            width="36px"
-            height="36px"
-            borderRadius="10px"
-            bg={s.bg}
-            color={s.color}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
+    <Flex direction="column" gap="16px">
+      <Flex gap="6px">
+        {RANGES.map((n) => (
+          <button
+            key={n}
+            onClick={() => setDays(n)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '9999px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: `1px solid ${days === n ? solvoColors.text : solvoColors.border}`,
+              background: days === n ? solvoColors.text : solvoColors.surface,
+              color: days === n ? solvoColors.surface : solvoColors.textMuted,
+            }}
           >
-            {icon}
-          </Box>
-          <Activity size={14} color={solvoColors.textSubtle} />
-        </Flex>
-        <Text
-          fontFamily={solvoFonts.display}
-          fontSize="28px"
-          color={solvoColors.text}
-          marginTop="10px"
-          lineHeight="1.1"
-        >
-          {loading ? '—' : value}
-        </Text>
-        <Text fontSize="sm" color={solvoColors.textMuted} marginTop="2px">
-          {label}
-        </Text>
-        {sub ? (
-          <Text fontSize="xs" color={solvoColors.textSubtle} marginTop="4px">
-            {sub}
-          </Text>
-        ) : null}
+            {t('admin.lastDays', { n })}
+          </button>
+        ))}
+      </Flex>
+
+      <Box display="grid" gridTemplateColumns={{ base: '1fr 1fr', md: 'repeat(4, 1fr)' }} gap="10px">
+        {tiles.map(([label, value, sub]) => (
+          <Card key={label} padding="14px 16px">
+            <Text fontFamily={solvoFonts.display} fontSize="28px" fontWeight={700} color={solvoColors.text}>
+              {value.toLocaleString()}
+            </Text>
+            <Text fontSize="13px" color={solvoColors.textMuted}>
+              {label}
+            </Text>
+            {sub && (
+              <Text fontSize="11px" color={solvoColors.textSubtle}>
+                {sub}
+              </Text>
+            )}
+          </Card>
+        ))}
       </Box>
-    </motion.div>
+
+      <Card>
+        <SectionTitle>{t('admin.daily')}</SectionTitle>
+        {/* Small multiples: each metric on its own axis (never a dual axis). */}
+        <Box display="grid" gridTemplateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap="20px">
+          <DailyBars title={t('admin.legendSuppliers')} rows={o.daily} pick={(r) => r.newSuppliers} />
+          <DailyBars title={t('admin.legendCustomers')} rows={o.daily} pick={(r) => r.newCustomers} />
+          <DailyBars title={t('admin.legendContacts')} rows={o.daily} pick={(r) => r.contacts} />
+        </Box>
+      </Card>
+
+      <Box display="grid" gridTemplateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap="16px">
+        <Card>
+          <SectionTitle>{t('admin.byChannel')}</SectionTitle>
+          <HBars rows={o.contactsByChannel} />
+        </Card>
+        <Card>
+          <SectionTitle>{t('admin.byProvince')}</SectionTitle>
+          <HBars rows={o.suppliersByProvince} />
+        </Card>
+        <Card>
+          <SectionTitle>{t('admin.top')}</SectionTitle>
+          {o.topSuppliers.length === 0 ? (
+            <Text fontSize="sm" color={solvoColors.textSubtle}>
+              {t('admin.none')}
+            </Text>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <tbody>
+                {o.topSuppliers.map((s) => (
+                  <tr key={s.supplierId} style={{ borderTop: `1px solid ${solvoColors.border}` }}>
+                    <td style={{ padding: '7px 0', color: solvoColors.text }}>
+                      <Link href={`/providers/${s.supplierId}`} style={{ color: 'inherit', textDecoration: 'none', fontWeight: 600 }}>
+                        {s.companyName}
+                      </Link>
+                      <div style={{ color: solvoColors.textSubtle, fontSize: '11px' }}>{s.provinceName ?? '—'}</div>
+                    </td>
+                    <td style={{ padding: '7px 0', textAlign: 'right', color: solvoColors.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{s.contacts}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+      </Box>
+    </Flex>
   );
 }
 
-function RevenueBars({
-  rows,
-  loading,
-}: {
-  rows: { day: string; platformFee: string; bookings: number }[];
-  loading?: boolean;
-}) {
-  if (loading) {
-    return (
-      <Text color={solvoColors.textMuted} fontSize="sm" padding="8px 0">
-        Loading…
-      </Text>
-    );
-  }
-  if (rows.length === 0) {
-    return (
-      <Text color={solvoColors.textMuted} fontSize="sm" padding="8px 0">
-        No revenue yet.
-      </Text>
-    );
-  }
+type DailyRow = AdminOverviewQuery['adminOverview']['daily'][number];
 
-  const max = Math.max(...rows.map((r) => Number(r.platformFee)), 1);
-  // Pick a handful of evenly-spaced labels along the x-axis so they fit
-  // within the card at any window size (7 / 30 / 90).
-  const labelCount = Math.min(rows.length, 7);
-  const labelRows = Array.from({ length: labelCount }, (_, k) => {
-    const idx = Math.round((k * (rows.length - 1)) / Math.max(labelCount - 1, 1));
-    return rows[idx];
-  });
+/** One metric per day. Single series → one hue; hover shows the exact value. */
+function DailyBars({ title, rows, pick }: { title: string; rows: DailyRow[]; pick: (r: DailyRow) => number }) {
+  const { locale } = useI18n();
+  const [hover, setHover] = React.useState<number | null>(null);
+  const values = rows.map(pick);
+  const max = Math.max(1, ...values);
+  const total = values.reduce((a, b) => a + b, 0);
+  const W = 300;
+  const H = 96;
+  const gap = 2;
+  const bw = Math.max(1, W / rows.length - gap);
+  const label = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 
   return (
     <Box>
-      <Flex
-        align="flex-end"
-        justify="space-between"
-        gap="3px"
-        height="140px"
-        padding="0 2px"
-      >
-        {rows.map((r, i) => {
-          const value = Number(r.platformFee);
-          const pct = (value / max) * 100;
-          // Always show at least a sliver for days with any bookings, so
-          // small-but-nonzero days don't look identical to empty ones.
-          const heightPct = value > 0 ? Math.max(pct, 4) : 0;
+      <Flex justify="space-between" align="baseline" marginBottom="6px">
+        <Text fontSize="13px" fontWeight={600} color={solvoColors.textMuted}>
+          {title}
+        </Text>
+        <Text fontSize="13px" fontWeight={700} color={solvoColors.text} style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {hover != null ? `${label(rows[hover].day)}: ${values[hover]}` : total}
+        </Text>
+      </Flex>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={`${title}: ${total}`} onMouseLeave={() => setHover(null)}>
+        <line x1={0} y1={H - 0.5} x2={W} y2={H - 0.5} stroke={solvoColors.border} strokeWidth={1} />
+        {values.map((v, i) => {
+          const h = v === 0 ? 0 : Math.max(3, (v / max) * (H - 8));
+          const x = i * (bw + gap);
           return (
-            <Box
-              key={r.day}
-              flex="1"
-              height="100%"
-              display="flex"
-              alignItems="flex-end"
-              title={`${r.day} · ${value.toLocaleString()} · ${r.bookings} booking${r.bookings === 1 ? '' : 's'}`}
-            >
-              <Box
-                width="100%"
-                height={`${heightPct}%`}
-                borderRadius="4px 4px 0 0"
-                style={{
-                  background:
-                    value > 0
-                      ? `linear-gradient(180deg, ${solvoColors.indigo} 0%, ${solvoColors.indigoMid} 100%)`
-                      : solvoColors.border,
-                  minHeight: value > 0 ? '4px' : '2px',
-                  transition: 'height 0.3s ease',
-                }}
-              />
-            </Box>
+            <g key={rows[i].day} onMouseEnter={() => setHover(i)}>
+              {/* Hit target taller than the mark. */}
+              <rect x={x} y={0} width={bw + gap} height={H} fill="transparent" />
+              {h > 0 && (
+                <path
+                  d={`M${x},${H} V${H - h + Math.min(4, h)} Q${x},${H - h} ${x + Math.min(4, bw / 2)},${H - h} H${x + bw - Math.min(4, bw / 2)} Q${x + bw},${H - h} ${x + bw},${H - h + Math.min(4, h)} V${H} Z`}
+                  fill={solvoColors.brand}
+                  opacity={hover == null || hover === i ? 1 : 0.45}
+                />
+              )}
+            </g>
           );
         })}
-      </Flex>
-      <Flex justify="space-between" marginTop="8px" padding="0 2px">
-        {labelRows.map((r) => (
-          <Text
-            key={r.day}
-            fontSize="10px"
-            color={solvoColors.textSubtle}
-            style={{ whiteSpace: 'nowrap' }}
-          >
-            {r.day.slice(5)}
-          </Text>
-        ))}
+      </svg>
+      <Flex justify="space-between" fontSize="11px" color={solvoColors.textSubtle} marginTop="2px">
+        <Text>{rows[0] ? label(rows[0].day) : ''}</Text>
+        <Text>{rows.length ? label(rows[rows.length - 1].day) : ''}</Text>
       </Flex>
     </Box>
   );
 }
 
-function Panel({
-  title,
-  icon,
-  right,
-  children,
-}: {
-  title: string;
-  icon?: React.ReactNode;
-  right?: React.ReactNode;
-  children: React.ReactNode;
-}) {
+function HBars({ rows }: { rows: Array<{ key: string; label: string; count: number }> }) {
+  const { t } = useI18n();
+  if (rows.length === 0) {
+    return (
+      <Text fontSize="sm" color={solvoColors.textSubtle}>
+        {t('admin.none')}
+      </Text>
+    );
+  }
+  const max = Math.max(1, ...rows.map((r) => r.count));
   return (
-    <Box
-      bg={solvoColors.surface}
-      borderWidth="1px"
-      borderStyle="solid"
-      borderColor={solvoColors.border}
-      borderRadius="16px"
-      padding="20px"
-      style={{ boxShadow: solvoShadows.cardRest }}
-    >
-      <Flex justify="space-between" align="center" marginBottom="14px" gap="12px" wrap="wrap">
-        <Flex align="center" gap="8px">
-          {icon}
-          <Text fontWeight={600} color={solvoColors.text}>
-            {title}
-          </Text>
-        </Flex>
-        {right}
-      </Flex>
-      {children}
-    </Box>
-  );
-}
-
-function GateCard({
-  title,
-  body,
-  ctaHref,
-  ctaLabel,
-}: {
-  title: string;
-  body: string;
-  ctaHref: string;
-  ctaLabel: string;
-}) {
-  return (
-    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-      <AtmosphericGlow />
-      <SolvoNavBar activePath="/admin" />
-      <Flex minHeight="60vh" align="center" justify="center" padding="24px">
-        <Box
-          bg={solvoColors.surface}
-          borderWidth="1px"
-          borderStyle="solid"
-          borderColor={solvoColors.border}
-          borderRadius="16px"
-          padding="28px"
-          maxWidth="440px"
-          textAlign="center"
-        >
-          <Text fontFamily={solvoFonts.display} fontSize="24px" color={solvoColors.text} marginBottom="8px">
-            {title}
-          </Text>
-          <Text color={solvoColors.textMuted} fontSize="sm" marginBottom="18px">
-            {body}
-          </Text>
-          <Link href={ctaHref} style={{ textDecoration: 'none' }}>
-            <Box
-              display="inline-block"
-              padding="10px 18px"
-              borderRadius="10px"
-              bg={solvoColors.accent}
-              color={solvoColors.accentFg}
-              fontWeight={600}
-              fontSize="14px"
-              cursor="pointer"
-            >
-              {ctaLabel}
-            </Box>
-          </Link>
+    <Flex direction="column" gap="8px">
+      {rows.map((r) => (
+        <Box key={r.key}>
+          <Flex justify="space-between" fontSize="13px" marginBottom="3px">
+            <Text color={solvoColors.textMuted}>{r.label}</Text>
+            <Text color={solvoColors.text} fontWeight={700} style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {r.count}
+            </Text>
+          </Flex>
+          <Box height="8px" bg={solvoColors.surfaceMuted} borderRadius="4px">
+            <Box height="8px" width={`${(r.count / max) * 100}%`} bg={solvoColors.brand} borderRadius="4px" />
+          </Box>
         </Box>
+      ))}
+    </Flex>
+  );
+}
+
+// ── Verification & preferred ─────────────────────────────────────────────
+
+function SupplierTable({ mode }: { mode: 'verification' | 'preferred' }) {
+  const { t, locale } = useI18n();
+  const [search, setSearch] = React.useState('');
+  const [debounced, setDebounced] = React.useState('');
+  const [status, setStatus] = React.useState<AdminSupplierStatus>(mode === 'verification' ? AdminSupplierStatus.Unverified : AdminSupplierStatus.All);
+  const [province, setProvince] = React.useState('');
+  const [offset, setOffset] = React.useState(0);
+  const [until, setUntil] = React.useState<Record<number, string>>({});
+  const { data: prov } = useProvincesQuery();
+
+  React.useEffect(() => {
+    const id = setTimeout(() => setDebounced(search), 300);
+    return () => clearTimeout(id);
+  }, [search]);
+  React.useEffect(() => setOffset(0), [debounced, status, province]);
+
+  const { data, loading, refetch } = useAdminSuppliersQuery({
+    variables: { filter: { search: debounced || undefined, status, province: province || undefined, limit: PAGE_SIZE, offset } },
+    fetchPolicy: 'cache-and-network',
+  });
+  const [setVerified] = useAdminSetSupplierVerifiedMutation();
+  const [setPreferred] = useAdminSetSupplierPreferredMutation();
+
+  const rows = data?.adminSuppliers.rows ?? [];
+  const total = data?.adminSuppliers.total ?? 0;
+  const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(locale) : '');
+
+  const filters: Array<[AdminSupplierStatus, string]> = [
+    [AdminSupplierStatus.All, t('admin.filterAll')],
+    [AdminSupplierStatus.Unverified, t('admin.filterUnverified')],
+    [AdminSupplierStatus.Verified, t('admin.filterVerified')],
+    [AdminSupplierStatus.Preferred, t('admin.filterPreferred')],
+  ];
+
+  return (
+    <Flex direction="column" gap="12px">
+      <Notice>{mode === 'verification' ? t('admin.verificationHint') : t('admin.preferredHint')}</Notice>
+      <Flex gap="8px" wrap="wrap" align="center">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('admin.search')} style={{ ...inputStyle, maxWidth: '320px' }} />
+        <select value={province} onChange={(e) => setProvince(e.target.value)} style={{ ...inputStyle, width: 'auto' }}>
+          <option value="">{t('common.allCountry')}</option>
+          {(prov?.provinces ?? []).map((p) => (
+            <option key={p.code} value={p.code}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <Flex gap="4px" wrap="wrap">
+          {filters.map(([v, label]) => (
+            <button
+              key={v}
+              onClick={() => setStatus(v)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '9999px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: `1px solid ${status === v ? solvoColors.text : solvoColors.border}`,
+                background: status === v ? solvoColors.text : solvoColors.surface,
+                color: status === v ? solvoColors.surface : solvoColors.textMuted,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </Flex>
       </Flex>
-    </Box>
+
+      {loading && rows.length === 0 ? (
+        <Text color={solvoColors.textSubtle}>{t('common.loading')}</Text>
+      ) : rows.length === 0 ? (
+        <Card>
+          <Text color={solvoColors.textSubtle}>{t('admin.noResults')}</Text>
+        </Card>
+      ) : (
+        <Flex direction="column" gap="8px">
+          {rows.map((s) => (
+            <Card key={s.supplierId} padding="14px 16px">
+              <Flex justify="space-between" gap="14px" wrap="wrap" align="flex-start">
+                <Box minWidth={0} flex="1">
+                  <Flex align="center" gap="6px" wrap="wrap">
+                    <Link href={`/providers/${s.supplierId}`} style={{ color: solvoColors.text, fontWeight: 700, textDecoration: 'none' }}>
+                      {s.companyName}
+                    </Link>
+                    {s.verifiedAt ? (
+                      <Chip tone="success">
+                        <ShieldCheck size={12} /> {t('common.verified')}
+                      </Chip>
+                    ) : (
+                      <Chip>{t('common.notVerified')}</Chip>
+                    )}
+                    {s.preferred && (
+                      <Chip tone="brand">
+                        <Star size={12} /> {t('common.preferred')}
+                        {s.preferredUntil ? ` · ${t('admin.until')} ${fmt(s.preferredUntil)}` : ''}
+                      </Chip>
+                    )}
+                  </Flex>
+                  <Text fontSize="13px" color={solvoColors.textMuted} marginTop="2px">
+                    {[s.city, s.provinceName].filter(Boolean).join(', ') || '—'} · {s.categories.join(', ') || '—'}
+                  </Text>
+                  {s.tagline && (
+                    <Text fontSize="13px" color={solvoColors.textSubtle}>
+                      {s.tagline}
+                    </Text>
+                  )}
+                  <Text fontSize="12px" color={solvoColors.textSubtle} marginTop="4px">
+                    {t('admin.owner')}: {s.ownerName} ({s.ownerEmail}) · {t('admin.joined', { date: fmt(s.createdAt) })} · {t('admin.contacts30', { n: s.contactsLast30Days })}
+                  </Text>
+                  <Text fontSize="12px" color={solvoColors.textSubtle}>
+                    {[s.businessPhone, s.whatsappNumber && `WA ${s.whatsappNumber}`, s.businessEmail, s.websiteUrl].filter(Boolean).join(' · ') || '—'}
+                  </Text>
+                </Box>
+                <Flex gap="6px" align="center" wrap="wrap">
+                  {mode === 'verification' ? (
+                    <Btn
+                      variant={s.verifiedAt ? 'secondary' : 'primary'}
+                      onClick={async () => {
+                        await setVerified({ variables: { supplierId: s.supplierId, verified: !s.verifiedAt } });
+                        await refetch();
+                      }}
+                    >
+                      {s.verifiedAt ? t('admin.unverify') : t('admin.verify')}
+                    </Btn>
+                  ) : s.preferred ? (
+                    <Btn
+                      variant="secondary"
+                      onClick={async () => {
+                        await setPreferred({ variables: { data: { supplierId: s.supplierId, preferred: false } } });
+                        await refetch();
+                      }}
+                    >
+                      {t('admin.removePreferred')}
+                    </Btn>
+                  ) : (
+                    <>
+                      <input
+                        type="date"
+                        aria-label={t('admin.until')}
+                        title={`${t('admin.until')} (${t('admin.noEnd')})`}
+                        value={until[s.supplierId] ?? ''}
+                        onChange={(e) => setUntil({ ...until, [s.supplierId]: e.target.value })}
+                        style={{ ...inputStyle, width: 'auto', padding: '8px 10px' }}
+                      />
+                      <Btn
+                        onClick={async () => {
+                          const d = until[s.supplierId];
+                          await setPreferred({ variables: { data: { supplierId: s.supplierId, preferred: true, until: d ? new Date(`${d}T23:59:59`).toISOString() : undefined } } });
+                          await refetch();
+                        }}
+                      >
+                        {t('admin.makePreferred')}
+                      </Btn>
+                    </>
+                  )}
+                </Flex>
+              </Flex>
+            </Card>
+          ))}
+        </Flex>
+      )}
+
+      {total > PAGE_SIZE && (
+        <Flex justify="space-between" align="center">
+          <Btn variant="secondary" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>
+            {t('admin.prev')}
+          </Btn>
+          <Text fontSize="13px" color={solvoColors.textSubtle}>
+            {t('admin.pageOf', { from: offset + 1, to: Math.min(offset + PAGE_SIZE, total), total })}
+          </Text>
+          <Btn variant="secondary" disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)}>
+            {t('admin.next')}
+          </Btn>
+        </Flex>
+      )}
+    </Flex>
   );
 }

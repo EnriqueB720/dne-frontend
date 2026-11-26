@@ -1,3 +1,0 @@
-mutation deleteAiConversation($conversationId: String!, $deviceId: String) {
-  deleteAiConversation(conversationId: $conversationId, deviceId: $deviceId)
-}

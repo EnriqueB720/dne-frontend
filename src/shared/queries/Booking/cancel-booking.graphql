@@ -1,9 +1,0 @@
-mutation cancelBooking($data: BookingCancelInput!) {
-  cancelBooking(data: $data) {
-    bookingId
-    status
-    cancelledAt
-    cancellationReason
-    cancelledBy
-  }
-}

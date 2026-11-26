@@ -1,712 +1,291 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import {
-  ArrowLeft,
-  Calendar,
-  Globe,
-  Heart,
-  Mail,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  Sparkles,
-  Star,
-} from 'lucide-react';
-import { AtmosphericGlow, Box, Flex, Text, SolvoNavBar, Pill } from '@components';
-import { solvoColors, solvoFonts } from '@constants';
+import { MapPin, ShieldCheck } from 'lucide-react';
+
+import { Box, Btn, Card, Chip, ContactLinks, Flex, Notice, SectionTitle, SolvoNavBar, StarInput, Stars, Text, inputStyle } from '@components';
+import { solvoColors, solvoFonts, solvoShadows } from '@constants';
+import { useDeleteReviewMutation, useSaveReviewMutation, useSupplierQuery, useSupplierReviewsQuery } from '@generated';
 import AuthContext from '@/shared/contexts/auth.context';
-import {
-  PromotionTier,
-  useFavoritesByCustomerQuery,
-  useSupplierQuery,
-  useToggleFavoriteMutation,
-} from '@generated';
+import { useI18n } from '@/shared/i18n';
+import { categoryName, formatPrice } from '@/shared/lib/supplier';
 
 /**
- * Whether a supplier currently qualifies for the "Sponsored" badge. Treats
- * an expired or future-dated FEATURED promotion as inactive.
+ * Public supplier profile: who they are, where they work, how to contact
+ * them and what customers say. Anyone can view it; signed-in
+ * customers can leave (or edit) one review.
  */
-function isSponsoredActive(
-  tier: PromotionTier | null | undefined,
-  startDate: unknown,
-  endDate: unknown,
-): boolean {
-  if (tier !== PromotionTier.Featured) return false;
-  const now = Date.now();
-  if (startDate && new Date(startDate as string).getTime() > now) return false;
-  if (endDate && new Date(endDate as string).getTime() < now) return false;
-  return true;
-}
-
-const PHOTO_TILES = ['🍽️', '🥗', '🍰', '🥂', '🌮'];
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
-/** Images are streamed through our API, not linked straight to Drive. */
-const mediaSrc = (mediaAssetId: number) => `${API_BASE}/files/media/${mediaAssetId}`;
-
-const formatColones = (value: string | number | null | undefined): string => {
-  if (value == null) return '—';
-  const n = typeof value === 'string' ? Number(value) : value;
-  if (!Number.isFinite(n)) return '—';
-  if (n >= 1_000_000) return `₡${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `₡${Math.round(n / 1_000)}k`;
-  return `₡${Math.round(n).toLocaleString('en-US')}`;
-};
-
-const formatReviewDate = (iso: string): string => {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-};
-
-const initialsFrom = (id: number): string =>
-  String.fromCharCode(65 + (id % 26));
-
-export default function ProviderProfile() {
+export default function SupplierProfilePage() {
   const router = useRouter();
-  const { id } = router.query;
-  const supplierId = useMemo(() => {
-    const raw = Array.isArray(id) ? id[0] : id;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  }, [id]);
+  const { t, lang, locale } = useI18n();
+  const { user, isAuthenticated } = React.useContext(AuthContext);
+  const supplierId = Number(router.query.id);
+  const valid = Number.isFinite(supplierId) && supplierId > 0;
 
-  const { user, isAuthenticated } = useContext(AuthContext);
-  const customerId = user?.customerId ?? null;
+  const { data, loading, error, refetch } = useSupplierQuery({ variables: { supplierId }, skip: !valid });
+  const reviewsQuery = useSupplierReviewsQuery({ variables: { supplierId }, skip: !valid, fetchPolicy: 'cache-and-network' });
+  const [saveReview, saveState] = useSaveReviewMutation();
+  const [deleteReview] = useDeleteReviewMutation();
 
-  const supplierQuery = useSupplierQuery({
-    variables: { where: { supplierId: supplierId ?? 0 } },
-    skip: !supplierId,
-    fetchPolicy: 'cache-and-network',
-  });
-  const supplier = supplierQuery.data?.supplier ?? null;
+  const s = data?.supplier;
+  const reviews = reviewsQuery.data?.supplierReviews ?? [];
+  const mine = reviews.find((r) => r.isMine);
+  const isOwn = user?.supplierId != null && user.supplierId === supplierId;
 
-  // Favorites — only fetched for signed-in customers
-  const favoritesQuery = useFavoritesByCustomerQuery({
-    variables: { customerId: customerId ?? 0 },
-    skip: !customerId,
-    fetchPolicy: 'cache-and-network',
-  });
-  const isFavorited = useMemo(() => {
-    if (!supplier || !customerId) return false;
-    return !!favoritesQuery.data?.favoritesByCustomer.find(
-      (f: any) => f.supplierId === supplier.supplierId,
-    );
-  }, [favoritesQuery.data, supplier, customerId]);
-
-  const [toggleFavorite, toggleState] = useToggleFavoriteMutation();
-  const [optimistic, setOptimistic] = useState<boolean | null>(null);
-  const showFavorited = optimistic ?? isFavorited;
-
-  /**
-   * Five gallery tiles: the supplier's uploaded photos first, padded out
-   * with the illustrated placeholders so the grid never collapses.
-   */
-  const galleryTiles = useMemo(() => {
-    const uploaded = (supplier?.media ?? []) as Array<{
-      mediaAssetId: number;
-      url: string;
-      altText?: string | null;
-    }>;
-    return PHOTO_TILES.map((emoji, i) => {
-      const photo = uploaded[i];
-      return {
-        key: photo ? `media-${photo.mediaAssetId}` : `placeholder-${i}`,
-        // Streamed through our API — see GET /files/media/:id.
-        url: photo ? mediaSrc(photo.mediaAssetId) : null,
-        altText: photo?.altText ?? null,
-        emoji,
-      };
-    });
-  }, [supplier]);
-
-  /** Published contact channels, in the order they're revealed. */
-  const contactChannels = useMemo(() => {
-    if (!supplier) return [];
-    const channels: Array<{
-      kind: 'phone' | 'email' | 'website';
-      value: string;
-      href: string;
-    }> = [];
-
-    for (const phone of [supplier.businessPhone, supplier.businessPhoneAlt]) {
-      if (phone?.trim()) {
-        channels.push({
-          kind: 'phone',
-          value: phone.trim(),
-          href: `tel:${phone.replace(/[^\d+]/g, '')}`,
-        });
-      }
+  const [rating, setRating] = React.useState(0);
+  const [text, setText] = React.useState('');
+  const [reviewError, setReviewError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (mine) {
+      setRating(mine.rating);
+      setText(mine.text ?? '');
     }
-    for (const email of [supplier.businessEmail, supplier.businessEmailAlt]) {
-      if (email?.trim()) {
-        channels.push({
-          kind: 'email',
-          value: email.trim(),
-          href: `mailto:${email.trim()}`,
-        });
-      }
-    }
-    if (supplier.websiteUrl?.trim()) {
-      const url = supplier.websiteUrl.trim();
-      channels.push({
-        kind: 'website',
-        value: url.replace(/^https?:\/\//, ''),
-        href: /^https?:\/\//i.test(url) ? url : `https://${url}`,
-      });
-    }
-    return channels;
-  }, [supplier]);
+  }, [mine?.reviewId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset optimistic flag when query catches up
-  useEffect(() => {
-    if (optimistic !== null && optimistic === isFavorited) {
-      setOptimistic(null);
-    }
-  }, [optimistic, isFavorited]);
-
-  const handleToggleFavorite = async () => {
-    if (!customerId || !supplier) return;
-    setOptimistic(!showFavorited);
+  const submitReview = async () => {
+    setReviewError(null);
     try {
-      await toggleFavorite({
-        variables: {
-          data: { customerId, supplierId: supplier.supplierId },
-        },
-      });
-      favoritesQuery.refetch();
-    } catch {
-      setOptimistic(null);
+      await saveReview({ variables: { data: { supplierId, rating, text: text.trim() || undefined } } });
+      await Promise.all([reviewsQuery.refetch(), refetch()]);
+    } catch (e: any) {
+      setReviewError(e?.message ?? t('common.error'));
     }
   };
 
-  // ── Gates ───────────────────────────────────────────────────────────
-  if (!supplierId) {
+  if (router.isReady && (!valid || (!loading && (error || !s)))) {
     return (
-      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-        <AtmosphericGlow />
+      <Box minHeight="100vh" bg={solvoColors.bg}>
         <SolvoNavBar />
-        <Flex minHeight="60vh" align="center" justify="center">
-          <Text color={solvoColors.textSubtle}>Invalid provider link.</Text>
-        </Flex>
-      </Box>
-    );
-  }
-
-  if (supplierQuery.loading && !supplier) {
-    return (
-      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-        <AtmosphericGlow />
-        <SolvoNavBar />
-        <Flex minHeight="60vh" align="center" justify="center">
-          <Text color={solvoColors.textSubtle}>Loading…</Text>
-        </Flex>
-      </Box>
-    );
-  }
-
-  if (!supplier) {
-    return (
-      <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-        <AtmosphericGlow />
-        <SolvoNavBar />
-        <Flex minHeight="60vh" align="center" justify="center" direction="column" gap="8px">
-          <Text fontFamily={solvoFonts.display} fontSize="22px" color={solvoColors.text}>
-            Provider not found
-          </Text>
-          <Link href="/" style={{ color: solvoColors.indigo }}>
-            Back to home
+        <Box maxWidth="720px" margin="60px auto" padding="0 20px" textAlign="center">
+          <Text color={solvoColors.textMuted}>{t('profile.notFound')}</Text>
+          <Link href="/" style={{ color: solvoColors.brandText }}>
+            {t('chat.backHome')}
           </Link>
-        </Flex>
+        </Box>
+      </Box>
+    );
+  }
+  if (!s) {
+    return (
+      <Box minHeight="100vh" bg={solvoColors.bg}>
+        <SolvoNavBar />
+        <Text textAlign="center" marginTop="80px" color={solvoColors.textSubtle}>
+          {t('common.loading')}
+        </Text>
       </Box>
     );
   }
 
-  const reviews = (supplier.reviewsReceived ?? []).slice(0, 6);
-  const categories = (supplier.categories ?? [])
-    .map((sc: any) => sc.category?.categoryName)
-    .filter(Boolean) as string[];
+  const cats = [...(s.categories ?? [])].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
+  const place = [s.city, s.provinceName].filter(Boolean).join(', ');
 
   return (
-    <Box position="relative" minHeight="100vh" bg={solvoColors.bg}>
-      <AtmosphericGlow />
+    <Box minHeight="100vh" bg={solvoColors.bg}>
       <SolvoNavBar />
+      <Box maxWidth="1080px" margin="0 auto" padding={{ base: '20px 16px 60px', md: '32px 24px 80px' }}>
+        <button onClick={() => router.back()} style={{ border: 'none', background: 'transparent', color: solvoColors.textSubtle, cursor: 'pointer', fontSize: '13px', marginBottom: '16px', padding: 0 }}>
+          {t('common.back')}
+        </button>
 
-      <Box maxWidth="1200px" margin="0 auto" padding={{ base: '24px 16px', md: '32px 24px' }}>
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <Flex
-            align="center"
-            gap="6px"
-            color={solvoColors.textMuted}
-            fontSize="sm"
-            marginBottom="20px"
-            _hover={{ color: solvoColors.text }}
-          >
-            <ArrowLeft size={14} />
-            Back
-          </Flex>
-        </Link>
+        {isOwn && (
+          <Notice tone="info">
+            {t('profile.ownProfile')}{' '}
+            <Link href="/provider" style={{ fontWeight: 700, color: 'inherit' }}>
+              {t('profile.editBusiness')} →
+            </Link>
+          </Notice>
+        )}
 
-        {/* Photo gallery — the supplier's own uploads when they have them,
-            illustrated placeholders until then. */}
-        <Box
-          display="grid"
-          gridTemplateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }}
-          gridTemplateRows={{ base: 'repeat(3, 100px)', md: 'repeat(2, 120px)' }}
-          gap="8px"
-          marginBottom="40px"
-          borderRadius="24px"
-          overflow="hidden"
-        >
-          {galleryTiles.map((tile, i) => (
-            <Flex
-              key={tile.key}
-              align="center"
-              justify="center"
-              gridColumn={i === 0 ? 'span 2' : undefined}
-              gridRow={i === 0 ? 'span 2' : undefined}
-              fontSize={i === 0 ? '64px' : '32px'}
-              style={
-                tile.url
-                  ? {
-                      backgroundImage: `url(${tile.url})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                    }
-                  : {
-                      background: `linear-gradient(135deg, ${solvoColors.indigoLight}, ${solvoColors.bg})`,
-                    }
-              }
-              title={tile.altText ?? undefined}
-            >
-              {tile.url ? '' : tile.emoji}
-            </Flex>
-          ))}
-        </Box>
 
-        {/* Two-column layout */}
-        <Box
-          display="grid"
-          gridTemplateColumns={{ base: '1fr', lg: '2fr 1fr' }}
-          gap="40px"
-        >
-          {/* Main column */}
-          <Box>
-            <Flex align="center" gap="10px" marginBottom="6px">
-              <Text
-                fontFamily={solvoFonts.display}
-                fontSize="4xl"
-                fontWeight="500"
-                color={solvoColors.text}
-              >
-                {supplier.companyName}
-              </Text>
-              {supplier.verified && (
-                <Box color={solvoColors.indigo} title="Verified business">
-                  <ShieldCheck size={20} />
-                </Box>
-              )}
-              {isSponsoredActive(
-                supplier.promotionTier,
-                supplier.promotionStartDate,
-                supplier.promotionEndDate,
-              ) && (
-                <Flex
-                  align="center"
-                  gap="4px"
-                  padding="3px 10px"
-                  borderRadius="full"
-                  bg={solvoColors.indigoLight}
-                  color={solvoColors.indigo}
-                  fontSize="11px"
-                  fontWeight={600}
-                  title="Featured placement"
-                >
-                  <Sparkles size={12} />
-                  Sponsored
-                </Flex>
-              )}
-            </Flex>
-
-            <Flex gap="16px" align="center" wrap="wrap" marginBottom="14px">
-              {supplier.rating != null && (
-                <Flex align="center" gap="4px">
-                  <Star size={14} fill={solvoColors.amberText} color={solvoColors.amberText} />
-                  <Text fontSize="sm" fontWeight="500">
-                    {Number(supplier.rating).toFixed(1)}
-                  </Text>
-                  {!!supplier.reviewCount && (
-                    <Text fontSize="sm" color={solvoColors.textSubtle}>
-                      ({supplier.reviewCount} review{supplier.reviewCount === 1 ? '' : 's'})
-                    </Text>
-                  )}
-                </Flex>
-              )}
-              {supplier.city && (
-                <Flex align="center" gap="4px" color={solvoColors.textSubtle}>
-                  <MapPin size={14} />
-                  <Text fontSize="sm">{supplier.city}</Text>
-                </Flex>
-              )}
-              {supplier.responseTimeMinutes != null && (
-                <Flex align="center" gap="4px" color={solvoColors.textSubtle}>
-                  <Calendar size={14} />
-                  <Text fontSize="sm">
-                    Replies in ~{supplier.responseTimeMinutes} min
-                  </Text>
-                </Flex>
-              )}
-            </Flex>
-
-            {categories.length > 0 && (
-              <Flex gap="6px" wrap="wrap" marginBottom="20px">
-                {categories.map((c) => (
-                  <Pill key={c} tone="default">
-                    {c}
-                  </Pill>
-                ))}
-              </Flex>
-            )}
-
-            {supplier.description && (
-              <Text
-                fontSize="lg"
-                color={solvoColors.textMuted}
-                lineHeight={1.7}
-                marginBottom="40px"
-              >
-                {supplier.description}
-              </Text>
-            )}
-
-            {/* Services */}
-            {supplier.services && supplier.services.length > 0 && (
-              <>
-                <Text
-                  fontFamily={solvoFonts.display}
-                  fontSize="2xl"
-                  fontWeight="500"
-                  color={solvoColors.text}
-                  marginBottom="16px"
-                >
-                  Services
+        <Box display="grid" gridTemplateColumns={{ base: '1fr', lg: '2fr 1fr' }} gap="24px" alignItems="start">
+          <Flex direction="column" gap="20px">
+            <Box>
+              <Flex align="center" gap="8px" wrap="wrap">
+                <Text fontFamily={solvoFonts.display} fontSize={{ base: '28px', md: '36px' }} fontWeight={700} color={solvoColors.text} letterSpacing="-0.02em">
+                  {s.companyName}
                 </Text>
-                <Box
-                  display="grid"
-                  gridTemplateColumns={{ base: '1fr', sm: '1fr 1fr' }}
-                  gap="10px"
-                  marginBottom="40px"
-                >
-                  {supplier.services.map((s: any) => (
-                    <Box
-                      key={s.serviceId}
-                      padding="14px 16px"
-                      bg={solvoColors.surface}
-                      borderWidth="1px"
-                      borderColor={solvoColors.border}
-                      borderRadius="14px"
-                    >
-                      <Text fontWeight="500" color={solvoColors.text} fontSize="sm">
-                        {s.name}
+                {s.verified && (
+                  <Chip tone="brand">
+                    <ShieldCheck size={13} /> {t('profile.verifiedBy')}
+                  </Chip>
+                )}
+                {s.preferred && <Chip tone="accent">{t('common.preferred')}</Chip>}
+              </Flex>
+              {s.tagline && (
+                <Text fontSize="lg" color={solvoColors.textMuted} marginTop="4px">
+                  {s.tagline}
+                </Text>
+              )}
+              <Flex gap="14px" wrap="wrap" marginTop="10px" fontSize="sm" color={solvoColors.textSubtle} align="center">
+                {(s.reviewCount ?? 0) > 0 ? (
+                  <Flex align="center" gap="6px">
+                    <Stars value={Number(s.rating ?? 0)} />
+                    <Text fontWeight={600} color={solvoColors.text}>
+                      {Number(s.rating).toFixed(1)}
+                    </Text>
+                    <Text>({s.reviewCount === 1 ? t('common.oneReview') : t('common.reviewsCount', { n: s.reviewCount ?? 0 })})</Text>
+                  </Flex>
+                ) : (
+                  <Chip>{t('common.newSupplier')}</Chip>
+                )}
+                {place && (
+                  <Flex align="center" gap="4px">
+                    <MapPin size={14} /> {place}
+                  </Flex>
+                )}
+              </Flex>
+              {cats.length > 0 && (
+                <Flex gap="6px" wrap="wrap" marginTop="12px">
+                  {cats.map((c) => c.category && <Chip key={c.category.categoryId}>{c.category.icon} {categoryName(c.category, lang)}</Chip>)}
+                </Flex>
+              )}
+            </Box>
+
+            {s.description && (
+              <Card>
+                <SectionTitle>{t('profile.about')}</SectionTitle>
+                <Text color={solvoColors.textMuted} lineHeight="1.7" whiteSpace="pre-line">
+                  {s.description}
+                </Text>
+                {(s.skills?.length ?? 0) > 0 && (
+                  <Box marginTop="14px">
+                    <Text fontSize="12px" fontWeight={700} color={solvoColors.textSubtle} marginBottom="6px">
+                      {t('profile.skills').toUpperCase()}
+                    </Text>
+                    <Flex gap="6px" wrap="wrap">
+                      {s.skills!.map((sk) => (
+                        <Chip key={sk}>{sk}</Chip>
+                      ))}
+                    </Flex>
+                  </Box>
+                )}
+              </Card>
+            )}
+
+            {(s.services?.length ?? 0) > 0 && (
+              <Card>
+                <SectionTitle>{t('profile.services')}</SectionTitle>
+                <Box display="grid" gridTemplateColumns={{ base: '1fr', md: '1fr 1fr' }} gap="10px">
+                  {s.services!.map((sv) => (
+                    <Box key={sv.serviceId} padding="12px 14px" bg={solvoColors.bg} borderRadius="12px">
+                      <Text fontWeight={600} color={solvoColors.text}>
+                        {sv.name}
                       </Text>
-                      {s.basePrice && (
-                        <Text fontSize="xs" color={solvoColors.textSubtle}>
-                          From {formatColones(s.basePrice)}
+                      {sv.description && (
+                        <Text fontSize="sm" color={solvoColors.textMuted} marginTop="2px">
+                          {sv.description}
                         </Text>
                       )}
-                      {s.description && (
-                        <Text fontSize="xs" color={solvoColors.textSubtle} marginTop="4px">
-                          {s.description}
+                      <Text fontSize="sm" fontWeight={600} color={solvoColors.accentText} marginTop="6px">
+                        {formatPrice(sv.priceFrom, sv.priceUnit, t, sv.currency)}
+                      </Text>
+                    </Box>
+                  ))}
+                </Box>
+              </Card>
+            )}
+
+            <Card>
+              <SectionTitle>{t('profile.reviews')}</SectionTitle>
+              {isAuthenticated && user?.isCustomer && !isOwn ? (
+                <Box marginBottom="18px" padding="14px" bg={solvoColors.bg} borderRadius="12px">
+                  <Text fontWeight={600} color={solvoColors.text} marginBottom="8px">
+                    {mine ? t('profile.editReview') : t('profile.writeReview')}
+                  </Text>
+                  <StarInput value={rating} onChange={setRating} />
+                  <textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder={t('profile.commentPlaceholder')}
+                    maxLength={2000}
+                    style={{ ...inputStyle, minHeight: '80px', marginTop: '10px', resize: 'vertical' }}
+                  />
+                  {reviewError && (
+                    <Text fontSize="sm" color={solvoColors.roseText} marginTop="6px">
+                      {reviewError}
+                    </Text>
+                  )}
+                  <Flex gap="8px" marginTop="10px">
+                    <Btn onClick={submitReview} disabled={rating < 1 || saveState.loading}>
+                      {saveState.loading ? t('common.saving') : mine ? t('profile.updateReview') : t('profile.submitReview')}
+                    </Btn>
+                    {mine && (
+                      <Btn
+                        variant="ghost"
+                        onClick={async () => {
+                          await deleteReview({ variables: { reviewId: mine.reviewId } });
+                          setRating(0);
+                          setText('');
+                          await Promise.all([reviewsQuery.refetch(), refetch()]);
+                        }}
+                      >
+                        {t('profile.deleteReview')}
+                      </Btn>
+                    )}
+                  </Flex>
+                </Box>
+              ) : !isOwn ? (
+                <Text fontSize="sm" color={solvoColors.textSubtle} marginBottom="14px">
+                  {isAuthenticated && user?.isSupplier ? (
+                    t('profile.suppliersCantReview')
+                  ) : (
+                    <Link href={`/login?next=${encodeURIComponent(router.asPath)}`} style={{ color: solvoColors.brandText }}>
+                      {t('profile.signInToReview')}
+                    </Link>
+                  )}
+                </Text>
+              ) : null}
+
+              {reviews.length === 0 ? (
+                <Text fontSize="sm" color={solvoColors.textSubtle}>
+                  {t('profile.noReviews')}
+                </Text>
+              ) : (
+                <Flex direction="column" gap="14px">
+                  {reviews.map((r) => (
+                    <Box key={r.reviewId} borderTop="1px solid" borderColor={solvoColors.border} paddingTop="12px">
+                      <Flex justify="space-between" align="center" gap="8px">
+                        <Text fontWeight={600} fontSize="sm" color={solvoColors.text}>
+                          {r.reviewerName} {r.isMine && <span style={{ color: solvoColors.textSubtle, fontWeight: 400 }}>{t('profile.you')}</span>}
+                        </Text>
+                        <Text fontSize="12px" color={solvoColors.textSubtle}>
+                          {new Date(r.createdAt).toLocaleDateString(locale)}
+                        </Text>
+                      </Flex>
+                      <Stars value={r.rating} />
+                      {r.text && (
+                        <Text fontSize="sm" color={solvoColors.textMuted} marginTop="4px" whiteSpace="pre-line">
+                          {r.text}
                         </Text>
                       )}
                     </Box>
                   ))}
-                </Box>
-              </>
-            )}
-
-            {/* Reviews */}
-            <Text
-              fontFamily={solvoFonts.display}
-              fontSize="2xl"
-              fontWeight="500"
-              color={solvoColors.text}
-              marginBottom="16px"
-            >
-              Reviews
-            </Text>
-            {reviews.length === 0 ? (
-              <Box
-                padding="24px"
-                bg={solvoColors.surface}
-                borderWidth="1px"
-                borderColor={solvoColors.border}
-                borderRadius="14px"
-                textAlign="center"
-              >
-                <Text fontSize="sm" color={solvoColors.textSubtle}>
-                  No reviews yet — be the first to book and review.
-                </Text>
-              </Box>
-            ) : (
-              <Flex direction="column" gap="14px">
-                {reviews.map((r: any) => (
-                  <Flex
-                    key={r.reviewId}
-                    direction="column"
-                    gap="8px"
-                    padding="16px 18px"
-                    bg={solvoColors.surface}
-                    borderWidth="1px"
-                    borderColor={solvoColors.border}
-                    borderRadius="14px"
-                  >
-                    <Flex align="center" justify="space-between">
-                      <Flex align="center" gap="10px">
-                        <Flex
-                          width="36px"
-                          height="36px"
-                          borderRadius="full"
-                          bg={solvoColors.indigoLight}
-                          color={solvoColors.indigo}
-                          align="center"
-                          justify="center"
-                          fontWeight={600}
-                          fontSize="14px"
-                        >
-                          {r.customer?.user?.name
-                            ? r.customer.user.name.charAt(0).toUpperCase()
-                            : initialsFrom(r.customerId)}
-                        </Flex>
-                        <Box>
-                          <Text fontSize="sm" fontWeight={600} color={solvoColors.text}>
-                            {r.customer?.user?.name ?? 'Customer'}
-                          </Text>
-                          <Text fontSize="xs" color={solvoColors.textSubtle}>
-                            {formatReviewDate(r.createdAt)}
-                          </Text>
-                        </Box>
-                      </Flex>
-                      <Flex align="center" gap="3px">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star
-                            key={i}
-                            size={12}
-                            fill={i < r.rating ? solvoColors.amberText : 'transparent'}
-                            color={solvoColors.amberText}
-                          />
-                        ))}
-                      </Flex>
-                    </Flex>
-                    {r.text && (
-                      <Text fontSize="sm" color={solvoColors.text} lineHeight={1.55}>
-                        {r.text}
-                      </Text>
-                    )}
-                    {(() => {
-                      const parts = [
-                        ['Quality', r.ratingQuality],
-                        ['Communication', r.ratingCommunication],
-                        ['Value', r.ratingValue],
-                        ['Punctuality', r.ratingPunctuality],
-                      ].filter(([, v]) => v != null) as Array<[string, number]>;
-                      if (parts.length === 0) return null;
-                      return (
-                        <Flex gap="6px" wrap="wrap">
-                          {parts.map(([label, v]) => (
-                            <Box
-                              key={label}
-                              padding="3px 8px"
-                              borderRadius="9999px"
-                              bg={solvoColors.bg}
-                              borderWidth="1px"
-                              borderColor={solvoColors.border}
-                            >
-                              <Text fontSize="11px" color={solvoColors.textMuted}>
-                                {label} {v}★
-                              </Text>
-                            </Box>
-                          ))}
-                        </Flex>
-                      );
-                    })()}
-                    {r.supplierResponse && (
-                      <Box
-                        marginTop="4px"
-                        padding="10px 12px"
-                        borderLeftWidth="3px"
-                        borderLeftStyle="solid"
-                        borderLeftColor={solvoColors.indigo}
-                        bg={solvoColors.bg}
-                      >
-                        <Text fontSize="11px" fontWeight={600} color={solvoColors.indigo} marginBottom="2px">
-                          {supplier.companyName} responded
-                        </Text>
-                        <Text fontSize="13px" color={solvoColors.textMuted}>
-                          {r.supplierResponse}
-                        </Text>
-                      </Box>
-                    )}
-                  </Flex>
-                ))}
-              </Flex>
-            )}
-          </Box>
-
-          {/* Sidebar */}
-          <Box>
-            <Box
-              padding="20px"
-              bg={solvoColors.surface}
-              borderWidth="1px"
-              borderColor={solvoColors.border}
-              borderRadius="20px"
-              position={{ base: 'static', lg: 'sticky' }}
-              top="96px"
-            >
-              <Text
-                fontSize="xs"
-                color={solvoColors.textSubtle}
-                letterSpacing="0.06em"
-                fontWeight={600}
-                marginBottom="6px"
-              >
-                INTERESTED?
-              </Text>
-              <Text
-                fontFamily={solvoFonts.display}
-                fontSize="22px"
-                color={solvoColors.text}
-                marginBottom="14px"
-              >
-                Get matched in minutes
-              </Text>
-              <Text fontSize="xs" color={solvoColors.textMuted} marginBottom="14px">
-                Start a request from the AI chat and {supplier.companyName} will be matched if they fit.
-              </Text>
-
-              <Flex direction="column" gap="8px">
-                <Link href="/" style={{ textDecoration: 'none' }}>
-                  <Box
-                    padding="12px 16px"
-                    borderRadius="12px"
-                    bg={solvoColors.accent}
-                    color={solvoColors.accentFg}
-                    fontWeight={600}
-                    fontSize="14px"
-                    textAlign="center"
-                    cursor="pointer"
-                  >
-                    Start a request
-                  </Box>
-                </Link>
-
-                {/* Save / Saved heart toggle — only for signed-in customers */}
-                {customerId && (
-                  <button
-                    type="button"
-                    onClick={handleToggleFavorite}
-                    disabled={toggleState.loading}
-                    style={{
-                      padding: '12px 16px',
-                      borderRadius: '12px',
-                      border: `1px solid ${showFavorited ? solvoColors.roseText : solvoColors.border}`,
-                      background: showFavorited ? solvoColors.roseLight : solvoColors.surface,
-                      color: showFavorited ? solvoColors.roseText : solvoColors.text,
-                      fontWeight: 600,
-                      fontSize: '14px',
-                      cursor: toggleState.loading ? 'wait' : 'pointer',
-                      opacity: toggleState.loading ? 0.7 : 1,
-                    }}
-                  >
-                    <Flex align="center" justify="center" gap="6px">
-                      <Heart
-                        size={14}
-                        fill={showFavorited ? solvoColors.roseText : 'transparent'}
-                      />
-                      {showFavorited ? 'Saved' : 'Save'}
-                    </Flex>
-                  </button>
-                )}
-              </Flex>
-
-              {/* Trust strip */}
-              <Box
-                marginTop="20px"
-                paddingTop="16px"
-                borderTopWidth="1px"
-                borderTopStyle="solid"
-                borderTopColor={solvoColors.border}
-              >
-                {supplier.responseTimeMinutes != null && (
-                  <Flex justify="space-between" marginBottom="6px">
-                    <Text fontSize="xs" color={solvoColors.textSubtle}>Response time</Text>
-                    <Text fontSize="xs" fontWeight={600} color={solvoColors.text}>
-                      ~{supplier.responseTimeMinutes} min
-                    </Text>
-                  </Flex>
-                )}
-                {supplier.verified && (
-                  <Flex justify="space-between" marginBottom="6px">
-                    <Text fontSize="xs" color={solvoColors.textSubtle}>Identity</Text>
-                    <Text fontSize="xs" fontWeight={600} color={solvoColors.emeraldText}>
-                      ✓ Verified
-                    </Text>
-                  </Flex>
-                )}
-                {supplier.minCapacity != null && supplier.maxCapacity != null && (
-                  <Flex justify="space-between">
-                    <Text fontSize="xs" color={solvoColors.textSubtle}>Capacity</Text>
-                    <Text fontSize="xs" fontWeight={600} color={solvoColors.text}>
-                      {supplier.minCapacity}–{supplier.maxCapacity}
-                    </Text>
-                  </Flex>
-                )}
-              </Box>
-
-              {/* Direct contact — shown immediately alongside the on-site flow */}
-              {contactChannels.length > 0 && (
-                <Box
-                  marginTop="16px"
-                  paddingTop="16px"
-                  borderTopWidth="1px"
-                  borderTopStyle="solid"
-                  borderTopColor={solvoColors.border}
-                >
-                  <Text fontSize="11px" fontWeight={600} color={solvoColors.textSubtle} marginBottom="10px" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Contact details
-                  </Text>
-                  <Flex direction="column" gap="6px">
-                    {contactChannels.map((c) => (
-                      <a
-                        key={`${c.kind}-${c.value}`}
-                        href={c.href}
-                        target={c.kind === 'website' ? '_blank' : undefined}
-                        rel={c.kind === 'website' ? 'noreferrer' : undefined}
-                        style={{ textDecoration: 'none' }}
-                      >
-                        <Flex
-                          align="center"
-                          gap="8px"
-                          padding="8px 10px"
-                          borderRadius="10px"
-                          bg={solvoColors.bg}
-                          color={solvoColors.textMuted}
-                          _hover={{ color: solvoColors.text }}
-                        >
-                          {c.kind === 'phone' && <Phone size={13} />}
-                          {c.kind === 'email' && <Mail size={13} />}
-                          {c.kind === 'website' && <Globe size={13} />}
-                          <Text fontSize="12px" style={{ wordBreak: 'break-all' }}>
-                            {c.value}
-                          </Text>
-                        </Flex>
-                      </a>
-                    ))}
-                  </Flex>
-                </Box>
+                </Flex>
               )}
-            </Box>
+            </Card>
+          </Flex>
+
+          <Box position={{ lg: 'sticky' }} top="88px">
+            <Card style={{ boxShadow: solvoShadows.floatingPanel }}>
+              <SectionTitle>{t('profile.contact')}</SectionTitle>
+              <Text fontSize="sm" color={solvoColors.textSubtle} marginBottom="12px">
+                {t('profile.contactHint')}
+              </Text>
+              <ContactLinks supplierId={s.supplierId} supplier={s} source="profile" emptyText={t('profile.noContact')} />
+              <Box marginTop="18px" borderTop="1px solid" borderColor={solvoColors.border} paddingTop="14px">
+                {place && (
+                  <Text fontSize="sm" color={solvoColors.textMuted}>
+                    <b>{t('profile.basedIn')}:</b> {place}
+                    {s.address ? ` · ${s.address}` : ''}
+                  </Text>
+                )}
+                {(s.serviceProvinceNames?.length ?? 0) > 0 && (
+                  <Text fontSize="sm" color={solvoColors.textMuted} marginTop="6px">
+                    <b>{t('profile.serves')}:</b> {s.serviceProvinceNames!.join(', ')}
+                  </Text>
+                )}
+              </Box>
+            </Card>
           </Box>
         </Box>
       </Box>

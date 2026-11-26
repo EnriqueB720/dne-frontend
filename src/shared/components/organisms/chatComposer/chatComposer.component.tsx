@@ -1,235 +1,165 @@
 import * as React from 'react';
-import { ArrowUp, Square, Mic, MicOff, Sparkles } from 'lucide-react';
+import { ArrowUp, MapPin, Mic, MicOff, Square } from 'lucide-react';
+
 import { Box, Flex, Text } from '@atoms';
-import { solvoColors, solvoFonts, MODEL_LIST, MODEL_META } from '@constants';
-import type { ModelKey } from '@/shared/jotai/ai-usage.atom';
+import { solvoColors, solvoFonts } from '@constants';
+import { useI18n } from '@/shared/i18n';
+
+/** Where the chat will search — shown as the "📍 Zona" chip. */
+export interface ZoneState {
+  /** 'device' = from GPS, 'picked' = chosen by hand, 'none' = nationwide. */
+  mode: 'device' | 'picked' | 'none';
+  code?: string | null;
+  name?: string | null;
+  locating?: boolean;
+  denied?: boolean;
+}
 
 export interface ChatComposerProps {
   onSend: (content: string) => void;
-  /** Abort the in-flight AI turn. When provided, the send button becomes a
-   *  stop button while `disabled` (i.e. "Solvo is thinking…") is true. */
   onStop?: () => void;
   disabled?: boolean;
-  model: ModelKey;
-  onModelChange: (m: ModelKey) => void;
-  /**
-   * When provided, a "See options →" chip is shown above the input so the
-   * user can request provider results with one tap instead of typing.
-   * The callback should call `handleSend('show me available options')`.
-   */
-  onShowOptions?: () => void;
+  zone: ZoneState;
+  provinces: Array<{ code: string; name: string }>;
+  /** A province code, or null for "whole country". */
+  onPickZone: (code: string | null) => void;
+  onUseDeviceZone: () => void;
 }
+
+const DEVICE_VALUE = '__device__';
+const NONE_VALUE = '__none__';
 
 const ChatComposer: React.FC<ChatComposerProps> = ({
   onSend,
   onStop,
   disabled = false,
-  model,
-  onModelChange,
-  onShowOptions,
+  zone,
+  provinces,
+  onPickZone,
+  onUseDeviceZone,
 }) => {
+  const { t, lang } = useI18n();
   const [value, setValue] = React.useState('');
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
-  // ── Speech recognition ─────────────────────────────────────────────────
+  // ── Voice input (browser speech recognition, in the UI language) ──
   const recognitionRef = React.useRef<any>(null);
-  const [isListening, setIsListening] = React.useState(false);
+  const [listening, setListening] = React.useState(false);
   const [micSupported, setMicSupported] = React.useState(false);
-  // Default to Spanish (Costa Rica) since the app is bilingual but CR-first.
-  // Users can toggle to English with the ES/EN pill in the toolbar.
-  const [micLang, setMicLang] = React.useState<'es-CR' | 'en-US'>('es-CR');
-
   React.useEffect(() => {
-    const SR =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    setMicSupported(!!SR);
-    // Respect the browser's language if it's English — the user likely expects
-    // English recognition by default on an EN browser.
-    if (typeof navigator !== 'undefined' && navigator.language && !navigator.language.startsWith('es')) {
-      setMicLang('en-US');
-    }
+    setMicSupported(!!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition));
+    return () => recognitionRef.current?.stop();
   }, []);
-
-  // Stop listening automatically if the AI starts responding.
   React.useEffect(() => {
-    if (disabled && isListening) {
+    if (disabled && listening) {
       recognitionRef.current?.stop();
-      setIsListening(false);
+      setListening(false);
     }
-  }, [disabled, isListening]);
+  }, [disabled, listening]);
 
-  // Cleanup on unmount.
-  React.useEffect(() => {
-    return () => {
-      recognitionRef.current?.stop();
-    };
-  }, []);
-
-  const resizeTextarea = () => {
+  const resize = () => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   };
 
-  const toggleListening = () => {
-    if (disabled) return;
-
-    const SR =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-
-    if (isListening) {
+  const toggleMic = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR || disabled) return;
+    if (listening) {
       recognitionRef.current?.stop();
-      setIsListening(false);
+      setListening(false);
       return;
     }
-
-    const recognition = new SR();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    // Use the language the user selected via the ES/EN toggle.
-    recognition.lang = micLang;
-
-    recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        } else {
-          interimTranscript += event.results[i][0].transcript;
-        }
-      }
-      const transcript = finalTranscript || interimTranscript;
-      if (transcript) {
-        setValue(transcript);
-        // Defer resize so the DOM has updated with new value.
-        setTimeout(resizeTextarea, 0);
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = lang === 'es' ? 'es-CR' : 'en-US';
+    rec.onresult = (e: any) => {
+      let text = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) text += e.results[i][0].transcript;
+      if (text) {
+        setValue(text);
+        setTimeout(resize, 0);
       }
     };
-
-    recognition.onend = () => {
-      setIsListening(false);
+    rec.onend = rec.onerror = () => {
+      setListening(false);
       recognitionRef.current = null;
     };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-      recognitionRef.current = null;
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
+    recognitionRef.current = rec;
+    rec.start();
+    setListening(true);
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────────
   const submit = () => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
-    // Stop listening if still active when the user submits.
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-    }
+    if (listening) recognitionRef.current?.stop();
     onSend(trimmed);
     setValue('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      submit();
-    }
-  };
+  const zoneLabel = zone.locating
+    ? t('chat.zoneLocating')
+    : zone.mode === 'device' && zone.name
+      ? t('chat.zoneDevice', { zone: zone.name })
+      : zone.mode === 'picked' && zone.name
+        ? zone.name
+        : zone.denied
+          ? t('chat.zoneDenied')
+          : t('common.allCountry');
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setValue(e.target.value);
-    e.target.style.height = 'auto';
-    e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+  const selectValue = zone.mode === 'picked' && zone.code ? zone.code : zone.mode === 'device' ? DEVICE_VALUE : NONE_VALUE;
+
+  const iconBtn: React.CSSProperties = {
+    width: '34px',
+    height: '34px',
+    borderRadius: '10px',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    cursor: 'pointer',
   };
 
   return (
     <Box
-      padding={{ base: '12px 16px', md: '16px 24px' }}
+      padding={{ base: '10px 12px', md: '14px 24px' }}
       borderTop="1px solid"
       borderColor={solvoColors.border}
       bg={solvoColors.surface}
       flexShrink={0}
     >
       <Box maxWidth="760px" margin="0 auto">
-
-        {/* "See options" suggestion chip — appears when the AI has chatted
-            for a few turns without showing any provider cards. */}
-        {onShowOptions && !disabled && (
-          <Flex marginBottom="10px" justify="flex-start">
-            <button
-              onClick={onShowOptions}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '9999px',
-                border: `1px solid ${solvoColors.indigo}`,
-                background: 'transparent',
-                color: solvoColors.indigo,
-                fontFamily: solvoFonts.sans,
-                fontSize: '12px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'background 0.15s, color 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = solvoColors.indigo;
-                (e.currentTarget as HTMLButtonElement).style.color = 'white';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                (e.currentTarget as HTMLButtonElement).style.color = solvoColors.indigo;
-              }}
-            >
-              <Sparkles size={12} />
-              See available options
-            </button>
-          </Flex>
-        )}
-
-        {/* Input box */}
-        <Box
+        <Flex
           bg={solvoColors.bg}
           borderWidth="1px"
-          borderColor={isListening ? solvoColors.indigo : solvoColors.border}
+          borderColor={listening ? solvoColors.brand : solvoColors.border}
           borderRadius="16px"
-          padding="12px 14px"
-          marginBottom="10px"
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: '10px',
-            transition: 'border-color 0.2s',
-          }}
+          padding="10px 12px"
+          align="flex-end"
+          gap="8px"
         >
           <textarea
             ref={textareaRef}
             rows={1}
             value={value}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
             disabled={disabled}
-            placeholder={
-              isListening
-                ? 'Listening…'
-                : disabled
-                  ? 'Solvo is thinking…'
-                  : 'Ask Solvo anything…'
-            }
+            onChange={(e) => {
+              setValue(e.target.value);
+              resize();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder={listening ? t('chat.listening') : disabled ? t('chat.thinking') : t('chat.placeholder')}
             style={{
               flex: 1,
               border: 'none',
@@ -237,168 +167,77 @@ const ChatComposer: React.FC<ChatComposerProps> = ({
               resize: 'none',
               background: 'transparent',
               fontFamily: solvoFonts.sans,
-              fontSize: '14px',
+              fontSize: '15px',
               color: solvoColors.text,
-              lineHeight: '1.5',
+              lineHeight: 1.5,
               minHeight: '24px',
-              maxHeight: '200px',
-              overflow: 'auto',
+              maxHeight: '180px',
             }}
           />
-
-          {/* Mic button — only shown when browser supports it */}
           {micSupported && (
             <button
-              onClick={toggleListening}
+              onClick={toggleMic}
               disabled={disabled}
-              aria-label={isListening ? 'Stop recording' : 'Start voice input'}
-              title={
-                isListening
-                  ? 'Stop recording'
-                  : `Speak your message (${micLang === 'es-CR' ? 'Spanish / ES' : 'English / EN'})`
-              }
+              aria-label={listening ? t('chat.voiceStop') : t('chat.voiceStart')}
+              title={listening ? t('chat.voiceStop') : t('chat.voiceStart')}
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '10px',
-                border: 'none',
-                background: isListening ? '#EF4444' : 'transparent',
-                color: isListening ? 'white' : solvoColors.textMuted,
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'background 0.2s, color 0.2s',
+                ...iconBtn,
+                background: listening ? solvoColors.roseLight : 'transparent',
+                color: listening ? solvoColors.roseText : solvoColors.textMuted,
                 opacity: disabled ? 0.4 : 1,
               }}
             >
-              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+              {listening ? <MicOff size={16} /> : <Mic size={16} />}
             </button>
           )}
-
-          {/* Send / Stop button */}
           {disabled && onStop ? (
-            <button
-              onClick={onStop}
-              aria-label="Stop generating"
-              title="Stop generating"
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '10px',
-                border: 'none',
-                background: solvoColors.accent,
-                color: solvoColors.accentFg,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'background 0.15s',
-              }}
-            >
-              <Square size={14} fill="white" />
+            <button onClick={onStop} aria-label={t('chat.stop')} title={t('chat.stop')} style={{ ...iconBtn, background: solvoColors.accent, color: solvoColors.accentFg }}>
+              <Square size={13} fill="currentColor" />
             </button>
           ) : (
             <button
               onClick={submit}
               disabled={disabled || !value.trim()}
-              aria-label="Send message"
+              aria-label={t('chat.send')}
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '10px',
-                border: 'none',
-                background:
-                  disabled || !value.trim()
-                    ? solvoColors.border
-                    : solvoColors.accent,
+                ...iconBtn,
+                background: disabled || !value.trim() ? solvoColors.border : solvoColors.accent,
                 color: solvoColors.accentFg,
                 cursor: disabled || !value.trim() ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'background 0.15s',
               }}
             >
               <ArrowUp size={16} />
             </button>
           )}
-        </Box>
+        </Flex>
 
-        {/* Model picker + voice language row */}
-        <Flex align="center" gap="8px" wrap="wrap">
-          <Text fontSize="11px" color={solvoColors.textSubtle}>
-            Model:
-          </Text>
-          {MODEL_LIST.map((m) => {
-            const selected = m.key === model;
-            return (
-              <button
-                key={m.key}
-                onClick={() => !disabled && onModelChange(m.key)}
-                disabled={disabled}
-                style={{
-                  padding: '3px 10px',
-                  borderRadius: '999px',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  cursor: disabled ? 'not-allowed' : 'pointer',
-                  border: `1px solid ${selected ? solvoColors.indigo : solvoColors.border}`,
-                  background: selected ? solvoColors.indigo : 'transparent',
-                  color: selected ? 'white' : solvoColors.textMuted,
-                  opacity: disabled ? 0.6 : 1,
-                  transition: 'all 0.15s',
-                }}
-              >
-                {m.shortLabel}
-              </button>
-            );
-          })}
-          <Text fontSize="11px" color={solvoColors.textSubtle} marginLeft="4px">
-            · {MODEL_META[model].fullName}
-          </Text>
-
-          {/* Voice language toggle — only shown when the browser supports the mic */}
-          {micSupported && (
-            <>
-              <Text fontSize="11px" color={solvoColors.textSubtle} marginLeft="8px">
-                · 🎤
-              </Text>
-              {(['es-CR', 'en-US'] as const).map((lang) => {
-                const selected = micLang === lang;
-                const label = lang === 'es-CR' ? 'ES' : 'EN';
-                return (
-                  <button
-                    key={lang}
-                    onClick={() => !isListening && !disabled && setMicLang(lang)}
-                    disabled={disabled || isListening}
-                    title={
-                      lang === 'es-CR'
-                        ? 'Voice input in Spanish'
-                        : 'Voice input in English'
-                    }
-                    style={{
-                      padding: '3px 8px',
-                      borderRadius: '999px',
-                      fontSize: '11px',
-                      fontWeight: 500,
-                      cursor: disabled || isListening ? 'not-allowed' : 'pointer',
-                      border: `1px solid ${selected ? solvoColors.indigo : solvoColors.border}`,
-                      background: selected ? solvoColors.indigo : 'transparent',
-                      color: selected ? 'white' : solvoColors.textMuted,
-                      opacity: disabled || isListening ? 0.5 : 1,
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </>
-          )}
+        {/* Zone chip: which province the search is limited to. */}
+        <Flex align="center" gap="6px" marginTop="8px" color={solvoColors.textSubtle}>
+          <MapPin size={13} />
+          <Text fontSize="12px">{t('chat.zoneLabel')}:</Text>
+          <Box position="relative">
+            <Text fontSize="12px" fontWeight={600} color={solvoColors.brandText} style={{ pointerEvents: 'none' }}>
+              {zoneLabel} ▾
+            </Text>
+            <select
+              aria-label={t('chat.zoneLabel')}
+              value={selectValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === DEVICE_VALUE) onUseDeviceZone();
+                else onPickZone(v === NONE_VALUE ? null : v);
+              }}
+              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%' }}
+            >
+              <option value={DEVICE_VALUE}>{t('chat.zoneUseDevice')}</option>
+              <option value={NONE_VALUE}>{t('common.allCountry')}</option>
+              {provinces.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </Box>
         </Flex>
       </Box>
     </Box>

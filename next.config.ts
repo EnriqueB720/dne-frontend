@@ -7,15 +7,17 @@ const nextConfig: NextConfig = {
   // without dragging along the whole node_modules tree. Node runs it via
   // `node server.js`. Zero effect on local `next dev`.
   output: 'standalone',
-  // Legacy booking-flow pages are disabled while customers contact
-  // suppliers directly. Temporary (307) redirects keep the page code in
-  // place — delete an entry to bring its page back.
+  // Removed in the MVP simplification (code kept on the
+  // archive/pre-mvp-simplification branch). Old links land somewhere useful.
   async redirects() {
-    return ['/requests', '/quotes', '/calendar'].map((source) => ({
-      source,
-      destination: '/',
-      permanent: false,
-    }));
+    return [
+      ...['/requests', '/quotes', '/calendar', '/bookings', '/messages', '/packages'].map((source) => ({
+        source,
+        destination: '/',
+        permanent: false,
+      })),
+      { source: '/provider/settings', destination: '/provider', permanent: false },
+    ];
   },
 };
 
