@@ -75,7 +75,7 @@ export default function RegisterPage() {
         </Text>
         <AccountTypePicker value={type} onChange={setType} />
         <form onSubmit={submit}>
-          <TextField label={t('auth.name')} value={name} onChange={(e) => setName(e.target.value)} required minLength={4} maxLength={100} autoComplete="name" />
+          <TextField label={t('auth.name')} value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={100} autoComplete="name" />
           <TextField label={t('auth.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           <PasswordField label={t('auth.password')} hint={t('auth.passwordHint')} value={password} onChange={setPassword} autoComplete="new-password" minLength={8} />
           <TextField label={t('auth.phone')} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required autoComplete="tel" />
